@@ -4,7 +4,11 @@ import sys
 from PyQt6.QtCore import QPoint, QSize, QStringListModel, Qt, QUrl
 from PyQt6.QtGui import QAction, QColor, QFont, QIcon, QKeySequence, QShortcut
 from PyQt6.QtNetwork import QNetworkProxy
-from PyQt6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile
+from PyQt6.QtWebEngineCore import (
+    QWebEngineDownloadRequest,
+    QWebEnginePage,
+    QWebEngineProfile,
+)
 from PyQt6.QtWidgets import (
     QApplication,
     QCompleter,
@@ -42,8 +46,9 @@ class MainWindow(QMainWindow):
 
         self.db = Database()
         self.zoom_factor = 1.0
+        self._active_downloads: list[QWebEngineDownloadRequest] = []
 
-        # Инициализация языка интерфейса (RU / EN)
+        # Язык интерфейса
         user_lang = self.db.get_setting("language", "ru")
         set_language(user_lang)
 
@@ -64,11 +69,27 @@ class MainWindow(QMainWindow):
     def _setup_network_and_profile(self) -> None:
         profile = QWebEngineProfile.defaultProfile()
 
+        # Собственный фирменный User-Agent surf с полной совместимостью с веб-стандартами
+        ua_type = self.db.get_setting("user_agent_type", "surf")
+        if ua_type == "surf" and "Surf/1.0" not in self.db.get_setting("custom_user_agent", ""):
+            self.db.set_setting(
+                "custom_user_agent",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Surf/1.0"
+            )
+
         ua_str = self.db.get_setting(
             "custom_user_agent",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Surf/1.0",
         )
         profile.setHttpUserAgent(ua_str)
+
+        folder = self.db.get_setting(
+            "download_folder",
+            os.path.join(os.path.expanduser("~"), "Downloads"),
+        )
+        os.makedirs(folder, exist_ok=True)
+        profile.setDownloadPath(folder)
+
         self._apply_network_proxy()
 
     def _apply_network_proxy(self) -> None:
@@ -106,7 +127,7 @@ class MainWindow(QMainWindow):
         # 1. Линия вкладок НАД панелью адреса
         self._build_tab_strip()
 
-        # 2. Панель навигации (тулбар под вкладками)
+        # 2. Панель навигации
         self._build_toolbar()
 
         # 3. Тонкий прогресс-бар загрузки
@@ -333,6 +354,9 @@ class MainWindow(QMainWindow):
         self.act_downloads.setShortcut(QKeySequence("Ctrl+J"))
         self.act_downloads.triggered.connect(self._open_downloads_dialog)
 
+        self.act_download_url = self.tools_menu.addAction("")
+        self.act_download_url.triggered.connect(self._download_from_url)
+
         self.act_settings = self.tools_menu.addAction("")
         self.act_settings.setShortcut(QKeySequence("Ctrl+,"))
         self.act_settings.triggered.connect(self._open_settings_dialog)
@@ -411,6 +435,7 @@ class MainWindow(QMainWindow):
 
         self.tools_menu.setTitle(tr("menu_tools"))
         self.act_downloads.setText(tr("act_downloads"))
+        self.act_download_url.setText(tr("act_download_url"))
         self.act_settings.setText(tr("act_settings"))
 
         self.help_menu.setTitle(tr("menu_help"))
@@ -454,16 +479,24 @@ class MainWindow(QMainWindow):
 
     def _setup_downloads(self) -> None:
         profile = QWebEngineProfile.defaultProfile()
+        try:
+            profile.downloadRequested.disconnect()
+        except Exception:
+            pass
         profile.downloadRequested.connect(self._handle_download_requested)
 
     def _apply_theme(self) -> None:
         theme_name = self.db.get_setting("theme", "dark")
+        accent = self.db.get_setting("accent_color", "#0060df")
         style_file = f"{theme_name}.qss"
         style_path = os.path.join(os.path.dirname(__file__), "styles", style_file)
 
         if os.path.exists(style_path):
             with open(style_path, "r", encoding="utf-8") as f:
-                self.setStyleSheet(f.read())
+                qss = f.read()
+            # Динамически внедряем выбранный пользователем акцентный цвет
+            qss = qss.replace("__ACCENT__", accent)
+            self.setStyleSheet(qss)
 
     def _apply_menu_visibility(self) -> None:
         auto_hide = self.db.get_setting("menu_bar_auto_hide", "1") == "1"
@@ -812,9 +845,32 @@ class MainWindow(QMainWindow):
 
     # --- Загрузка файлов ---
 
-    def _handle_download_requested(self, download) -> None:
-        folder = self.db.get_setting("download_folder", os.path.expanduser("~/Downloads"))
-        suggested = download.downloadFileName()
+    def _download_from_url(self) -> None:
+        url, ok = QInputDialog.getText(
+            self,
+            tr("download_url_title"),
+            tr("download_url_label"),
+            QLineEdit.EchoMode.Normal,
+            "https://",
+        )
+        if ok and url.strip():
+            tab = self.current_tab()
+            if tab:
+                tab.web_view.page().download(QUrl(url.strip()))
+
+    def _handle_download_requested(self, download: QWebEngineDownloadRequest) -> None:
+        # Сохраняем ссылку, чтобы объект не уничтожился сборщиком мусора Python
+        self._active_downloads.append(download)
+
+        raw_folder = self.db.get_setting(
+            "download_folder",
+            os.path.join(os.path.expanduser("~"), "Downloads"),
+        )
+        folder = os.path.abspath(raw_folder)
+        os.makedirs(folder, exist_ok=True)
+
+        suggested = download.suggestedFileName() or download.downloadFileName() or "downloaded_file"
+        suggested = os.path.basename(suggested)
         full_path = os.path.join(folder, suggested)
 
         file_path, _ = QFileDialog.getSaveFileName(
@@ -825,22 +881,37 @@ class MainWindow(QMainWindow):
         )
         if not file_path:
             download.cancel()
+            if download in self._active_downloads:
+                self._active_downloads.remove(download)
             return
 
-        download.setDownloadDirectory(os.path.dirname(file_path))
-        download.setDownloadFileName(os.path.basename(file_path))
+        target_dir = os.path.dirname(os.path.abspath(file_path))
+        target_name = os.path.basename(file_path)
+
+        download.setDownloadDirectory(target_dir)
+        download.setDownloadFileName(target_name)
         download.accept()
 
         url_str = download.url().toString()
-        name = os.path.basename(file_path)
-        self.status_bar.showMessage(tr("status_download_started", name=name), 4000)
+        self.status_bar.showMessage(tr("status_download_started", name=target_name), 4000)
 
-        def on_finished():
-            size = download.totalBytes()
-            self.db.add_download(name, file_path, url_str, size, "Завершено" if get_language() == "ru" else "Completed")
-            self.status_bar.showMessage(tr("status_download_finished", name=name), 5000)
+        def on_state_changed(state):
+            if state == QWebEngineDownloadRequest.DownloadState.DownloadCompleted:
+                size = download.totalBytes()
+                status_text = "Завершено" if get_language() == "ru" else "Completed"
+                self.db.add_download(target_name, file_path, url_str, size, status_text)
+                self.status_bar.showMessage(tr("status_download_finished", name=target_name), 5000)
+                if download in self._active_downloads:
+                    self._active_downloads.remove(download)
+            elif state in (
+                QWebEngineDownloadRequest.DownloadState.DownloadCancelled,
+                QWebEngineDownloadRequest.DownloadState.DownloadInterrupted,
+            ):
+                if download in self._active_downloads:
+                    self._active_downloads.remove(download)
+                self.status_bar.showMessage(f"Download cancelled/failed: {target_name}", 3000)
 
-        download.isFinishedChanged.connect(on_finished)
+        download.stateChanged.connect(on_state_changed)
 
     def _refresh_completer(self) -> None:
         recent = self.db.get_history(limit=80)

@@ -1,4 +1,4 @@
-/* surf - Тёмная тема со скруглённым интерфейсом */
+/* surf - Тёмная тема со скруглённым интерфейсом и динамическим акцентом */
 
 QMainWindow, QDialog {
     background-color: #1a1a20;
@@ -29,19 +29,21 @@ QTabBar {
 QTabBar::tab {
     background-color: #24242d;
     color: #a4a4b2;
-    padding: 6px 12px;
+    padding: 6px 14px;
     margin-right: 3px;
     border-top-left-radius: 8px;
     border-top-right-radius: 8px;
     min-width: 65px;
     max-width: 200px;
     height: 20px;
+    border-bottom: 2px solid transparent;
 }
 
 QTabBar::tab:selected {
     background-color: #353542;
     color: #ffffff;
     font-weight: 600;
+    border-bottom: 2px solid __ACCENT__;
 }
 
 QTabBar::tab:hover:!selected {
@@ -62,6 +64,7 @@ QTabBar QToolButton {
 
 QTabBar QToolButton:hover {
     background-color: #353542;
+    border-color: __ACCENT__;
 }
 
 /* Кнопка "+" добавления вкладки */
@@ -78,6 +81,7 @@ QTabBar QToolButton:hover {
 
 #newTabBtn:hover {
     background-color: #2c2c38;
+    border-color: __ACCENT__;
 }
 
 /* Панель навигации под вкладками */
@@ -118,11 +122,11 @@ QLineEdit#addressBar {
     border-radius: 14px;
     padding: 5px 14px;
     font-size: 13px;
-    selection-background-color: #0060df;
+    selection-background-color: __ACCENT__;
 }
 
 QLineEdit#addressBar:focus {
-    border: 1px solid #00ddff;
+    border: 1.5px solid __ACCENT__;
     background-color: #202028;
 }
 
@@ -157,7 +161,7 @@ QMenu::item {
 }
 
 QMenu::item:selected {
-    background-color: #0060df;
+    background-color: __ACCENT__;
     color: #ffffff;
     border-radius: 4px;
 }
@@ -176,7 +180,7 @@ QTableWidget {
     border: 1px solid #353542;
     border-radius: 8px;
     gridline-color: #2c2c38;
-    selection-background-color: #0060df;
+    selection-background-color: __ACCENT__;
     selection-color: #ffffff;
 }
 
@@ -188,7 +192,7 @@ QHeaderView::section {
     font-weight: bold;
 }
 
-/* Прогресс-бар */
+/* Прогресс-бар загрузки */
 QProgressBar {
     border: none;
     background-color: transparent;
@@ -196,7 +200,7 @@ QProgressBar {
 }
 
 QProgressBar::chunk {
-    background-color: #00ddff;
+    background-color: __ACCENT__;
 }
 
 /* Строка состояния */
@@ -222,10 +226,11 @@ QStatusBar {
     font-size: 14px;
     padding: 10px 20px;
     color: #fbfbfe;
+    selection-background-color: __ACCENT__;
 }
 
 #speedDialSearch:focus {
-    border-color: #00ddff;
+    border: 1.5px solid __ACCENT__;
     background-color: #2a2a35;
 }
 
@@ -242,7 +247,7 @@ QGroupBox::title {
     subcontrol-origin: margin;
     subcontrol-position: top left;
     padding: 0 6px;
-    color: #00ddff;
+    color: __ACCENT__;
 }
 
 QComboBox, QSpinBox {
@@ -251,6 +256,10 @@ QComboBox, QSpinBox {
     border: 1px solid #353542;
     border-radius: 6px;
     padding: 4px 10px;
+}
+
+QComboBox:focus, QSpinBox:focus {
+    border-color: __ACCENT__;
 }
 
 QPushButton {
@@ -262,8 +271,22 @@ QPushButton {
 
 QPushButton:hover {
     background-color: #353542;
+    border-color: __ACCENT__;
 }
 
 QPushButton:pressed {
     background-color: #424254;
+}
+
+#readerExitBtn {
+    background-color: __ACCENT__;
+    color: #ffffff;
+    font-weight: bold;
+    border: none;
+    border-radius: 4px;
+    padding: 5px 14px;
+}
+
+#readerExitBtn:hover {
+    opacity: 0.9;
 }

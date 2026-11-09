@@ -168,7 +168,12 @@
            <widget class="QComboBox" name="uaCombo">
             <item>
              <property name="text">
-              <string>Современный десктопный браузер (рекомендуется)</string>
+              <string>Surf 1.0 (современный веб, рекомендуется)</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Surf 1.0 (чистый идентификатор)</string>
              </property>
             </item>
             <item>
@@ -178,7 +183,7 @@
             </item>
             <item>
              <property name="text">
-              <string>QtWebEngine (по умолчанию)</string>
+              <string>Mozilla Firefox</string>
              </property>
             </item>
             <item>

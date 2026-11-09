@@ -22,6 +22,20 @@ from surf.i18n import tr
 from surf.widgets.reader_view import ReaderViewWidget
 
 
+class BrowserPage(QWebEnginePage):
+    def __init__(self, profile, parent=None):
+        super().__init__(profile, parent)
+
+    def createWindow(self, window_type):
+        view = self.view()
+        if view:
+            win = view.window()
+            if hasattr(win, "add_new_tab"):
+                new_tab = win.add_new_tab()
+                return new_tab.web_view.page()
+        return super().createWindow(window_type)
+
+
 class SpeedDialWidget(QWidget):
     open_url = pyqtSignal(str)
 
@@ -101,6 +115,8 @@ class BrowserTab(QWidget):
 
         # 0: Веб-страница (QWebEngineView)
         self.web_view = QWebEngineView()
+        self.browser_page = BrowserPage(QWebEngineProfile.defaultProfile(), self.web_view)
+        self.web_view.setPage(self.browser_page)
         self.web_view.titleChanged.connect(self._on_title_changed)
         self.web_view.urlChanged.connect(self._on_url_changed)
         self.web_view.iconChanged.connect(self._on_icon_changed)

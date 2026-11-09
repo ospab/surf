@@ -14,9 +14,10 @@ SEARCH_ENGINES = {
 }
 
 USER_AGENTS = {
-    0: ("firefox", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0"),
-    1: ("chrome", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"),
-    2: ("default", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) QtWebEngine/6.140.0 Chrome/140.0.0.0 Safari/537.36"),
+    0: ("surf", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Surf/1.0"),
+    1: ("surf_pure", "Surf/1.0 (Windows NT 10.0; Win64; x64)"),
+    2: ("chrome", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"),
+    3: ("firefox", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0"),
 }
 
 PROXY_TYPES = {
@@ -64,23 +65,21 @@ class SettingsDialog(QDialog):
         )
 
         # Приватность и User-Agent
-        ua_type = self.db.get_setting("user_agent_type", "firefox")
+        ua_type = self.db.get_setting("user_agent_type", "surf")
         ua_string = self.db.get_setting("custom_user_agent", USER_AGENTS[0][1])
 
-        if ua_type == "firefox":
-            self.uaCombo.setCurrentIndex(0)
-            self.uaEdit.setText(USER_AGENTS[0][1])
-            self.uaEdit.setReadOnly(True)
-        elif ua_type == "chrome":
-            self.uaCombo.setCurrentIndex(1)
-            self.uaEdit.setText(USER_AGENTS[1][1])
-            self.uaEdit.setReadOnly(True)
-        elif ua_type == "default":
-            self.uaCombo.setCurrentIndex(2)
-            self.uaEdit.setText(USER_AGENTS[2][1])
+        found_idx = None
+        for idx, (code, val) in USER_AGENTS.items():
+            if code == ua_type:
+                found_idx = idx
+                break
+
+        if found_idx is not None:
+            self.uaCombo.setCurrentIndex(found_idx)
+            self.uaEdit.setText(USER_AGENTS[found_idx][1])
             self.uaEdit.setReadOnly(True)
         else:
-            self.uaCombo.setCurrentIndex(3)
+            self.uaCombo.setCurrentIndex(4)
             self.uaEdit.setText(ua_string)
             self.uaEdit.setReadOnly(False)
 
@@ -178,10 +177,11 @@ class SettingsDialog(QDialog):
         self.browseDownloadBtn.setText(tr("btn_browse"))
 
         self.uaGroup.setTitle(tr("group_user_agent"))
-        self.uaCombo.setItemText(0, tr("ua_desktop"))
-        self.uaCombo.setItemText(1, tr("ua_chrome"))
-        self.uaCombo.setItemText(2, tr("ua_default"))
-        self.uaCombo.setItemText(3, tr("ua_custom"))
+        self.uaCombo.setItemText(0, tr("ua_surf"))
+        self.uaCombo.setItemText(1, tr("ua_surf_pure"))
+        self.uaCombo.setItemText(2, tr("ua_chrome"))
+        self.uaCombo.setItemText(3, tr("ua_firefox"))
+        self.uaCombo.setItemText(4, tr("ua_custom"))
 
         self.historyPrivacyGroup.setTitle(tr("group_history_privacy"))
         self.saveHistoryCheck.setText(tr("chk_save_history"))
