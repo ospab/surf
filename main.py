@@ -11,7 +11,7 @@ if PARENT_DIR not in sys.path:
     sys.path.insert(0, PARENT_DIR)
 
 from PyQt6.QtCore import QByteArray, QEvent, QObject, QPoint, QSize, QStringListModel, Qt, QUrl, pyqtSignal
-from PyQt6.QtGui import QAction, QColor, QFont, QIcon, QKeySequence, QPainter, QPixmap, QShortcut
+from PyQt6.QtGui import QAction, QColor, QFont, QIcon, QKeySequence, QMouseEvent, QPainter, QPixmap, QShortcut
 from PyQt6.QtNetwork import QNetworkProxy
 from PyQt6.QtSvg import QSvgRenderer
 from PyQt6.QtWebEngineCore import (
@@ -84,9 +84,10 @@ class ZoomWheelFilter(QObject):
 
 
 class ClosableTabBar(QTabBar):
-    """Панель вкладок в стиле Firefox Proton: фавиконы, индикатор аудио/mute, кнопка закрытия."""
+    """Панель вкладок в стиле Firefox Proton: фавиконы, индикатор аудио/mute, кнопка закрытия, отрыв вкладок."""
 
     tabAudioMuteRequested = pyqtSignal(int)
+    tabDetachRequested = pyqtSignal(int, QPoint)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -99,6 +100,26 @@ class ClosableTabBar(QTabBar):
         self._vol_icon = QIcon(os.path.join(icon_dir, "volume-2.svg"))
         self._vol_x_icon = QIcon(os.path.join(icon_dir, "volume-x.svg"))
         self._audio_states: dict[int, tuple[bool, bool]] = {}
+
+        self._drag_start_pos: QPoint | None = None
+        self._drag_tab_idx: int = -1
+        self._is_detached_mode: bool = False
+        self._cursor_overridden: bool = False
+
+        self.tabMoved.connect(self._sync_audio_states_on_tab_moved)
+        self.update_movable_state()
+
+    def update_movable_state(self) -> None:
+        """Перемещать вкладки можно только когда их 2 или более."""
+        self.setMovable(self.count() > 1)
+
+    def _set_drag_cursor(self, enabled: bool) -> None:
+        if enabled and not self._cursor_overridden:
+            QApplication.setOverrideCursor(Qt.CursorShape.DragMoveCursor)
+            self._cursor_overridden = True
+        elif not enabled and self._cursor_overridden:
+            QApplication.restoreOverrideCursor()
+            self._cursor_overridden = False
 
     def set_theme_mode(self, is_dark: bool, vol_icon: QIcon | None = None, vol_x_icon: QIcon | None = None) -> None:
         self._is_dark = is_dark
@@ -134,6 +155,8 @@ class ClosableTabBar(QTabBar):
 
     def tabInserted(self, index: int) -> None:
         super().tabInserted(index)
+        self.update_movable_state()
+
         new_audio = {}
         for k, v in self._audio_states.items():
             if k >= index:
@@ -170,6 +193,8 @@ class ClosableTabBar(QTabBar):
 
     def tabRemoved(self, index: int) -> None:
         super().tabRemoved(index)
+        self.update_movable_state()
+
         new_audio = {}
         for k, v in self._audio_states.items():
             if k < index:
@@ -177,6 +202,93 @@ class ClosableTabBar(QTabBar):
             elif k > index:
                 new_audio[k - 1] = v
         self._audio_states = new_audio
+
+    def _sync_audio_states_on_tab_moved(self, from_idx: int, to_idx: int) -> None:
+        if from_idx in self._audio_states:
+            st = self._audio_states.pop(from_idx)
+            new_audio = {}
+            for k, v in self._audio_states.items():
+                if from_idx < to_idx:
+                    if from_idx < k <= to_idx:
+                        new_audio[k - 1] = v
+                    else:
+                        new_audio[k] = v
+                else:
+                    if to_idx <= k < from_idx:
+                        new_audio[k + 1] = v
+                    else:
+                        new_audio[k] = v
+            new_audio[to_idx] = st
+            self._audio_states = new_audio
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        self.update_movable_state()
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._drag_start_pos = event.pos()
+            self._drag_tab_idx = self.tabAt(event.pos())
+            self._is_detached_mode = False
+
+            if self.count() <= 1:
+                # Если вкладка всего одна, запрещаем внутреннее перемещение в QTabBar
+                idx = self.tabAt(event.pos())
+                if idx >= 0:
+                    self.setCurrentIndex(idx)
+                event.accept()
+                return
+
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        if (event.buttons() & Qt.MouseButton.LeftButton) and self._drag_start_pos is not None and self._drag_tab_idx >= 0:
+            dist = (event.pos() - self._drag_start_pos).manhattanLength()
+            if dist > QApplication.startDragDistance():
+                if self.count() > 1:
+                    cur_global = event.globalPosition().toPoint()
+                    local_pt = self.mapFromGlobal(cur_global)
+                    win = self.window()
+                    win_geo = win.frameGeometry() if win else None
+
+                    # Проверяем, вытянут ли курсор за пределы окна или полосы вкладок
+                    is_outside = False
+                    if win_geo and not win_geo.contains(cur_global):
+                        is_outside = True
+                    elif local_pt.y() < -20 or local_pt.y() > self.height() + 35 or local_pt.x() < -30 or local_pt.x() > self.width() + 40:
+                        is_outside = True
+
+                    if is_outside:
+                        if not self._is_detached_mode:
+                            self._is_detached_mode = True
+                            self._set_drag_cursor(True)
+                    else:
+                        if self._is_detached_mode:
+                            self._is_detached_mode = False
+                            self._set_drag_cursor(False)
+
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        if self._is_detached_mode:
+            self._set_drag_cursor(False)
+            self._is_detached_mode = False
+
+            if self.count() > 1:
+                cur_global = event.globalPosition().toPoint()
+                detach_idx = self.currentIndex()
+                if detach_idx < 0:
+                    detach_idx = self._drag_tab_idx
+                if 0 <= detach_idx < self.count():
+                    self.tabDetachRequested.emit(detach_idx, cur_global)
+
+                self._drag_start_pos = None
+                self._drag_tab_idx = -1
+                event.accept()
+                return
+
+        self._set_drag_cursor(False)
+        self._is_detached_mode = False
+        self._drag_start_pos = None
+        self._drag_tab_idx = -1
+        super().mouseReleaseEvent(event)
 
     def set_tab_audio(self, index: int, audible: bool, muted: bool) -> None:
         self._audio_states[index] = (audible, muted)
@@ -441,6 +553,7 @@ class MainWindow(QMainWindow):
         self.tab_bar.tabCloseRequested.connect(self.close_tab)
         self.tab_bar.tabAudioMuteRequested.connect(self._toggle_tab_audio_mute)
         self.tab_bar.tabMoved.connect(self._on_tab_moved)
+        self.tab_bar.tabDetachRequested.connect(self._detach_tab_to_new_window)
         self.tab_bar.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.tab_bar.customContextMenuRequested.connect(self._show_tab_context_menu)
 
@@ -1036,12 +1149,12 @@ class MainWindow(QMainWindow):
         self._focus_address_bar()
         return tab
 
-    def close_tab(self, index: int) -> None:
+    def close_tab(self, index: int, save_to_recent: bool = True) -> None:
         if self.tab_bar.count() > 1:
             tab = self.tab_stack.widget(index)
             if tab and isinstance(tab, BrowserTab):
                 url = tab.current_url
-                if url and not url.startswith("surf://newtab") and url != "about:blank":
+                if save_to_recent and url and not url.startswith("surf://newtab") and url != "about:blank":
                     self._recently_closed_urls.append(url)
 
             self.tab_bar.removeTab(index)
@@ -1049,10 +1162,50 @@ class MainWindow(QMainWindow):
             if widget:
                 self.tab_stack.removeWidget(widget)
                 widget.deleteLater()
+            self.tab_bar.update_movable_state()
         else:
             current = self.current_tab()
             if current:
                 current.show_speed_dial()
+            self.tab_bar.update_movable_state()
+
+    def _detach_tab_to_new_window(self, tab_idx: int, drop_pos: QPoint) -> None:
+        """Отрывает вкладку и открывает её в отдельном новом окне браузера."""
+        if self.tab_bar.count() <= 1:
+            return
+        if not (0 <= tab_idx < self.tab_stack.count()):
+            return
+
+        old_tab = self.tab_stack.widget(tab_idx)
+        if not old_tab or not isinstance(old_tab, BrowserTab):
+            return
+
+        url = old_tab.current_url
+        title = old_tab.current_title
+
+        # Создаем новое окно браузера
+        new_win = MainWindow(is_private=self.is_private)
+        new_win.resize(self.size())
+
+        # Позиционируем окно в месте сброса курсора
+        target_x = max(20, drop_pos.x() - 140)
+        target_y = max(20, drop_pos.y() - 30)
+        new_win.move(target_x, target_y)
+
+        # Закрываем вкладку в исходном окне
+        self.close_tab(tab_idx, save_to_recent=False)
+
+        # Открываем перенесённый URL в новом окне
+        target_tab = new_win.current_tab()
+        if target_tab:
+            if url and not url.startswith("surf://newtab") and url != "about:blank":
+                target_tab.load_url(url)
+            else:
+                target_tab.show_speed_dial()
+
+        new_win.show()
+        new_win.raise_()
+        new_win.activateWindow()
 
     def _save_current_session(self) -> None:
         """Сохраняет список открытых вкладок текущего окна для восстановления."""
