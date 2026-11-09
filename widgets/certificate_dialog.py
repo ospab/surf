@@ -3,8 +3,9 @@ import socket
 import ssl
 from urllib.parse import urlparse
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont, QIcon
+from PyQt6.QtCore import QByteArray, Qt
+from PyQt6.QtGui import QFont, QIcon, QPainter, QPixmap
+from PyQt6.QtSvg import QSvgRenderer
 from PyQt6.QtWidgets import (
     QDialog,
     QFormLayout,
@@ -110,6 +111,23 @@ class CertificateDialog(QDialog):
         self.cert_data = cert_data or fetch_certificate_details(url)
         self._init_ui()
 
+    def _render_vector_icon(self, path: str, color: str, size: int = 24) -> QPixmap:
+        if not os.path.exists(path):
+            return QPixmap()
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                svg_text = f.read()
+            svg_text = svg_text.replace("#fbfbfe", color).replace("#15141a", color).replace('stroke="white"', f'stroke="{color}"')
+            renderer = QSvgRenderer(QByteArray(svg_text.encode("utf-8")))
+            pix = QPixmap(size, size)
+            pix.fill(Qt.GlobalColor.transparent)
+            painter = QPainter(pix)
+            renderer.render(painter)
+            painter.end()
+            return pix
+        except Exception:
+            return QPixmap()
+
     def _init_ui(self) -> None:
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(18, 18, 18, 18)
@@ -117,41 +135,68 @@ class CertificateDialog(QDialog):
 
         # 1. Верхний баннер статуса соединения
         banner = QWidget()
+        banner.setObjectName("certBanner")
         banner_layout = QHBoxLayout(banner)
         banner_layout.setContentsMargins(14, 12, 14, 12)
-        banner_layout.setSpacing(12)
+        banner_layout.setSpacing(14)
 
         is_secure = self.cert_data.get("is_secure", False)
         status_color = "#10b981" if is_secure else "#ef4444"
         bg_color = "rgba(16, 185, 129, 0.12)" if is_secure else "rgba(239, 68, 68, 0.12)"
+        badge_bg = "rgba(16, 185, 129, 0.22)" if is_secure else "rgba(239, 68, 68, 0.22)"
 
-        banner.setStyleSheet(
-            f"background-color: {bg_color}; border: 1.5px solid {status_color}; border-radius: 8px;"
-        )
+        banner.setStyleSheet(f"""
+            QWidget#certBanner {{
+                background-color: {bg_color};
+                border: 1.5px solid {status_color};
+                border-radius: 10px;
+            }}
+            #certBanner QLabel {{
+                border: none;
+                background: transparent;
+            }}
+            #certBanner QLabel#certIconBadge {{
+                background-color: {badge_bg};
+                border: 1px solid {status_color};
+                border-radius: 21px;
+            }}
+        """)
 
-        icon_label = QLabel("🔒" if is_secure else "⚠️")
-        icon_label.setFont(QFont("", 22))
-        banner_layout.addWidget(icon_label)
+        # Круглый бейдж 42x42 с векторной иконкой замка / щита
+        icon_badge = QLabel()
+        icon_badge.setObjectName("certIconBadge")
+        icon_badge.setFixedSize(42, 42)
+        icon_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        icons_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources", "icons")
+        icon_path = os.path.join(icons_dir, "lock.svg" if is_secure else "shield.svg")
+        pix = self._render_vector_icon(icon_path, status_color, 22)
+        if not pix.isNull():
+            icon_badge.setPixmap(pix)
+        else:
+            icon_badge.setText("🔒" if is_secure else "⚠️")
+
+        banner_layout.addWidget(icon_badge)
 
         status_text_layout = QVBoxLayout()
+        status_text_layout.setContentsMargins(0, 0, 0, 0)
         status_text_layout.setSpacing(2)
 
         status_title = QLabel(tr("cert_status_secure") if is_secure else tr("cert_status_insecure"))
         status_title.setFont(QFont("", 13, QFont.Weight.Bold))
-        status_title.setStyleSheet(f"color: {status_color}; border: none; background: transparent;")
+        status_title.setStyleSheet(f"color: {status_color}; font-weight: bold;")
 
         host_label = QLabel(self.cert_data.get("host", self.url))
-        host_label.setFont(QFont("", 11))
-        host_label.setStyleSheet("color: #a4a4b2; border: none; background: transparent;")
+        host_label.setFont(QFont("", 11, QFont.Weight.Bold))
 
         status_desc = QLabel(tr("cert_status_secure_desc") if is_secure else tr("cert_status_insecure_desc"))
         status_desc.setWordWrap(True)
-        status_desc.setStyleSheet("border: none; background: transparent; font-size: 11px;")
+        status_desc.setStyleSheet("color: #a4a4b2; font-size: 11px;")
 
         status_text_layout.addWidget(status_title)
         status_text_layout.addWidget(host_label)
         status_text_layout.addWidget(status_desc)
-        banner_layout.addLayout(status_text_layout)
+        banner_layout.addLayout(status_text_layout, stretch=1)
 
         main_layout.addWidget(banner)
 
