@@ -2,8 +2,18 @@ import html
 import urllib.parse
 from urllib.parse import urlparse
 
-from PyQt6.QtCore import QEvent, QPoint, Qt, QUrl, pyqtSignal
-from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
+from PyQt6.QtCore import QEvent, QPoint, QRectF, Qt, QUrl, pyqtSignal
+from PyQt6.QtGui import (
+    QBrush,
+    QColor,
+    QFont,
+    QFontMetrics,
+    QIcon,
+    QPainter,
+    QPainterPath,
+    QPen,
+    QPixmap,
+)
 from PyQt6.QtWebEngineCore import (
     QWebEngineContextMenuRequest,
     QWebEnginePage,
@@ -13,7 +23,10 @@ from PyQt6.QtWebEngineCore import (
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWidgets import (
     QApplication,
+    QDialog,
     QFileDialog,
+    QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -65,24 +78,389 @@ class BrowserPage(QWebEnginePage):
         return super().createWindow(window_type)
 
 
+def generate_tile_badge(title: str, url: str, is_add_btn: bool = False, is_dark: bool = True) -> QPixmap:
+    """Генерирует высокочеткую круглую иконку/монограмму для плитки быстрого доступа."""
+    pixmap = QPixmap(84, 84)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    pixmap.setDevicePixelRatio(2.0)
+
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
+    painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+
+    circle_rect = QRectF(2, 2, 38, 38)
+
+    if is_add_btn:
+        bg_col = QColor("#2a2a35" if is_dark else "#e5e5ea")
+        border_col = QColor("#3f3f50" if is_dark else "#d1d1d6")
+        painter.setBrush(QBrush(bg_col))
+        painter.setPen(QPen(border_col, 1.5))
+        painter.drawEllipse(circle_rect)
+
+        pen = QPen(QColor("#fbfbfe" if is_dark else "#15141a"), 2.2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+        painter.setPen(pen)
+        painter.drawLine(21, 14, 21, 28)
+        painter.drawLine(14, 21, 28, 21)
+        painter.end()
+        return pixmap
+
+    url_lower = url.lower()
+    domain = ""
+    try:
+        domain = urlparse(url).netloc.lower()
+        if domain.startswith("www."):
+            domain = domain[4:]
+    except Exception:
+        pass
+
+    if "google." in url_lower:
+        painter.setBrush(QBrush(QColor("#ffffff")))
+        painter.setPen(QPen(QColor("#3a3a48" if is_dark else "#e0e0e0"), 1))
+        painter.drawEllipse(circle_rect)
+        painter.setPen(QColor("#4285f4"))
+        font = QFont("Arial", 18, QFont.Weight.Bold)
+        painter.setFont(font)
+        painter.drawText(circle_rect, Qt.AlignmentFlag.AlignCenter, "G")
+    elif "github." in url_lower:
+        painter.setBrush(QBrush(QColor("#24292e")))
+        painter.setPen(QPen(QColor("#404448"), 1))
+        painter.drawEllipse(circle_rect)
+        painter.setPen(QColor("#ffffff"))
+        font = QFont("Arial", 12, QFont.Weight.Bold)
+        painter.setFont(font)
+        painter.drawText(circle_rect, Qt.AlignmentFlag.AlignCenter, "GH")
+    elif "youtube." in url_lower or "youtu.be" in url_lower:
+        painter.setBrush(QBrush(QColor("#ff0000")))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawEllipse(circle_rect)
+        painter.setBrush(QBrush(QColor("#ffffff")))
+        path = QPainterPath()
+        path.moveTo(17, 15)
+        path.lineTo(27, 21)
+        path.lineTo(17, 27)
+        path.closeSubpath()
+        painter.drawPath(path)
+    elif "habr." in url_lower:
+        painter.setBrush(QBrush(QColor("#65a3be")))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawEllipse(circle_rect)
+        painter.setPen(QColor("#ffffff"))
+        font = QFont("Arial", 17, QFont.Weight.Bold)
+        painter.setFont(font)
+        painter.drawText(circle_rect, Qt.AlignmentFlag.AlignCenter, "H")
+    elif "wikipedia." in url_lower:
+        painter.setBrush(QBrush(QColor("#f8f9fa")))
+        painter.setPen(QPen(QColor("#444452" if is_dark else "#c8ccd1"), 1))
+        painter.drawEllipse(circle_rect)
+        painter.setPen(QColor("#202122"))
+        font = QFont("Times New Roman", 18, QFont.Weight.Bold)
+        painter.setFont(font)
+        painter.drawText(circle_rect, Qt.AlignmentFlag.AlignCenter, "W")
+    elif "ya.ru" in url_lower or "yandex." in url_lower:
+        painter.setBrush(QBrush(QColor("#fc3f1d")))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawEllipse(circle_rect)
+        painter.setPen(QColor("#ffffff"))
+        font = QFont("Arial", 17, QFont.Weight.Bold)
+        painter.setFont(font)
+        painter.drawText(circle_rect, Qt.AlignmentFlag.AlignCenter, "Я")
+    else:
+        palette = [
+            "#0060df", "#00875a", "#e53e3e", "#805ad5",
+            "#dd6b20", "#319795", "#0284c7", "#d946ef",
+            "#059669", "#d97706", "#2563eb", "#7c3aed"
+        ]
+        key = domain or title or url
+        color_hex = palette[abs(hash(key)) % len(palette)]
+        painter.setBrush(QBrush(QColor(color_hex)))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawEllipse(circle_rect)
+
+        letter = ""
+        clean_name = title.strip() or domain.strip()
+        for ch in clean_name:
+            if ch.isalnum():
+                letter = ch.upper()
+                break
+        if not letter:
+            letter = "?"
+
+        painter.setPen(QColor("#ffffff"))
+        font = QFont("Arial", 16, QFont.Weight.Bold)
+        painter.setFont(font)
+        painter.drawText(circle_rect, Qt.AlignmentFlag.AlignCenter, letter)
+
+    painter.end()
+    return pixmap
+
+
+class SpeedDialEditDialog(QDialog):
+    """Модальное окно добавления или редактирования плитки быстрого доступа."""
+
+    def __init__(self, parent=None, title: str = "", url: str = "", is_new: bool = True):
+        super().__init__(parent)
+        self.is_new = is_new
+        self.tile_title = title
+        self.tile_url = url
+        self.setObjectName("speedDialDialog")
+        self.setWindowTitle(tr("speed_dial_dialog_add_title") if is_new else tr("speed_dial_dialog_edit_title"))
+        self.setFixedWidth(400)
+        self.setModal(True)
+        self._init_ui(title, url)
+
+    def _init_ui(self, title: str, url: str) -> None:
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.setContentsMargins(20, 20, 20, 20)
+
+        # Поле Название
+        lbl_name = QLabel(tr("speed_dial_name_label"))
+        layout.addWidget(lbl_name)
+
+        self.input_name = QLineEdit(title)
+        self.input_name.setPlaceholderText(tr("speed_dial_name_placeholder"))
+        self.input_name.setMinimumHeight(36)
+        layout.addWidget(self.input_name)
+
+        # Поле URL
+        lbl_url = QLabel(tr("speed_dial_url_label"))
+        layout.addWidget(lbl_url)
+
+        self.input_url = QLineEdit(url)
+        self.input_url.setPlaceholderText(tr("speed_dial_url_placeholder"))
+        self.input_url.setMinimumHeight(36)
+        self.input_url.returnPressed.connect(self._handle_save)
+        layout.addWidget(self.input_url)
+
+        layout.addSpacing(6)
+
+        # Кнопки действия
+        btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(10)
+        btn_layout.addStretch()
+
+        self.btn_cancel = QPushButton(tr("btn_cancel"))
+        self.btn_cancel.setMinimumHeight(32)
+        self.btn_cancel.clicked.connect(self.reject)
+        btn_layout.addWidget(self.btn_cancel)
+
+        self.btn_save = QPushButton(tr("btn_save"))
+        self.btn_save.setObjectName("btnPrimary")
+        self.btn_save.setMinimumHeight(32)
+        self.btn_save.setDefault(True)
+        self.btn_save.clicked.connect(self._handle_save)
+        btn_layout.addWidget(self.btn_save)
+
+        layout.addLayout(btn_layout)
+
+    def _handle_save(self) -> None:
+        url = self.input_url.text().strip()
+        if not url:
+            self.input_url.setFocus()
+            return
+
+        if not (url.startswith("http://") or url.startswith("https://") or url.startswith("surf://") or url.startswith("file://")):
+            url = f"https://{url}"
+
+        name = self.input_name.text().strip()
+        if not name:
+            try:
+                parsed = urlparse(url)
+                name = parsed.netloc.replace("www.", "")
+                if not name:
+                    name = url
+            except Exception:
+                name = url
+
+        self.tile_title = name
+        self.tile_url = url
+        self.accept()
+
+
+class SpeedDialCard(QFrame):
+    """Интерактивная плитка веб-сайта в стиле Firefox Proton / Chrome."""
+
+    clicked = pyqtSignal(str)
+    open_new_tab = pyqtSignal(str)
+    edit_requested = pyqtSignal(dict)
+    delete_requested = pyqtSignal(dict)
+    pin_requested = pyqtSignal(dict)
+
+    def __init__(self, tile_data: dict, is_dark: bool = True, parent=None):
+        super().__init__(parent)
+        self.tile_data = tile_data
+        self.is_dark = is_dark
+        self._pressed = False
+        self.setObjectName("speedDialCard")
+        self.setFixedSize(110, 92)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._init_ui()
+
+    def _init_ui(self) -> None:
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(6, 8, 6, 6)
+        layout.setSpacing(4)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        # Круглая иконка
+        self.icon_label = QLabel(self)
+        self.icon_label.setFixedSize(42, 42)
+        self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.icon_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+
+        pixmap = generate_tile_badge(
+            self.tile_data.get("title", ""),
+            self.tile_data.get("url", ""),
+            is_add_btn=False,
+            is_dark=self.is_dark,
+        )
+        self.icon_label.setPixmap(pixmap)
+        layout.addWidget(self.icon_label, 0, Qt.AlignmentFlag.AlignCenter)
+
+        # Название сайта
+        title_text = self.tile_data.get("title", "")
+        self.title_label = QLabel(self)
+        self.title_label.setObjectName("speedDialCardTitle")
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.title_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+
+        metrics = QFontMetrics(self.title_label.font())
+        elided = metrics.elidedText(title_text, Qt.TextElideMode.ElideRight, 96)
+        self.title_label.setText(elided)
+        layout.addWidget(self.title_label)
+
+        # Подсказка с полным адресом
+        url = self.tile_data.get("url", "")
+        self.setToolTip(f"{title_text}\n{url}" if url else title_text)
+
+        # Кнопка меню (три точки) в верхнем правом углу
+        self.menu_btn = QPushButton("···", self)
+        self.menu_btn.setObjectName("tileMenuBtn")
+        self.menu_btn.setFixedSize(20, 18)
+        self.menu_btn.move(86, 3)
+        self.menu_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.menu_btn.setToolTip(tr("speed_dial_edit"))
+        self.menu_btn.clicked.connect(self._on_menu_clicked)
+
+    def _on_menu_clicked(self) -> None:
+        pos = self.menu_btn.mapToGlobal(QPoint(0, self.menu_btn.height()))
+        self._show_context_menu(pos)
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._pressed = True
+        elif event.button() == Qt.MouseButton.RightButton:
+            self._show_context_menu(event.globalPosition().toPoint())
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton and self._pressed:
+            self._pressed = False
+            if self.rect().contains(event.position().toPoint()):
+                self.clicked.emit(self.tile_data.get("url", ""))
+        super().mouseReleaseEvent(event)
+
+    def _show_context_menu(self, global_pos: QPoint) -> None:
+        menu = QMenu(self)
+
+        act_open = menu.addAction(tr("speed_dial_open"))
+        act_open.triggered.connect(lambda: self.clicked.emit(self.tile_data.get("url", "")))
+
+        act_tab = menu.addAction(tr("ctx_open_link_tab"))
+        act_tab.triggered.connect(lambda: self.open_new_tab.emit(self.tile_data.get("url", "")))
+
+        act_copy = menu.addAction(tr("ctx_copy_link"))
+        act_copy.triggered.connect(lambda: QApplication.clipboard().setText(self.tile_data.get("url", "")))
+
+        menu.addSeparator()
+
+        if self.tile_data.get("is_fallback"):
+            act_pin = menu.addAction(tr("speed_dial_pin"))
+            act_pin.triggered.connect(lambda: self.pin_requested.emit(self.tile_data))
+        else:
+            act_edit = menu.addAction(tr("speed_dial_edit"))
+            act_edit.triggered.connect(lambda: self.edit_requested.emit(self.tile_data))
+
+        act_del = menu.addAction(tr("speed_dial_delete"))
+        act_del.triggered.connect(lambda: self.delete_requested.emit(self.tile_data))
+
+        menu.exec(global_pos)
+
+
+class SpeedDialAddCard(QFrame):
+    """Плитка добавления нового сайта (+)."""
+
+    clicked = pyqtSignal()
+
+    def __init__(self, is_dark: bool = True, parent=None):
+        super().__init__(parent)
+        self.is_dark = is_dark
+        self._pressed = False
+        self.setObjectName("speedDialAddCard")
+        self.setFixedSize(110, 92)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._init_ui()
+
+    def _init_ui(self) -> None:
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(6, 8, 6, 6)
+        layout.setSpacing(4)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        # Круг с плюсом
+        self.icon_label = QLabel(self)
+        self.icon_label.setFixedSize(42, 42)
+        self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.icon_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+
+        pixmap = generate_tile_badge("", "", is_add_btn=True, is_dark=self.is_dark)
+        self.icon_label.setPixmap(pixmap)
+        layout.addWidget(self.icon_label, 0, Qt.AlignmentFlag.AlignCenter)
+
+        # Текст Добавить
+        self.title_label = QLabel(tr("speed_dial_add"), self)
+        self.title_label.setObjectName("speedDialAddTitle")
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.title_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        layout.addWidget(self.title_label)
+
+        self.setToolTip(tr("speed_dial_add"))
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._pressed = True
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton and self._pressed:
+            self._pressed = False
+            if self.rect().contains(event.position().toPoint()):
+                self.clicked.emit()
+        super().mouseReleaseEvent(event)
+
+
 class SpeedDialWidget(QWidget):
     open_url = pyqtSignal(str)
+    open_new_tab = pyqtSignal(str)
 
     def __init__(self, db: Database, parent=None):
         super().__init__(parent)
         self.db = db
         self.setObjectName("speedDialWidget")
         self._init_ui()
+        self.refresh_tiles()
 
     def _init_ui(self) -> None:
         main_layout = QVBoxLayout(self)
         main_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.setContentsMargins(40, 40, 40, 40)
+        main_layout.setContentsMargins(40, 20, 40, 30)
 
         center_box = QWidget()
         center_box.setMaximumWidth(680)
         box_layout = QVBoxLayout(center_box)
-        box_layout.setSpacing(20)
+        box_layout.setSpacing(18)
+        box_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         # Минималистичный логотип surf
         logo_layout = QHBoxLayout()
@@ -106,11 +484,101 @@ class SpeedDialWidget(QWidget):
         self.search_input.returnPressed.connect(self._handle_search)
         box_layout.addWidget(self.search_input)
 
+        # Сетка плиток быстрого доступа
+        self.tiles_container = QWidget()
+        self.tiles_container.setObjectName("speedDialContainer")
+        self.tiles_layout = QGridLayout(self.tiles_container)
+        self.tiles_layout.setSpacing(14)
+        self.tiles_layout.setContentsMargins(0, 8, 0, 0)
+        self.tiles_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        box_layout.addWidget(self.tiles_container)
         main_layout.addWidget(center_box)
+
+    def refresh_tiles(self) -> None:
+        """Перезагружает сетку плиток из БД (или топа истории) с кнопкой добавления."""
+        while self.tiles_layout.count():
+            item = self.tiles_layout.takeAt(0)
+            w = item.widget()
+            if w:
+                w.deleteLater()
+
+        is_dark = self.db.get_setting("theme", "dark") == "dark"
+
+        # 1. Загрузка закрепленных плиток из базы данных
+        tiles = self.db.get_speed_dial_tiles()
+
+        # 2. Если закрепленных плиток нет, автоматически отображаем топ посещаемых сайтов
+        if not tiles:
+            tiles = self.db.get_top_visited_sites(limit=6)
+
+        columns = 4
+        index = 0
+
+        for tile in tiles:
+            card = SpeedDialCard(tile, is_dark=is_dark, parent=self.tiles_container)
+            card.clicked.connect(self.open_url.emit)
+            card.open_new_tab.connect(self.open_new_tab.emit)
+            card.edit_requested.connect(self._on_edit_tile)
+            card.delete_requested.connect(self._on_delete_tile)
+            card.pin_requested.connect(self._on_pin_tile)
+
+            row = index // columns
+            col = index % columns
+            self.tiles_layout.addWidget(card, row, col)
+            index += 1
+
+        # Плитка добавления (+)
+        add_card = SpeedDialAddCard(is_dark=is_dark, parent=self.tiles_container)
+        add_card.clicked.connect(self._on_add_tile)
+        row = index // columns
+        col = index % columns
+        self.tiles_layout.addWidget(add_card, row, col)
+
+    def _on_add_tile(self) -> None:
+        dlg = SpeedDialEditDialog(self, title="", url="", is_new=True)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            self.db.add_speed_dial_tile(dlg.tile_title, dlg.tile_url)
+            self.refresh_tiles()
+
+    def _on_edit_tile(self, tile_data: dict) -> None:
+        dlg = SpeedDialEditDialog(
+            self,
+            title=tile_data.get("title", ""),
+            url=tile_data.get("url", ""),
+            is_new=False,
+        )
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            tile_id = tile_data.get("id")
+            if tile_id is not None:
+                self.db.update_speed_dial_tile(tile_id, dlg.tile_title, dlg.tile_url)
+            else:
+                self.db.add_speed_dial_tile(dlg.tile_title, dlg.tile_url)
+            self.refresh_tiles()
+
+    def _on_delete_tile(self, tile_data: dict) -> None:
+        tile_id = tile_data.get("id")
+        if tile_id is not None:
+            self.db.delete_speed_dial_tile(tile_id)
+        else:
+            url = tile_data.get("url")
+            if url:
+                with self.db._get_connection() as conn:
+                    conn.cursor().execute("DELETE FROM history WHERE url = ?", (url,))
+                    conn.commit()
+        self.refresh_tiles()
+
+    def _on_pin_tile(self, tile_data: dict) -> None:
+        title = tile_data.get("title", "")
+        url = tile_data.get("url", "")
+        if url:
+            self.db.add_speed_dial_tile(title, url)
+            self.refresh_tiles()
 
     def retranslate_ui(self) -> None:
         self.subtitle_label.setText(tr("app_subtitle"))
         self.search_input.setPlaceholderText(tr("search_placeholder"))
+        self.refresh_tiles()
 
     def _handle_search(self) -> None:
         query = self.search_input.text().strip()
@@ -171,6 +639,7 @@ class BrowserTab(QWidget):
         # 1: Стартовая панель быстрого поиска
         self.speed_dial = SpeedDialWidget(self.db)
         self.speed_dial.open_url.connect(self.load_url)
+        self.speed_dial.open_new_tab.connect(self.open_new_tab.emit)
 
         # 2: Режим чтения (QTextBrowser)
         self.reader_view = ReaderViewWidget()
@@ -290,6 +759,7 @@ class BrowserTab(QWidget):
         self.current_url = "surf://newtab"
         self.title_changed.emit(self.current_title)
         self.url_changed.emit("")
+        self.speed_dial.refresh_tiles()
 
     def show_normal_view(self) -> None:
         if self.current_url and not self.current_url.startswith("surf://"):
@@ -314,6 +784,8 @@ class BrowserTab(QWidget):
     def set_theme_mode(self, is_dark: bool) -> None:
         if hasattr(self, "reader_view"):
             self.reader_view.set_theme_mode(is_dark)
+        if hasattr(self, "speed_dial"):
+            self.speed_dial.refresh_tiles()
 
     def toggle_reader_mode(self) -> None:
         if self.stack.currentIndex() == 2:

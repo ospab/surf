@@ -26,7 +26,18 @@ DEFAULT_SETTINGS = {
     "proxy_user": "",
     "proxy_password": "",
     "download_folder": os.path.expanduser("~/Downloads"),
+    "speed_dial_initialized": "0",
+    "restore_session_on_startup": "1",
 }
+
+DEFAULT_SPEED_DIAL_TILES = [
+    {"title": "Google", "url": "https://www.google.com", "icon": "google"},
+    {"title": "GitHub", "url": "https://github.com", "icon": "github"},
+    {"title": "YouTube", "url": "https://www.youtube.com", "icon": "youtube"},
+    {"title": "Habr", "url": "https://habr.com", "icon": "habr"},
+    {"title": "Wikipedia", "url": "https://ru.wikipedia.org", "icon": "wikipedia"},
+    {"title": "Яндекс", "url": "https://ya.ru", "icon": "yandex"},
+]
 
 
 class Database:
@@ -109,6 +120,48 @@ class Database:
                 cursor.execute(
                     "UPDATE settings SET value = 'https://www.google.com' WHERE key = 'homepage' AND value = 'https://ya.ru'"
                 )
+
+            # Плитки быстрого доступа (Speed Dial / Top Sites)
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS speed_dial_tiles (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    url TEXT NOT NULL,
+                    icon TEXT NOT NULL DEFAULT '',
+                    position INTEGER NOT NULL DEFAULT 0
+                )
+                """
+            )
+
+            cursor.execute("SELECT COUNT(*) AS count FROM speed_dial_tiles")
+            has_tiles = cursor.fetchone()["count"] > 0
+            cursor.execute("SELECT value FROM settings WHERE key = 'speed_dial_initialized'")
+            init_row = cursor.fetchone()
+            dial_initialized = init_row is not None and init_row["value"] == "1"
+
+            if not has_tiles and not dial_initialized:
+                for pos, tile in enumerate(DEFAULT_SPEED_DIAL_TILES):
+                    cursor.execute(
+                        "INSERT INTO speed_dial_tiles (title, url, icon, position) VALUES (?, ?, ?, ?)",
+                        (tile["title"], tile["url"], tile.get("icon", ""), pos),
+                    )
+                cursor.execute(
+                    "INSERT OR REPLACE INTO settings (key, value) VALUES ('speed_dial_initialized', '1')"
+                )
+
+            # Сессии открытых вкладок (Session Restore)
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS session_tabs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    url TEXT NOT NULL,
+                    title TEXT NOT NULL DEFAULT '',
+                    tab_index INTEGER NOT NULL DEFAULT 0,
+                    is_active INTEGER NOT NULL DEFAULT 0
+                )
+                """
+            )
 
             conn.commit()
 
@@ -352,3 +405,120 @@ class Database:
             for h in history:
                 writer.writerow([h["id"], h["title"], h["url"], h["visit_time"], h["visit_count"]])
         return len(history)
+
+    # --- Плитки быстрого доступа (Speed Dial / Top Sites) ---
+
+    def get_speed_dial_tiles(self) -> list[dict]:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, title, url, icon, position FROM speed_dial_tiles ORDER BY position ASC, id ASC"
+            )
+            return [dict(row) for row in cursor.fetchall()]
+
+    def add_speed_dial_tile(self, title: str, url: str, icon: str = "") -> int:
+        if not url:
+            return -1
+        title = title.strip() if title else url
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COALESCE(MAX(position), -1) + 1 AS next_pos FROM speed_dial_tiles")
+            next_pos = cursor.fetchone()["next_pos"]
+            cursor.execute(
+                "INSERT INTO speed_dial_tiles (title, url, icon, position) VALUES (?, ?, ?, ?)",
+                (title, url, icon, next_pos),
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    def update_speed_dial_tile(self, tile_id: int, title: str, url: str, icon: str = "") -> bool:
+        if not url:
+            return False
+        title = title.strip() if title else url
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE speed_dial_tiles SET title = ?, url = ?, icon = ? WHERE id = ?",
+                (title, url, icon, tile_id),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def delete_speed_dial_tile(self, tile_id: int) -> bool:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM speed_dial_tiles WHERE id = ?", (tile_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def get_top_visited_sites(self, limit: int = 6) -> list[dict]:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT url, title, SUM(visit_count) AS visits
+                FROM history
+                WHERE url NOT LIKE 'surf://%' AND url NOT LIKE 'about:%' AND url NOT LIKE 'data:%'
+                GROUP BY url
+                ORDER BY visits DESC
+                LIMIT ?
+                """,
+                (limit,),
+            )
+            rows = cursor.fetchall()
+            result = []
+            for row in rows:
+                url = row["url"]
+                title = (row["title"] or "").strip()
+                if not title or title == url:
+                    parsed = urlparse(url)
+                    title = parsed.netloc.replace("www.", "") or url
+                result.append({
+                    "id": None,
+                    "title": title,
+                    "url": url,
+                    "icon": "",
+                    "position": 0,
+                    "is_fallback": True,
+                })
+            return result
+
+    get_most_visited_sites = get_top_visited_sites
+
+    # --- Восстановление сессий (Session Restore) ---
+
+    def save_session_tabs(self, tabs: list[dict]) -> None:
+        """Сохраняет список вкладок текущей сессии."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM session_tabs")
+            for t in tabs:
+                url = t.get("url", "")
+                if not url or url.startswith("data:"):
+                    continue
+                cursor.execute(
+                    "INSERT INTO session_tabs (url, title, tab_index, is_active) VALUES (?, ?, ?, ?)",
+                    (url, t.get("title", ""), t.get("tab_index", 0), 1 if t.get("is_active") else 0),
+                )
+            conn.commit()
+
+    def get_saved_session_tabs(self) -> list[dict]:
+        """Возвращает вкладки сохранённой сессии."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, url, title, tab_index, is_active FROM session_tabs ORDER BY tab_index ASC, id ASC"
+            )
+            res = []
+            for row in cursor.fetchall():
+                d = dict(row)
+                d["is_active"] = bool(d.get("is_active", 0))
+                res.append(d)
+            return res
+
+    def clear_saved_session(self) -> None:
+        """Очищает сохранённую сессию."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM session_tabs")
+            conn.commit()

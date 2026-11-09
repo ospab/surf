@@ -324,6 +324,103 @@ QStatusBar QLabel {
     background-color: #ffffff;
 }
 
+/* Сетка плиток быстрого доступа (Speed Dial / Top Sites) */
+#speedDialContainer {
+    background: transparent;
+}
+
+SpeedDialCard, #speedDialCard, .SpeedDialCard {
+    background-color: #ffffff;
+    border: 1px solid #e5e5ea;
+    border-radius: 12px;
+}
+
+SpeedDialCard:hover, #speedDialCard:hover, .SpeedDialCard:hover {
+    background-color: #f8f8fa;
+    border-color: #c7c7cc;
+}
+
+#speedDialCardTitle {
+    color: #15141a;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+#speedDialAddCard {
+    background-color: rgba(255, 255, 255, 0.7);
+    border: 1.5px dashed #c7c7cc;
+    border-radius: 12px;
+}
+
+#speedDialAddCard:hover {
+    background-color: #ffffff;
+    border: 1.5px dashed __ACCENT__;
+}
+
+#speedDialAddTitle {
+    color: #636366;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+#speedDialAddCard:hover #speedDialAddTitle {
+    color: #15141a;
+}
+
+#tileMenuBtn {
+    background: transparent;
+    border: none;
+    border-radius: 9px;
+    color: #8e8e93;
+    font-size: 13px;
+    font-weight: bold;
+    padding: 0;
+    line-height: 1;
+}
+
+#tileMenuBtn:hover {
+    background-color: #e5e5ea;
+    color: #15141a;
+}
+
+/* Диалог добавления/редактирования ярлыка */
+#speedDialDialog {
+    background-color: #f2f2f7;
+}
+
+#speedDialDialog QLabel {
+    color: #15141a;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+#speedDialDialog QLineEdit {
+    background-color: #ffffff;
+    border: 1px solid #c7c7cc;
+    border-radius: 6px;
+    padding: 6px 12px;
+    color: #15141a;
+    font-size: 13px;
+}
+
+#speedDialDialog QLineEdit:focus {
+    border-color: __ACCENT__;
+}
+
+#speedDialDialog #btnPrimary {
+    background-color: __ACCENT__;
+    color: #ffffff;
+    border: 1px solid __ACCENT__;
+    border-radius: 6px;
+    font-weight: bold;
+    padding: 6px 16px;
+}
+
+#speedDialDialog #btnPrimary:hover {
+    background-color: __ACCENT__;
+    opacity: 0.9;
+}
+
 /* Режим чтения */
 #readerToolbar {
     background-color: #e5e5ea;

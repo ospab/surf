@@ -309,6 +309,103 @@ QStatusBar {
     background-color: #2a2a35;
 }
 
+/* Сетка плиток быстрого доступа (Speed Dial / Top Sites) */
+#speedDialContainer {
+    background: transparent;
+}
+
+SpeedDialCard, #speedDialCard, .SpeedDialCard {
+    background-color: #24242d;
+    border: 1px solid #353542;
+    border-radius: 12px;
+}
+
+SpeedDialCard:hover, #speedDialCard:hover, .SpeedDialCard:hover {
+    background-color: #2e2e3a;
+    border-color: #48485a;
+}
+
+#speedDialCardTitle {
+    color: #fbfbfe;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+#speedDialAddCard {
+    background-color: rgba(36, 36, 45, 0.6);
+    border: 1.5px dashed #3e3e4f;
+    border-radius: 12px;
+}
+
+#speedDialAddCard:hover {
+    background-color: #24242d;
+    border: 1.5px dashed __ACCENT__;
+}
+
+#speedDialAddTitle {
+    color: #9d9da8;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+#speedDialAddCard:hover #speedDialAddTitle {
+    color: #fbfbfe;
+}
+
+#tileMenuBtn {
+    background: transparent;
+    border: none;
+    border-radius: 9px;
+    color: #8f8f9d;
+    font-size: 13px;
+    font-weight: bold;
+    padding: 0;
+    line-height: 1;
+}
+
+#tileMenuBtn:hover {
+    background-color: #353542;
+    color: #fbfbfe;
+}
+
+/* Диалог добавления/редактирования ярлыка */
+#speedDialDialog {
+    background-color: #1c1b22;
+}
+
+#speedDialDialog QLabel {
+    color: #fbfbfe;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+#speedDialDialog QLineEdit {
+    background-color: #24242d;
+    border: 1px solid #353542;
+    border-radius: 6px;
+    padding: 6px 12px;
+    color: #fbfbfe;
+    font-size: 13px;
+}
+
+#speedDialDialog QLineEdit:focus {
+    border-color: __ACCENT__;
+}
+
+#speedDialDialog #btnPrimary {
+    background-color: __ACCENT__;
+    color: #ffffff;
+    border: 1px solid __ACCENT__;
+    border-radius: 6px;
+    font-weight: bold;
+    padding: 6px 16px;
+}
+
+#speedDialDialog #btnPrimary:hover {
+    background-color: __ACCENT__;
+    opacity: 0.9;
+}
+
 /* Диалог настроек и модальные окна */
 QGroupBox {
     border: 1px solid #353542;

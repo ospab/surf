@@ -98,6 +98,30 @@ TRANSLATIONS = {
         "save_screenshot_dialog": "Сохранить скриншот страницы",
         "save_download_dialog": "Сохранить загружаемый файл",
 
+        # Быстрый доступ (Speed Dial / Top Sites)
+        "speed_dial_title": "Быстрый доступ",
+        "speed_dial_open": "Открыть",
+        "speed_dial_add": "Добавить сайт",
+        "speed_dial_edit": "Редактировать...",
+        "speed_dial_delete": "Удалить",
+        "speed_dial_pin": "Закрепить на панели",
+        "speed_dial_dialog_add_title": "Новый ярлык",
+        "speed_dial_dialog_edit_title": "Редактировать ярлык",
+        "speed_dial_name_label": "Название:",
+        "speed_dial_name_placeholder": "Например, Google",
+        "speed_dial_url_label": "Веб-адрес (URL):",
+        "speed_dial_url_placeholder": "https://example.com",
+        "btn_save": "Сохранить",
+        "btn_cancel": "Отмена",
+
+        # Восстановление сессий (Session Restore)
+        "act_restore_session": "Восстановить предыдущую сессию",
+        "tip_restore_session": "Открыть вкладки из предыдущего сеанса",
+        "pref_restore_session": "Восстанавливать вкладки прошлого сеанса при запуске",
+        "status_session_restored": "Восстановлено вкладок: {count}",
+        "status_no_session": "Нет сохранённых сессий для восстановления",
+        "btn_restore_session": "Восстановить прошлую сессию",
+
         # О программе
         "about_title": "О программе surf",
         "about_text": (
@@ -349,6 +373,30 @@ TRANSLATIONS = {
         "save_pdf_dialog": "Save Web Page as PDF",
         "save_screenshot_dialog": "Save Page Screenshot",
         "save_download_dialog": "Save Downloaded File",
+
+        # Speed Dial / Top Sites
+        "speed_dial_title": "Top Sites",
+        "speed_dial_open": "Open",
+        "speed_dial_add": "Add Shortcut",
+        "speed_dial_edit": "Edit...",
+        "speed_dial_delete": "Delete",
+        "speed_dial_pin": "Pin to Speed Dial",
+        "speed_dial_dialog_add_title": "Add Shortcut",
+        "speed_dial_dialog_edit_title": "Edit Shortcut",
+        "speed_dial_name_label": "Name:",
+        "speed_dial_name_placeholder": "e.g., Google",
+        "speed_dial_url_label": "URL:",
+        "speed_dial_url_placeholder": "https://example.com",
+        "btn_save": "Save",
+        "btn_cancel": "Cancel",
+
+        # Session Restore
+        "act_restore_session": "Restore Previous Session",
+        "tip_restore_session": "Open tabs from previous session",
+        "pref_restore_session": "Restore previous session tabs on startup",
+        "status_session_restored": "Restored tabs: {count}",
+        "status_no_session": "No saved session to restore",
+        "btn_restore_session": "Restore Previous Session",
 
         # About
         "about_title": "About surf",
