@@ -2,14 +2,33 @@ import os
 from PyQt6 import uic
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QCheckBox, QColorDialog, QDialog, QFileDialog
+from PyQt6.QtWidgets import (
+    QAbstractItemView,
+    QCheckBox,
+    QColorDialog,
+    QComboBox,
+    QDialog,
+    QFileDialog,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
 
 try:
     from surf.database import Database
     from surf.i18n import get_language, set_language, tr
+    from surf.utils.device_service import DeviceService
 except ModuleNotFoundError:
     from database import Database
     from i18n import get_language, set_language, tr
+    from utils.device_service import DeviceService
 
 SEARCH_ENGINES = {
     0: ("google", "Google", "https://www.google.com/search?q="),
@@ -44,8 +63,145 @@ class SettingsDialog(QDialog):
         ui_path = os.path.join(os.path.dirname(__file__), "..", "ui", "settings.ui")
         uic.loadUi(ui_path, self)
 
+        self._setup_devices_tab()
         self._load_current_settings()
         self._connect_signals()
+
+    def _setup_devices_tab(self) -> None:
+        """Создает и настраивает вкладку 'Устройства' для выбора микрофона, камеры и разрешений сайтов."""
+        self.devicesTab = QWidget()
+        dev_layout = QVBoxLayout(self.devicesTab)
+        dev_layout.setContentsMargins(16, 16, 16, 16)
+        dev_layout.setSpacing(16)
+
+        # 1. Группа устройств по умолчанию
+        self.defaultDevGroup = QGroupBox(tr("group_default_devices"))
+        grp_layout = QFormLayout(self.defaultDevGroup)
+        grp_layout.setSpacing(12)
+
+        self.defaultMicCombo = QComboBox()
+        self.defaultCamCombo = QComboBox()
+
+        self.lblDefaultMic = QLabel(tr("lbl_default_mic"))
+        self.lblDefaultCam = QLabel(tr("lbl_default_camera"))
+        grp_layout.addRow(self.lblDefaultMic, self.defaultMicCombo)
+        grp_layout.addRow(self.lblDefaultCam, self.defaultCamCombo)
+        dev_layout.addWidget(self.defaultDevGroup)
+
+        # 2. Группа сохраненных разрешений сайтов
+        self.siteDevGroup = QGroupBox(tr("group_site_devices"))
+        site_layout = QVBoxLayout(self.siteDevGroup)
+        site_layout.setSpacing(8)
+
+        self.siteDevTable = QTableWidget()
+        self.siteDevTable.setColumnCount(4)
+        self.siteDevTable.setHorizontalHeaderLabels([
+            tr("col_site"),
+            tr("col_microphone"),
+            tr("col_camera"),
+            tr("col_action"),
+        ])
+        self.siteDevTable.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.siteDevTable.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        self.siteDevTable.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        self.siteDevTable.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        self.siteDevTable.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.siteDevTable.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        site_layout.addWidget(self.siteDevTable)
+
+        tbl_btn_row = QHBoxLayout()
+        tbl_btn_row.addStretch()
+        self.clearAllDevBtn = QPushButton(tr("btn_clear_all_devices"))
+        self.clearAllDevBtn.clicked.connect(self._clear_all_site_devices)
+        tbl_btn_row.addWidget(self.clearAllDevBtn)
+        site_layout.addLayout(tbl_btn_row)
+
+        dev_layout.addWidget(self.siteDevGroup, 1)
+
+        self.settingsTabs.addTab(self.devicesTab, tr("tab_devices"))
+
+    def _load_device_settings(self) -> None:
+        """Загружает список устройств и текущие настройки микрофона и камеры."""
+        svc = DeviceService.instance()
+
+        # Микрофоны
+        self.defaultMicCombo.clear()
+        self.defaultMicCombo.addItem(tr("system_default_device"), "")
+        for m in svc.get_audio_inputs():
+            label = m["name"]
+            if m.get("is_default"):
+                label += f" ({tr('lbl_default')})"
+            self.defaultMicCombo.addItem(label, m["name"])
+
+        # Камеры
+        self.defaultCamCombo.clear()
+        self.defaultCamCombo.addItem(tr("system_default_device"), "")
+        for c in svc.get_video_inputs():
+            label = c["name"]
+            if c.get("is_default"):
+                label += f" ({tr('lbl_default')})"
+            self.defaultCamCombo.addItem(label, c["name"])
+
+        saved_mic = self.db.get_setting("default_audio_device", "")
+        if saved_mic:
+            idx = self.defaultMicCombo.findData(saved_mic)
+            if idx >= 0:
+                self.defaultMicCombo.setCurrentIndex(idx)
+
+        saved_cam = self.db.get_setting("default_video_device", "")
+        if saved_cam:
+            idx = self.defaultCamCombo.findData(saved_cam)
+            if idx >= 0:
+                self.defaultCamCombo.setCurrentIndex(idx)
+
+        self._load_site_device_table()
+
+    def _load_site_device_table(self) -> None:
+        """Заполняет таблицу сохранённых разрешений сайтов на микрофоны и камеры."""
+        self.siteDevTable.setRowCount(0)
+        prefs = self.db.get_all_site_device_preferences()
+        self.siteDevTable.setRowCount(len(prefs))
+        for row, item in enumerate(prefs):
+            origin = item.get("origin", "")
+            allow_a = item.get("allow_audio", True)
+            dev_a = item.get("audio_device", "")
+            allow_v = item.get("allow_video", True)
+            dev_v = item.get("video_device", "")
+
+            site_item = QTableWidgetItem(origin)
+            self.siteDevTable.setItem(row, 0, site_item)
+
+            mic_txt = dev_a if allow_a else tr("device_blocked")
+            if allow_a and not dev_a:
+                mic_txt = tr("system_default_device")
+            mic_item = QTableWidgetItem(mic_txt)
+            self.siteDevTable.setItem(row, 1, mic_item)
+
+            cam_txt = dev_v if allow_v else tr("device_blocked")
+            if allow_v and not dev_v:
+                cam_txt = tr("system_default_device")
+            cam_item = QTableWidgetItem(cam_txt)
+            self.siteDevTable.setItem(row, 2, cam_item)
+
+            del_btn = QPushButton(tr("btn_delete_perm"))
+            del_btn.clicked.connect(lambda checked, orig=origin: self._delete_site_device(orig))
+            self.siteDevTable.setCellWidget(row, 3, del_btn)
+
+    def _delete_site_device(self, origin: str) -> None:
+        self.db.delete_site_device_preference(origin)
+        self.db.delete_site_permission(origin, "media")
+        self.db.delete_site_permission(origin, "audio")
+        self.db.delete_site_permission(origin, "video")
+        self._load_site_device_table()
+
+    def _clear_all_site_devices(self) -> None:
+        with self.db._get_connection() as conn:
+            conn.cursor().execute("DELETE FROM site_device_preferences")
+            conn.commit()
+        self.db.delete_site_permission(feature="media")
+        self.db.delete_site_permission(feature="audio")
+        self.db.delete_site_permission(feature="video")
+        self._load_site_device_table()
 
     def _load_current_settings(self) -> None:
         # Основные
@@ -130,6 +286,9 @@ class SettingsDialog(QDialog):
 
         self.accent_color = self.db.get_setting("accent_color", "#0060df")
         self._update_color_button(self.accent_color)
+
+        # Устройства
+        self._load_device_settings()
 
     def _connect_signals(self) -> None:
         self.browseDownloadBtn.clicked.connect(self._choose_download_dir)
@@ -257,6 +416,21 @@ class SettingsDialog(QDialog):
         self.colorLabel.setText(tr("lbl_accent"))
         self.colorBtn.setText(tr("btn_accent"))
 
+        # Устройства
+        self.settingsTabs.setTabText(4, tr("tab_devices"))
+        if hasattr(self, "defaultDevGroup"):
+            self.defaultDevGroup.setTitle(tr("group_default_devices"))
+            self.lblDefaultMic.setText(tr("lbl_default_mic"))
+            self.lblDefaultCam.setText(tr("lbl_default_camera"))
+            self.siteDevGroup.setTitle(tr("group_site_devices"))
+            self.siteDevTable.setHorizontalHeaderLabels([
+                tr("col_site"),
+                tr("col_microphone"),
+                tr("col_camera"),
+                tr("col_action"),
+            ])
+            self.clearAllDevBtn.setText(tr("btn_clear_all_devices"))
+
     def _save_settings(self) -> None:
         # Основные
         homepage = self.homeEdit.text().strip() or "https://www.google.com"
@@ -309,6 +483,14 @@ class SettingsDialog(QDialog):
         # Оформление
         self.db.set_setting("theme", "dark" if self.themeCombo.currentIndex() == 0 else "light")
         self.db.set_setting("accent_color", self.accent_color)
+
+        # Устройства по умолчанию
+        if hasattr(self, "defaultMicCombo"):
+            def_mic = self.defaultMicCombo.currentData() or ""
+            self.db.set_setting("default_audio_device", def_mic)
+        if hasattr(self, "defaultCamCombo"):
+            def_cam = self.defaultCamCombo.currentData() or ""
+            self.db.set_setting("default_video_device", def_cam)
 
         self.settings_changed.emit()
         self.accept()

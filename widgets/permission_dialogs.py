@@ -1,7 +1,7 @@
 """
 Модуль системных запросов разрешений на устройства и медиа (Permissions & Device Prompts).
 Реализует:
-- Выпадающую панель разрешения устройств (PermissionPromptBar) для микрофона, камеры, геолокации и т.д.
+- Выпадающую панель разрешения устройств (PermissionPromptBar) с разделением на микрофоны и камеры и выбором конкретного девайса
 - Диалог выбора экрана/окна для демонстрации (DesktopMediaDialog)
 - Подтверждение доступа к файловой системе (FileSystemAccessDialog)
 """
@@ -18,7 +18,9 @@ from PyQt6.QtWebEngineCore import (
 )
 from PyQt6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QDialog,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QListView,
@@ -30,8 +32,10 @@ from PyQt6.QtWidgets import (
 
 try:
     from surf.i18n import get_language, tr
+    from surf.utils.device_service import DeviceService
 except ModuleNotFoundError:
     from i18n import get_language, tr
+    from utils.device_service import DeviceService
 
 
 def normalize_origin(url: QUrl) -> str:
@@ -53,19 +57,19 @@ def get_feature_info(feature_or_type, is_ru: bool) -> tuple[str, str, str]:
     """
     type_str = str(feature_or_type).lower()
 
-    if "audio" in type_str and "video" in type_str:
+    if type_str in ("media", "audiovideo", "videoaudio") or ("audio" in type_str and "video" in type_str):
         return (
             "media",
             "доступ к микрофону и камере" if is_ru else "access to microphone and camera",
             "camera.svg",
         )
-    elif "audio" in type_str:
+    elif "audio" in type_str or type_str in ("mic", "microphone"):
         return (
             "audio",
             "доступ к микрофону" if is_ru else "access to your microphone",
             "mic.svg",
         )
-    elif "video" in type_str:
+    elif "video" in type_str or type_str in ("cam", "camera"):
         return (
             "video",
             "доступ к камере" if is_ru else "access to your camera",
@@ -124,7 +128,6 @@ def load_themed_icon(icon_name: str, color_hex: str = "#fbfbfe", size: int = 18)
     try:
         with open(icon_path, "r", encoding="utf-8") as f:
             svg_data = f.read()
-        # Заменяем stroke="currentColor" на нужный цвет
         svg_data = svg_data.replace('stroke="currentColor"', f'stroke="{color_hex}"')
         svg_data = svg_data.replace('fill="currentColor"', f'fill="{color_hex}"')
 
@@ -144,12 +147,12 @@ def load_themed_icon(icon_name: str, color_hex: str = "#fbfbfe", size: int = 18)
 
 class PermissionPromptBar(QWidget):
     """
-    Выпадающая плашка-промпт запроса доступа к девайсам
-    (микрофон, камера, геолокация, уведомления и т.д.)
+    Выпадающая плашка-промпт запроса доступа к девайсам с разделением на микрофон
+    и камеру, выпадающими списками конкретных устройств и кнопками действий.
     """
 
-    allowed = pyqtSignal(bool)   # remember: bool
-    denied = pyqtSignal(bool)    # remember: bool
+    allowed = pyqtSignal(object)   # remember or dict
+    denied = pyqtSignal(bool)     # remember: bool
     dismissed = pyqtSignal()
 
     def __init__(self, parent=None):
@@ -166,47 +169,107 @@ class PermissionPromptBar(QWidget):
         self.hide()
 
     def _init_ui(self) -> None:
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(16, 8, 16, 8)
-        layout.setSpacing(12)
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(16, 10, 16, 10)
+        main_layout.setSpacing(8)
 
-        # Иконка устройства
+        # 1. Верхняя строка: Иконка + Заголовок + Быстрый крестик
+        top_row = QHBoxLayout()
+        top_row.setSpacing(10)
+
         self.icon_label = QLabel(self)
         self.icon_label.setFixedSize(20, 20)
         self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.icon_label)
+        top_row.addWidget(self.icon_label)
 
-        # Текст запроса
         self.text_label = QLabel(self)
         self.text_label.setTextFormat(Qt.TextFormat.RichText)
         self.text_label.setFont(QFont("-apple-system, BlinkMacSystemFont, Segoe UI, Roboto", 10))
-        layout.addWidget(self.text_label, 1)
+        top_row.addWidget(self.text_label, 1)
 
-        # Чекбокс «Запомнить выбор»
-        self.remember_cb = QCheckBox(self)
-        self.remember_cb.setChecked(True)
-        self.remember_cb.setCursor(Qt.CursorShape.PointingHandCursor)
-        layout.addWidget(self.remember_cb)
-
-        # Кнопка Заблокировать
-        self.btn_deny = QPushButton(self)
-        self.btn_deny.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_deny.clicked.connect(self._on_deny_clicked)
-        layout.addWidget(self.btn_deny)
-
-        # Кнопка Разрешить
-        self.btn_allow = QPushButton(self)
-        self.btn_allow.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_allow.clicked.connect(self._on_allow_clicked)
-        layout.addWidget(self.btn_allow)
-
-        # Кнопка закрыть (крестик)
         self.btn_close = QPushButton("×", self)
         self.btn_close.setFixedSize(24, 24)
         self.btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_close.setToolTip("Закрыть")
         self.btn_close.clicked.connect(self._on_dismiss_clicked)
-        layout.addWidget(self.btn_close)
+        top_row.addWidget(self.btn_close)
+        main_layout.addLayout(top_row)
+
+        # 2. Блок выбора конкретных устройств (Микрофон / Камера)
+        self.device_box = QWidget(self)
+        device_box_layout = QVBoxLayout(self.device_box)
+        device_box_layout.setContentsMargins(30, 2, 0, 2)
+        device_box_layout.setSpacing(6)
+
+        # Строка микрофона
+        self.mic_row = QWidget(self.device_box)
+        mic_layout = QHBoxLayout(self.mic_row)
+        mic_layout.setContentsMargins(0, 0, 0, 0)
+        mic_layout.setSpacing(10)
+
+        self.mic_icon = QLabel(self.mic_row)
+        self.mic_icon.setFixedSize(16, 16)
+        mic_layout.addWidget(self.mic_icon)
+
+        self.mic_check = QCheckBox(self.mic_row)
+        self.mic_check.setChecked(True)
+        self.mic_check.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.mic_check.toggled.connect(self._on_mic_toggled)
+        mic_layout.addWidget(self.mic_check)
+
+        self.mic_combo = QComboBox(self.mic_row)
+        self.mic_combo.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.mic_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        mic_layout.addWidget(self.mic_combo, 1)
+        device_box_layout.addWidget(self.mic_row)
+
+        # Строка камеры
+        self.cam_row = QWidget(self.device_box)
+        cam_layout = QHBoxLayout(self.cam_row)
+        cam_layout.setContentsMargins(0, 0, 0, 0)
+        cam_layout.setSpacing(10)
+
+        self.cam_icon = QLabel(self.cam_row)
+        self.cam_icon.setFixedSize(16, 16)
+        cam_layout.addWidget(self.cam_icon)
+
+        self.cam_check = QCheckBox(self.cam_row)
+        self.cam_check.setChecked(True)
+        self.cam_check.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.cam_check.toggled.connect(self._on_cam_toggled)
+        cam_layout.addWidget(self.cam_check)
+
+        self.cam_combo = QComboBox(self.cam_row)
+        self.cam_combo.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.cam_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        cam_layout.addWidget(self.cam_combo, 1)
+        device_box_layout.addWidget(self.cam_row)
+
+        main_layout.addWidget(self.device_box)
+
+        # 3. Нижняя строка действий
+        bottom_row = QHBoxLayout()
+        bottom_row.setSpacing(10)
+        bottom_row.setContentsMargins(30, 2, 0, 0)
+
+        self.remember_cb = QCheckBox(self)
+        self.remember_cb.setChecked(True)
+        self.remember_cb.setCursor(Qt.CursorShape.PointingHandCursor)
+        bottom_row.addWidget(self.remember_cb)
+
+        bottom_row.addStretch()
+
+        self.btn_deny = QPushButton(self)
+        self.btn_deny.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_deny.clicked.connect(self._on_deny_clicked)
+        bottom_row.addWidget(self.btn_deny)
+
+        self.btn_allow = QPushButton(self)
+        self.btn_allow.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_allow.clicked.connect(self._on_allow_clicked)
+        bottom_row.addWidget(self.btn_allow)
+
+        main_layout.addLayout(bottom_row)
 
         self._apply_style()
 
@@ -223,6 +286,7 @@ class PermissionPromptBar(QWidget):
             deny_bg = "#2e2d38"
             deny_hover = "#393846"
             close_hover = "#393846"
+            combo_bg = "#2b2a33"
         else:
             bg = "#f0f0f4"
             border = "#d1d1d6"
@@ -230,6 +294,7 @@ class PermissionPromptBar(QWidget):
             deny_bg = "#ffffff"
             deny_hover = "#e5e5ea"
             close_hover = "#e5e5ea"
+            combo_bg = "#ffffff"
 
         self.setStyleSheet(f"""
             PermissionPromptBar {{
@@ -242,6 +307,27 @@ class PermissionPromptBar(QWidget):
             QCheckBox {{
                 color: {text_color};
                 font-size: 12px;
+                spacing: 6px;
+            }}
+            QComboBox {{
+                background-color: {combo_bg};
+                border: 1px solid {border};
+                border-radius: 4px;
+                padding: 4px 10px;
+                color: {text_color};
+                font-size: 12px;
+                min-height: 22px;
+            }}
+            QComboBox:disabled {{
+                opacity: 0.5;
+                color: #888888;
+            }}
+            QComboBox QAbstractItemView {{
+                background-color: {combo_bg};
+                border: 1px solid {border};
+                selection-background-color: {self._accent};
+                selection-color: #ffffff;
+                color: {text_color};
             }}
             QPushButton#allowBtn {{
                 background-color: {self._accent};
@@ -250,7 +336,7 @@ class PermissionPromptBar(QWidget):
                 font-size: 12px;
                 border: none;
                 border-radius: 6px;
-                padding: 5px 16px;
+                padding: 6px 18px;
             }}
             QPushButton#allowBtn:hover {{
                 opacity: 0.9;
@@ -283,6 +369,44 @@ class PermissionPromptBar(QWidget):
         self.btn_deny.setObjectName("denyBtn")
         self.btn_close.setObjectName("closeBtn")
 
+        color = "#fbfbfe" if self._is_dark else "#15141a"
+        self.mic_icon.setPixmap(load_themed_icon("mic.svg", color, size=14))
+        self.cam_icon.setPixmap(load_themed_icon("camera.svg", color, size=14))
+
+    def _on_mic_toggled(self, checked: bool) -> None:
+        self.mic_combo.setEnabled(checked)
+
+    def _on_cam_toggled(self, checked: bool) -> None:
+        self.cam_combo.setEnabled(checked)
+
+    def _populate_devices(self) -> None:
+        """Заполняет списки доступных микрофонов и камер через DeviceService."""
+        svc = DeviceService.instance()
+
+        # Микрофоны
+        self.mic_combo.clear()
+        mics = svc.get_audio_inputs()
+        if mics:
+            for m in mics:
+                label = m["name"]
+                if m.get("is_default"):
+                    label += " (" + ("По умолчанию" if get_language() == "ru" else "Default") + ")"
+                self.mic_combo.addItem(label, m["name"])
+        else:
+            self.mic_combo.addItem("Микрофон не обнаружен" if get_language() == "ru" else "No microphone found", "")
+
+        # Камеры
+        self.cam_combo.clear()
+        cams = svc.get_video_inputs()
+        if cams:
+            for c in cams:
+                label = c["name"]
+                if c.get("is_default"):
+                    label += " (" + ("По умолчанию" if get_language() == "ru" else "Default") + ")"
+                self.cam_combo.addItem(label, c["name"])
+        else:
+            self.cam_combo.addItem("Камера не обнаружена" if get_language() == "ru" else "No camera found", "")
+
     def show_prompt(
         self,
         origin_str: str,
@@ -291,7 +415,7 @@ class PermissionPromptBar(QWidget):
         on_deny=None,
         on_dismiss=None,
     ) -> None:
-        """Показывает плашку запроса доступа к девайсу."""
+        """Показывает плашку запроса с разделением на микрофон и камеру."""
         self._current_origin = origin_str
         is_ru = get_language() == "ru"
 
@@ -311,6 +435,8 @@ class PermissionPromptBar(QWidget):
             self.remember_cb.setText("Запомнить выбор")
             self.btn_allow.setText("Разрешить")
             self.btn_deny.setText("Заблокировать")
+            self.mic_check.setText("Микрофон:")
+            self.cam_check.setText("Камера:")
         else:
             self.text_label.setText(
                 f"<b>{html.escape(clean_host)}</b> requests {friendly_text}"
@@ -318,8 +444,34 @@ class PermissionPromptBar(QWidget):
             self.remember_cb.setText("Remember decision")
             self.btn_allow.setText("Allow")
             self.btn_deny.setText("Block")
+            self.mic_check.setText("Microphone:")
+            self.cam_check.setText("Camera:")
 
-        # Иконка
+        # Настройка отображения устройств в зависимости от запрашиваемого типа
+        if feature_key in ("media", "audio", "video"):
+            self._populate_devices()
+            self.device_box.show()
+
+            if feature_key == "media":
+                self.mic_row.show()
+                self.mic_check.setChecked(True)
+                self.mic_combo.setEnabled(True)
+                self.cam_row.show()
+                self.cam_check.setChecked(True)
+                self.cam_combo.setEnabled(True)
+            elif feature_key == "audio":
+                self.mic_row.show()
+                self.mic_check.setChecked(True)
+                self.mic_combo.setEnabled(True)
+                self.cam_row.hide()
+            elif feature_key == "video":
+                self.mic_row.hide()
+                self.cam_row.show()
+                self.cam_check.setChecked(True)
+                self.cam_combo.setEnabled(True)
+        else:
+            self.device_box.hide()
+
         color = "#fbfbfe" if self._is_dark else "#15141a"
         pixmap = load_themed_icon(icon_name, color, size=18)
         self.icon_label.setPixmap(pixmap)
@@ -340,10 +492,30 @@ class PermissionPromptBar(QWidget):
     def _on_allow_clicked(self) -> None:
         remember = self.remember_cb.isChecked()
         cb = self._on_allow_cb
-        self.close_prompt()
-        if cb:
-            cb(remember)
-        self.allowed.emit(remember)
+
+        # Если это запрос медиаустройств — передаем подробную конфигурацию разделения девайсов
+        if self._current_feature_key in ("media", "audio", "video") and self.device_box.isVisible():
+            allow_audio = self.mic_check.isChecked() and not self.mic_row.isHidden()
+            selected_audio = self.mic_combo.currentData() or self.mic_combo.currentText()
+            allow_video = self.cam_check.isChecked() and not self.cam_row.isHidden()
+            selected_video = self.cam_combo.currentData() or self.cam_combo.currentText()
+
+            config = {
+                "allow_audio": allow_audio,
+                "selected_audio": selected_audio if allow_audio else "",
+                "allow_video": allow_video,
+                "selected_video": selected_video if allow_video else "",
+                "remember": remember,
+            }
+            self.close_prompt()
+            if cb:
+                cb(config)
+            self.allowed.emit(config)
+        else:
+            self.close_prompt()
+            if cb:
+                cb(remember)
+            self.allowed.emit(remember)
 
     def _on_deny_clicked(self) -> None:
         remember = self.remember_cb.isChecked()

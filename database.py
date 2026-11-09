@@ -165,6 +165,20 @@ class Database:
                 """
             )
 
+            # Выбор конкретных устройств ввода (микрофон, камера) для сайтов
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS site_device_preferences (
+                    origin TEXT PRIMARY KEY,
+                    audio_device TEXT DEFAULT '',
+                    video_device TEXT DEFAULT '',
+                    allow_audio INTEGER DEFAULT 1,
+                    allow_video INTEGER DEFAULT 1,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+
             conn.commit()
 
     # --- История ---
@@ -583,3 +597,70 @@ class Database:
             else:
                 cursor.execute("DELETE FROM site_permissions")
             conn.commit()
+
+    # --- Настройки конкретных устройств мультимедиа (микрофоны, камеры) ---
+
+    def get_site_device_preference(self, origin: str) -> dict | None:
+        """Возвращает настройки выбранных микрофона и камеры для источника."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT origin, audio_device, video_device, allow_audio, allow_video FROM site_device_preferences WHERE origin = ?",
+                (origin,),
+            )
+            row = cursor.fetchone()
+            if row:
+                d = dict(row)
+                d["allow_audio"] = bool(d.get("allow_audio", 1))
+                d["allow_video"] = bool(d.get("allow_video", 1))
+                return d
+            return None
+
+    def set_site_device_preference(
+        self,
+        origin: str,
+        audio_device: str = "",
+        video_device: str = "",
+        allow_audio: bool = True,
+        allow_video: bool = True,
+    ) -> None:
+        """Сохраняет выбранный микрофон и камеру для сайта."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO site_device_preferences (origin, audio_device, video_device, allow_audio, allow_video, updated_at)
+                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(origin) DO UPDATE SET
+                    audio_device = excluded.audio_device,
+                    video_device = excluded.video_device,
+                    allow_audio = excluded.allow_audio,
+                    allow_video = excluded.allow_video,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (origin, audio_device, video_device, 1 if allow_audio else 0, 1 if allow_video else 0),
+            )
+            conn.commit()
+
+    def delete_site_device_preference(self, origin: str) -> bool:
+        """Удаляет сохранённую конфигурацию устройств для источника."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM site_device_preferences WHERE origin = ?", (origin,))
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def get_all_site_device_preferences(self) -> list[dict]:
+        """Возвращает список сохранённых конфигураций девайсов для всех сайтов."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT origin, audio_device, video_device, allow_audio, allow_video, updated_at FROM site_device_preferences ORDER BY origin ASC"
+            )
+            res = []
+            for row in cursor.fetchall():
+                d = dict(row)
+                d["allow_audio"] = bool(d.get("allow_audio", 1))
+                d["allow_video"] = bool(d.get("allow_video", 1))
+                res.append(d)
+            return res

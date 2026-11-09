@@ -1,4 +1,5 @@
 import html
+import json
 import urllib.parse
 from urllib.parse import urlparse
 
@@ -159,8 +160,21 @@ class BrowserPage(QWebEnginePage):
 
         db = self.tab.db if self.tab and hasattr(self.tab, "db") else None
         if db:
+            if feat_key in ("media", "audio", "video"):
+                dev_pref = db.get_site_device_preference(origin_str)
+                if dev_pref:
+                    if self.tab and hasattr(self.tab, "apply_device_config"):
+                        self.tab.apply_device_config(dev_pref)
+                    if dev_pref.get("allow_audio") or dev_pref.get("allow_video"):
+                        permission.grant()
+                    else:
+                        permission.deny()
+                    return
+
             saved = db.get_site_permission(origin_str, feat_key)
             if saved == "allow":
+                if feat_key in ("media", "audio", "video") and self.tab and hasattr(self.tab, "apply_saved_device_preferences"):
+                    self.tab.apply_saved_device_preferences(origin_str)
                 permission.grant()
                 return
             elif saved == "deny":
@@ -178,8 +192,21 @@ class BrowserPage(QWebEnginePage):
 
         db = self.tab.db if self.tab and hasattr(self.tab, "db") else None
         if db:
+            if feat_key in ("media", "audio", "video"):
+                dev_pref = db.get_site_device_preference(origin_str)
+                if dev_pref:
+                    if self.tab and hasattr(self.tab, "apply_device_config"):
+                        self.tab.apply_device_config(dev_pref)
+                    if dev_pref.get("allow_audio") or dev_pref.get("allow_video"):
+                        self.setFeaturePermission(security_origin, feature, QWebEnginePage.PermissionPolicy.PermissionGrantedByUser)
+                    else:
+                        self.setFeaturePermission(security_origin, feature, QWebEnginePage.PermissionPolicy.PermissionDeniedByUser)
+                    return
+
             saved = db.get_site_permission(origin_str, feat_key)
             if saved == "allow":
+                if feat_key in ("media", "audio", "video") and self.tab and hasattr(self.tab, "apply_saved_device_preferences"):
+                    self.tab.apply_saved_device_preferences(origin_str)
                 self.setFeaturePermission(security_origin, feature, QWebEnginePage.PermissionPolicy.PermissionGrantedByUser)
                 return
             elif saved == "deny":
@@ -929,6 +956,39 @@ class BrowserTab(QWidget):
         self.stack.setCurrentIndex(0)
         self.url_changed.emit(url_str)
 
+    def apply_device_config(self, config: dict) -> None:
+        """Передает параметры выбранных аудио- и видеоустройств в контекст JavaScript страницы."""
+        try:
+            cfg_json = json.dumps({
+                "allow_audio": bool(config.get("allow_audio", True)),
+                "selected_audio": str(config.get("selected_audio") or config.get("audio_device") or ""),
+                "allow_video": bool(config.get("allow_video", True)),
+                "selected_video": str(config.get("selected_video") or config.get("video_device") or ""),
+            })
+            js_code = f"if (window.__surf_set_media_config) {{ window.__surf_set_media_config({cfg_json}); }}"
+            self.browser_page.runJavaScript(js_code)
+        except Exception:
+            pass
+
+    def apply_saved_device_preferences(self, url_str: str) -> None:
+        """Загружает сохраненные или стандартные устройства для текущего сайта."""
+        if not url_str or url_str.startswith("surf://") or url_str == "about:blank":
+            return
+        origin_str = normalize_origin(QUrl(url_str))
+        dev_pref = self.db.get_site_device_preference(origin_str) if self.db else None
+        if dev_pref:
+            self.apply_device_config(dev_pref)
+        else:
+            def_audio = self.db.get_setting("default_audio_device", "") if self.db else ""
+            def_video = self.db.get_setting("default_video_device", "") if self.db else ""
+            if def_audio or def_video:
+                self.apply_device_config({
+                    "allow_audio": True,
+                    "selected_audio": def_audio,
+                    "allow_video": True,
+                    "selected_video": def_video,
+                })
+
     def request_permission(
         self,
         origin_str: str,
@@ -950,25 +1010,57 @@ class BrowserTab(QWidget):
             if self.permission_bar._current_origin == origin_str and self.permission_bar._current_feature_key == feat_key:
                 return
 
-        def on_allow(remember: bool):
+        def on_allow(result):
+            if isinstance(result, dict):
+                allow_audio = result.get("allow_audio", True)
+                selected_audio = result.get("selected_audio", "")
+                allow_video = result.get("allow_video", True)
+                selected_video = result.get("selected_video", "")
+                remember = result.get("remember", False)
+
+                self.apply_device_config(result)
+
+                if remember and self.db:
+                    self.db.set_site_device_preference(
+                        origin_str,
+                        audio_device=selected_audio,
+                        video_device=selected_video,
+                        allow_audio=allow_audio,
+                        allow_video=allow_video,
+                    )
+                    self.db.set_site_permission(
+                        origin_str,
+                        feat_key,
+                        "allow" if (allow_audio or allow_video) else "deny",
+                    )
+
+                should_grant = bool(allow_audio or allow_video)
+            else:
+                should_grant = True
+                remember = bool(result)
+                if remember and self.db:
+                    self.db.set_site_permission(origin_str, feat_key, "allow")
+
             items = self._pending_perm_requests.pop(req_key, [])
             for req in items:
                 if req["permission"]:
                     try:
-                        req["permission"].grant()
+                        if should_grant:
+                            req["permission"].grant()
+                        else:
+                            req["permission"].deny()
                     except Exception:
                         pass
                 if req["origin_url"] and req["feature"] is not None:
                     try:
-                        self.browser_page.setFeaturePermission(
-                            req["origin_url"],
-                            req["feature"],
-                            QWebEnginePage.PermissionPolicy.PermissionGrantedByUser,
+                        policy = (
+                            QWebEnginePage.PermissionPolicy.PermissionGrantedByUser
+                            if should_grant
+                            else QWebEnginePage.PermissionPolicy.PermissionDeniedByUser
                         )
+                        self.browser_page.setFeaturePermission(req["origin_url"], req["feature"], policy)
                     except Exception:
                         pass
-            if remember and self.db:
-                self.db.set_site_permission(origin_str, feat_key, "allow")
 
         def on_deny(remember: bool):
             items = self._pending_perm_requests.pop(req_key, [])
@@ -989,6 +1081,14 @@ class BrowserTab(QWidget):
                         pass
             if remember and self.db:
                 self.db.set_site_permission(origin_str, feat_key, "deny")
+                if feat_key in ("media", "audio", "video"):
+                    self.db.set_site_device_preference(
+                        origin_str,
+                        audio_device="",
+                        video_device="",
+                        allow_audio=False,
+                        allow_video=False,
+                    )
 
         def on_dismiss():
             items = self._pending_perm_requests.pop(req_key, [])
@@ -1030,5 +1130,7 @@ class BrowserTab(QWidget):
                 FaviconService.instance().save_to_cache(self.current_url, pix)
 
     def _on_load_finished(self, ok: bool) -> None:
-        if ok and self.current_url and not self.current_url.startswith("surf://") and not self.profile.isOffTheRecord():
-            self.db.add_history_entry(self.current_url, self.current_title)
+        if ok and self.current_url and not self.current_url.startswith("surf://"):
+            self.apply_saved_device_preferences(self.current_url)
+            if not self.profile.isOffTheRecord():
+                self.db.add_history_entry(self.current_url, self.current_title)
