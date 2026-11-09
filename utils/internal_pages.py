@@ -38,6 +38,23 @@ def register_surf_scheme() -> None:
     QWebEngineUrlScheme.registerScheme(scheme)
 
 
+def get_base_js() -> str:
+    """Возвращает общий JavaScript для внутренних страниц: перехват Ctrl+клик и клик колесом мыши для открытия в новой вкладке."""
+    return """
+    <script>
+    document.addEventListener('click', function(e) {
+        var a = e.target.closest('a');
+        if (!a || !a.href) return;
+        if (e.ctrlKey || e.metaKey || e.button === 1) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.open(a.href, '_blank');
+        }
+    });
+    </script>
+    """
+
+
 def get_base_css(is_dark: bool, accent: str = "#0060df") -> str:
     """Возвращает общие стили для внутренних страниц surf."""
     if is_dark:
@@ -279,6 +296,7 @@ def render_pages_directory(is_dark: bool, accent: str = "#0060df") -> str:
         <meta charset="utf-8">
         <title>{title}</title>
         <style>{get_base_css(is_dark, accent)}</style>
+        {get_base_js()}
     </head>
     <body>
         <div class="container">
@@ -301,7 +319,7 @@ def render_pages_directory(is_dark: bool, accent: str = "#0060df") -> str:
 
 
 def render_about_page(db: Database, is_dark: bool, accent: str = "#0060df") -> str:
-    """Генерирует страницу surf://about в элегантном центрированном дизайне с брендингом ospab foundation."""
+    """Генерирует минималистичную страницу surf://about строго в стиле mozilla без фиктивных элементов."""
     is_ru = get_language() == "ru"
     title = "О программе surf" if is_ru else "About surf"
 
@@ -312,8 +330,6 @@ def render_about_page(db: Database, is_dark: bool, accent: str = "#0060df") -> s
         "custom_user_agent",
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Surf/1.0",
     )
-    search_eng = db.get_setting("search_engine", "https://www.google.com/search?q=")
-    dl_folder = db.get_setting("download_folder", os.path.join(os.path.expanduser("~"), "Downloads"))
 
     return f"""<!DOCTYPE html>
     <html>
@@ -327,96 +343,43 @@ def render_about_page(db: Database, is_dark: bool, accent: str = "#0060df") -> s
                 flex-direction: column;
                 align-items: center;
                 justify-content: center;
-                min-height: 90vh;
+                min-height: 85vh;
                 padding: 40px 20px;
             }}
             .about-container {{
                 width: 100%;
-                max-width: 620px;
+                max-width: 600px;
                 margin: 0 auto;
             }}
             .about-card {{
                 background: var(--card-bg);
                 border: 1px solid var(--border);
-                border-radius: 16px;
-                padding: 42px 36px 36px 36px;
+                border-radius: 12px;
+                padding: 40px 36px 36px 36px;
                 text-align: center;
-                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
-            }}
-            .logo-icon {{
-                width: 76px;
-                height: 76px;
-                margin: 0 auto 16px auto;
-                border-radius: 22px;
-                background: linear-gradient(135deg, {accent} 0%, #00c6ff 100%);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: #ffffff;
-                font-size: 34px;
-                font-weight: 800;
-                letter-spacing: -1px;
-                box-shadow: 0 6px 20px rgba(0, 96, 223, 0.35);
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
             }}
             .app-title {{
-                font-size: 36px;
-                font-weight: 800;
-                letter-spacing: -0.5px;
-                margin-bottom: 2px;
+                font-size: 46px;
+                font-weight: 900;
+                letter-spacing: -1.5px;
+                margin: 0 0 8px 0;
+                color: var(--text);
+                line-height: 1.1;
             }}
-            .app-version {{
-                font-size: 14px;
-                color: var(--text-muted);
-                margin-bottom: 20px;
-            }}
-            .version-pill {{
-                background: rgba(0, 96, 223, 0.14);
-                color: {accent};
-                border: 1px solid rgba(0, 96, 223, 0.3);
-                padding: 2px 8px;
-                border-radius: 12px;
-                font-size: 12px;
-                font-weight: 600;
-                margin-left: 6px;
-            }}
-            .update-banner {{
-                display: inline-flex;
-                align-items: center;
-                gap: 12px;
-                background: rgba(16, 185, 129, 0.1);
-                border: 1px solid rgba(16, 185, 129, 0.28);
-                border-radius: 12px;
-                padding: 10px 18px;
-                margin-bottom: 22px;
-                text-align: left;
-            }}
-            .check-badge {{
-                width: 26px;
-                height: 26px;
-                border-radius: 50%;
-                background: #10b981;
-                color: white;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 14px;
-                font-weight: bold;
-                flex-shrink: 0;
-            }}
-            .update-text {{
-                font-size: 13px;
-                font-weight: 600;
-                color: #10b981;
-            }}
-            .update-sub {{
-                font-size: 11px;
-                color: var(--text-muted);
+            .app-divider {{
+                width: 42px;
+                height: 3px;
+                background: var(--accent);
+                border-radius: 2px;
+                margin: 0 auto 18px auto;
             }}
             .app-motto {{
-                font-size: 14px;
+                font-size: 15px;
                 line-height: 1.6;
                 color: var(--text);
-                margin-bottom: 12px;
+                margin-bottom: 10px;
+                font-weight: 500;
             }}
             .app-org {{
                 font-size: 13px;
@@ -429,15 +392,16 @@ def render_about_page(db: Database, is_dark: bool, accent: str = "#0060df") -> s
                 justify-content: center;
                 flex-wrap: wrap;
                 gap: 16px;
-                padding-top: 18px;
+                padding: 16px 0;
                 border-top: 1px solid var(--border);
-                margin-bottom: 20px;
+                border-bottom: 1px solid var(--border);
+                margin-bottom: 22px;
             }}
             .app-links a {{
                 color: var(--accent);
                 text-decoration: none;
                 font-size: 13px;
-                font-weight: 500;
+                font-weight: 600;
             }}
             .app-links a:hover {{
                 text-decoration: underline;
@@ -446,7 +410,7 @@ def render_about_page(db: Database, is_dark: bool, accent: str = "#0060df") -> s
                 text-align: left;
                 background: var(--code-bg);
                 border: 1px solid var(--border);
-                border-radius: 10px;
+                border-radius: 8px;
                 padding: 14px 18px;
                 font-size: 12px;
             }}
@@ -455,6 +419,7 @@ def render_about_page(db: Database, is_dark: bool, accent: str = "#0060df") -> s
                 font-weight: 600;
                 color: var(--text-muted);
                 outline: none;
+                user-select: none;
             }}
             .specs-table {{
                 width: 100%;
@@ -462,7 +427,7 @@ def render_about_page(db: Database, is_dark: bool, accent: str = "#0060df") -> s
                 border-collapse: collapse;
             }}
             .specs-table td {{
-                padding: 5px 0;
+                padding: 6px 0;
                 color: var(--text);
                 border-bottom: 1px solid rgba(255, 255, 255, 0.05);
             }}
@@ -471,49 +436,38 @@ def render_about_page(db: Database, is_dark: bool, accent: str = "#0060df") -> s
                 width: 170px;
             }}
         </style>
+        {get_base_js()}
     </head>
     <body>
         <div class="about-container">
             <div class="about-card">
-                <div class="logo-icon">surf</div>
-                <div class="app-title">surf</div>
-                <div class="app-version">
-                    1.0.0 (64-бит)
-                    <span class="version-pill">{"Стабильный канал" if is_ru else "Stable Channel"}</span>
-                </div>
-
-                <div class="update-banner">
-                    <div class="check-badge">✓</div>
-                    <div>
-                        <div class="update-text">{"Браузер surf обновлён" if is_ru else "surf is up to date"}</div>
-                        <div class="update-sub">{"Канал обновлений: Release • ospab foundation" if is_ru else "Update channel: Release • ospab foundation"}</div>
-                    </div>
-                </div>
+                <h1 class="app-title">surf</h1>
+                <div class="app-divider"></div>
 
                 <div class="app-motto">
-                    {"Быстрый, приватный и независимый веб-серфинг нового поколения." if is_ru else "Fast, private, and independent web browsing experience."}
+                    {"Быстрый, приватный и независимый веб-серфинг." if is_ru else "Fast, private, and independent web browsing experience."}
                 </div>
 
                 <div class="app-org">
-                    {"Создано и поддерживается организацией <b>ospab foundation</b> и сообществом независимых разработчиков открытого исходного кода." if is_ru else "Built and maintained by <b>ospab foundation</b> and the open-source community."}
+                    {"Разрабатывается организацией <b>ospab foundation</b> и сообществом открытого исходного кода." if is_ru else "Built and maintained by <b>ospab foundation</b> and the open-source community."}
                 </div>
 
                 <div class="app-links">
-                    <a href="surf://pages">{"Все страницы surf://" if is_ru else "Pages Directory"}</a>
+                    <a href="surf://pages">{"Каталог страниц" if is_ru else "Pages Directory"}</a>
                     <a href="surf://settings">{"Настройки" if is_ru else "Settings"}</a>
                     <a href="surf://protection">{"Защита от трекеров" if is_ru else "Tracking Protection"}</a>
                     <a href="surf://gpu">{"Графика и GPU" if is_ru else "Graphics & GPU"}</a>
                     <a href="surf://help">{"Справка" if is_ru else "Help & Docs"}</a>
                 </div>
 
-                <details class="specs-box">
+                <details class="specs-box" open>
                     <summary>{"Сведения о сборке и среде выполнения" if is_ru else "Build & Runtime Details"}</summary>
                     <table class="specs-table">
                         <tr><td class="dim">{"Организация" if is_ru else "Organization"}</td><td><b>ospab foundation</b></td></tr>
                         <tr><td class="dim">{"Движок рендеринга" if is_ru else "Rendering Engine"}</td><td>SurfEngine (Chromium / QtWebEngine Core)</td></tr>
                         <tr><td class="dim">{"Среда выполнения" if is_ru else "Runtime"}</td><td>Python {platform.python_version()} • PyQt6 {PYQT_VERSION_STR} • Qt {QT_VERSION_STR}</td></tr>
                         <tr><td class="dim">{"Платформа" if is_ru else "Operating System"}</td><td>{platform.system()} {platform.release()} ({platform.architecture()[0]})</td></tr>
-                        <tr><td class="dim">{"Менеджер окон" if is_ru else "Window Manager"}</td><td>Windows DWM API (Themed DWM Frame & Immersive Dark Mode)</td></tr>
+                        <tr><td class="dim">{"Менеджер окон" if is_ru else "Window Manager"}</td><td>Windows DWM API (Desktop Window Manager)</td></tr>
                         <tr><td class="dim">{"База данных" if is_ru else "Local Storage"}</td><td>SQLite3 (surf.db)</td></tr>
                         <tr><td class="dim">{"Идентификация" if is_ru else "User-Agent"}</td><td style="font-family: Consolas, monospace; font-size: 11px; word-break: break-all;">{html.escape(ua_str)}</td></tr>
                     </table>
@@ -557,6 +511,7 @@ def render_history_page(db: Database, is_dark: bool, accent: str = "#0060df") ->
         <meta charset="utf-8">
         <title>{title}</title>
         <style>{get_base_css(is_dark, accent)}</style>
+        {get_base_js()}
         <script>
             function filterHistory() {{
                 var q = document.getElementById('search').value.toLowerCase();
@@ -634,6 +589,7 @@ def render_bookmarks_page(db: Database, is_dark: bool, accent: str = "#0060df") 
         <meta charset="utf-8">
         <title>{title}</title>
         <style>{get_base_css(is_dark, accent)}</style>
+        {get_base_js()}
         <script>
             function filterBookmarks() {{
                 var q = document.getElementById('search').value.toLowerCase();
@@ -722,6 +678,7 @@ def render_downloads_page(db: Database, is_dark: bool, accent: str = "#0060df") 
         <meta charset="utf-8">
         <title>{title}</title>
         <style>{get_base_css(is_dark, accent)}</style>
+        {get_base_js()}
     </head>
     <body>
         <div class="container">
@@ -808,6 +765,7 @@ def render_protection_page(is_dark: bool, accent: str = "#0060df") -> str:
         <meta charset="utf-8">
         <title>{title}</title>
         <style>{get_base_css(is_dark, accent)}</style>
+        {get_base_js()}
     </head>
     <body>
         <div class="container">
@@ -869,6 +827,7 @@ def render_gpu_page(is_dark: bool, accent: str = "#0060df") -> str:
         <meta charset="utf-8">
         <title>{title}</title>
         <style>{get_base_css(is_dark, accent)}</style>
+        {get_base_js()}
     </head>
     <body>
         <div class="container">
@@ -960,6 +919,7 @@ def render_help_page(is_dark: bool, accent: str = "#0060df") -> str:
         <meta charset="utf-8">
         <title>{title}</title>
         <style>{get_base_css(is_dark, accent)}</style>
+        {get_base_js()}
     </head>
     <body>
         <div class="container">
@@ -1014,6 +974,7 @@ def render_settings_page(db: Database, is_dark: bool, accent: str = "#0060df") -
         <meta charset="utf-8">
         <title>{title}</title>
         <style>{get_base_css(is_dark, accent)}</style>
+        {get_base_js()}
     </head>
     <body>
         <div class="container">

@@ -476,6 +476,18 @@ class MainWindow(QMainWindow):
                     enumerable: true
                 });
             } catch (e) {}
+
+            try {
+                document.addEventListener('click', function(e) {
+                    var a = e.target && e.target.closest ? e.target.closest('a') : null;
+                    if (!a || !a.href) return;
+                    if (e.ctrlKey || e.metaKey || e.button === 1) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        window.open(a.href, '_blank');
+                    }
+                }, true);
+            } catch (e) {}
         })();
         """)
         branding_script.setInjectionPoint(QWebEngineScript.InjectionPoint.DocumentCreation)

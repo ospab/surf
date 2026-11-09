@@ -77,17 +77,36 @@ def format_search_url(engine_template: str, query: str) -> str:
 
 
 class BrowserPage(QWebEnginePage):
-    def __init__(self, profile, parent=None):
+    def __init__(self, profile, parent=None, main_window=None):
         super().__init__(profile, parent)
+        self.main_window = main_window
+
+    def _get_main_window(self):
+        if self.main_window:
+            return self.main_window
+        p = self.parent()
+        if p and hasattr(p, "window"):
+            return p.window()
+        return None
 
     def createWindow(self, window_type):
-        view = self.view()
-        if view:
-            win = view.window()
-            if hasattr(win, "add_new_tab"):
-                new_tab = win.add_new_tab()
-                return new_tab.web_view.page()
+        win = self._get_main_window()
+        if win and hasattr(win, "add_new_tab"):
+            new_tab = win.add_new_tab()
+            new_tab.stack.setCurrentIndex(0)
+            return new_tab.web_view.page()
         return super().createWindow(window_type)
+
+    def acceptNavigationRequest(self, url: QUrl, nav_type: QWebEnginePage.NavigationType, is_main_frame: bool) -> bool:
+        modifiers = QApplication.keyboardModifiers()
+        is_ctrl = bool(modifiers & Qt.KeyboardModifier.ControlModifier)
+        # Если клик по ссылке был с зажатой клавишей Ctrl — открываем в новой вкладке
+        if nav_type == QWebEnginePage.NavigationType.NavigationTypeLinkClicked and is_ctrl:
+            win = self._get_main_window()
+            if win and hasattr(win, "add_new_tab"):
+                win.add_new_tab(url.toString())
+                return False
+        return super().acceptNavigationRequest(url, nav_type, is_main_frame)
 
 
 def generate_tile_badge(title: str, url: str, is_add_btn: bool = False, is_dark: bool = True) -> QPixmap:
@@ -538,6 +557,7 @@ class BrowserTab(QWidget):
 
     def __init__(self, db: Database, parent=None, profile: QWebEngineProfile | None = None):
         super().__init__(parent)
+        self.main_window = parent
         self.db = db
         self.profile = profile or QWebEngineProfile.defaultProfile()
         self.current_title = tr("new_tab")
@@ -554,7 +574,7 @@ class BrowserTab(QWidget):
 
         # 0: Веб-страница (QWebEngineView)
         self.web_view = QWebEngineView()
-        self.browser_page = BrowserPage(self.profile, self.web_view)
+        self.browser_page = BrowserPage(self.profile, self.web_view, main_window=self.main_window)
         self.web_view.setPage(self.browser_page)
 
         # Устранение белой вспышки (White Flash)
@@ -698,7 +718,7 @@ class BrowserTab(QWidget):
         self.speed_dial.refresh_tiles()
 
     def show_normal_view(self) -> None:
-        if self.current_url and not self.current_url.startswith("surf://"):
+        if self.current_url and not self.current_url.startswith("surf://newtab"):
             self.stack.setCurrentIndex(0)
         else:
             self.show_speed_dial()
@@ -771,25 +791,31 @@ class BrowserTab(QWidget):
             QMessageBox.information(self, tr("screenshot_saved_title"), tr("screenshot_saved_msg", path=file_path))
 
     def _on_title_changed(self, title: str) -> None:
-        if self.stack.currentIndex() == 0 and title:
+        if title:
             self.current_title = title
             self.title_changed.emit(title)
-            if self.current_url and not self.profile.isOffTheRecord():
+            if self.current_url and not self.current_url.startswith("surf://") and not self.profile.isOffTheRecord():
                 self.db.add_history_entry(self.current_url, title)
 
     def _on_url_changed(self, qurl: QUrl) -> None:
         url_str = qurl.toString()
-        if self.stack.currentIndex() == 0:
-            self.current_url = url_str
-            self.url_changed.emit(url_str)
+        if not url_str or url_str == "about:blank":
+            return
+
+        if url_str.startswith("surf://newtab"):
+            self.show_speed_dial()
+            return
+
+        self.current_url = url_str
+        self.stack.setCurrentIndex(0)
+        self.url_changed.emit(url_str)
 
     def _on_icon_changed(self, icon: QIcon) -> None:
-        if self.stack.currentIndex() == 0:
-            self.icon_changed.emit(icon)
-            if self.current_url and not self.current_url.startswith("surf://"):
-                pix = icon.pixmap(64, 64)
-                if not pix.isNull():
-                    FaviconService.instance().save_to_cache(self.current_url, pix)
+        self.icon_changed.emit(icon)
+        if self.current_url and not self.current_url.startswith("surf://"):
+            pix = icon.pixmap(64, 64)
+            if not pix.isNull():
+                FaviconService.instance().save_to_cache(self.current_url, pix)
 
     def _on_load_finished(self, ok: bool) -> None:
         if ok and self.current_url and not self.current_url.startswith("surf://") and not self.profile.isOffTheRecord():
