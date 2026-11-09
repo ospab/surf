@@ -13,8 +13,12 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
-from surf.database import Database
-from surf.i18n import tr
+try:
+    from surf.database import Database
+    from surf.i18n import tr
+except ModuleNotFoundError:
+    from database import Database
+    from i18n import tr
 
 
 class DownloadManagerDialog(QDialog):

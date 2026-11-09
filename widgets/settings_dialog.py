@@ -4,8 +4,12 @@ from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QColorDialog, QDialog, QFileDialog
 
-from surf.database import Database
-from surf.i18n import get_language, set_language, tr
+try:
+    from surf.database import Database
+    from surf.i18n import get_language, set_language, tr
+except ModuleNotFoundError:
+    from database import Database
+    from i18n import get_language, set_language, tr
 
 SEARCH_ENGINES = {
     0: ("google", "Google", "https://www.google.com/search?q="),

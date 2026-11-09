@@ -4,7 +4,7 @@ import sqlite3
 from datetime import datetime, timedelta
 from urllib.parse import urlparse
 
-DEFAULT_DB_FILE = "surf.db"
+DEFAULT_DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "surf.db")
 
 DEFAULT_SETTINGS = {
     "homepage": "https://www.google.com",

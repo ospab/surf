@@ -7,9 +7,14 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem,
 )
 
-from surf.database import Database
-from surf.i18n import tr
-from surf.ui.ui_history import Ui_HistoryDialog
+try:
+    from surf.database import Database
+    from surf.i18n import tr
+    from surf.ui.ui_history import Ui_HistoryDialog
+except ModuleNotFoundError:
+    from database import Database
+    from i18n import tr
+    from ui.ui_history import Ui_HistoryDialog
 
 
 class HistoryDialog(QDialog, Ui_HistoryDialog):

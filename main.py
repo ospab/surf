@@ -1,6 +1,15 @@
 import os
 import sys
 
+# Поддержка прямого запуска 'python ./main.py' из папки проекта,
+# а также запуска как модуля 'python -m surf.main' из внешнего каталога
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+PARENT_DIR = os.path.dirname(CURRENT_DIR)
+if CURRENT_DIR not in sys.path:
+    sys.path.insert(0, CURRENT_DIR)
+if PARENT_DIR not in sys.path:
+    sys.path.insert(0, PARENT_DIR)
+
 from PyQt6.QtCore import QByteArray, QEvent, QObject, QPoint, QSize, QStringListModel, Qt, QUrl
 from PyQt6.QtGui import QAction, QColor, QFont, QIcon, QKeySequence, QPainter, QPixmap, QShortcut
 from PyQt6.QtNetwork import QNetworkProxy
@@ -31,12 +40,20 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from surf.database import Database
-from surf.i18n import get_language, set_language, tr
-from surf.widgets.browser_tab import BrowserTab
-from surf.widgets.download_manager import DownloadManagerDialog
-from surf.widgets.history_dialog import HistoryDialog
-from surf.widgets.settings_dialog import SettingsDialog
+try:
+    from surf.database import Database
+    from surf.i18n import get_language, set_language, tr
+    from surf.widgets.browser_tab import BrowserTab
+    from surf.widgets.download_manager import DownloadManagerDialog
+    from surf.widgets.history_dialog import HistoryDialog
+    from surf.widgets.settings_dialog import SettingsDialog
+except ModuleNotFoundError:
+    from database import Database
+    from i18n import get_language, set_language, tr
+    from widgets.browser_tab import BrowserTab
+    from widgets.download_manager import DownloadManagerDialog
+    from widgets.history_dialog import HistoryDialog
+    from widgets.settings_dialog import SettingsDialog
 
 
 class ZoomWheelFilter(QObject):

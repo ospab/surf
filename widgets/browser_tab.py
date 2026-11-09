@@ -18,9 +18,14 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from surf.database import Database
-from surf.i18n import tr
-from surf.widgets.reader_view import ReaderViewWidget
+try:
+    from surf.database import Database
+    from surf.i18n import tr
+    from surf.widgets.reader_view import ReaderViewWidget
+except ModuleNotFoundError:
+    from database import Database
+    from i18n import tr
+    from widgets.reader_view import ReaderViewWidget
 
 
 def format_search_url(engine_template: str, query: str) -> str:
