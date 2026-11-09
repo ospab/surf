@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import (
 )
 
 from surf.database import Database
+from surf.i18n import tr
 from surf.ui.ui_history import Ui_HistoryDialog
 
 
@@ -20,13 +21,43 @@ class HistoryDialog(QDialog, Ui_HistoryDialog):
         self.setupUi(self)
         self.db = db
 
+        self._retranslate_ui()
         self._setup_tables()
         self._connect_signals()
         self.reload_all()
 
+    def _retranslate_ui(self) -> None:
+        self.setWindowTitle(tr("history_dialog_title"))
+        self.tabs.setTabText(0, tr("tab_history"))
+        self.tabs.setTabText(1, tr("tab_bookmarks"))
+        self.tabs.setTabText(2, tr("tab_stats"))
+
+        self.historySearchEdit.setPlaceholderText(tr("search_history_placeholder"))
+        self.bookmarksSearchEdit.setPlaceholderText(tr("search_bookmarks_placeholder"))
+
+        self.periodCombo.setItemText(0, tr("filter_all"))
+        self.periodCombo.setItemText(1, tr("filter_today"))
+        self.periodCombo.setItemText(2, tr("filter_yesterday"))
+        self.periodCombo.setItemText(3, tr("filter_week"))
+
+        self.exportHistoryCsvBtn.setText(tr("btn_export_csv"))
+        self.deleteHistoryBtn.setText(tr("btn_delete_selected"))
+        self.clearAllHistoryBtn.setText(tr("btn_clear_history"))
+        self.openHistoryUrlBtn.setText(tr("btn_open_tab"))
+
+        self.importBookmarksCsvBtn.setText(tr("btn_import_csv"))
+        self.exportBookmarksCsvBtn.setText(tr("btn_export_csv"))
+        self.deleteBookmarkBtn.setText(tr("btn_delete_bookmark"))
+        self.openBookmarkUrlBtn.setText(tr("btn_open_tab"))
+
+        self.statsInfoLabel.setText(tr("stats_info"))
+        self.closeBtn.setText(tr("btn_close"))
+
     def _setup_tables(self) -> None:
         self.historyTable.setColumnCount(5)
-        self.historyTable.setHorizontalHeaderLabels(["ID", "Заголовок", "URL", "Дата и время", "Визитов"])
+        self.historyTable.setHorizontalHeaderLabels([
+            tr("col_id"), tr("col_title"), tr("col_url"), tr("col_time"), tr("col_visits")
+        ])
         self.historyTable.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
         self.historyTable.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         self.historyTable.setSelectionBehavior(self.historyTable.SelectionBehavior.SelectRows)
@@ -34,7 +65,9 @@ class HistoryDialog(QDialog, Ui_HistoryDialog):
         self.historyTable.setColumnHidden(0, True)
 
         self.bookmarksTable.setColumnCount(5)
-        self.bookmarksTable.setHorizontalHeaderLabels(["ID", "Название", "URL", "Папка", "Дата добавления"])
+        self.bookmarksTable.setHorizontalHeaderLabels([
+            tr("col_id"), tr("col_title"), tr("col_url"), tr("col_folder"), tr("col_added")
+        ])
         self.bookmarksTable.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
         self.bookmarksTable.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         self.bookmarksTable.setSelectionBehavior(self.bookmarksTable.SelectionBehavior.SelectRows)
@@ -42,7 +75,9 @@ class HistoryDialog(QDialog, Ui_HistoryDialog):
         self.bookmarksTable.setColumnHidden(0, True)
 
         self.statsTable.setColumnCount(3)
-        self.statsTable.setHorizontalHeaderLabels(["№", "Домен", "Всего просмотров"])
+        self.statsTable.setHorizontalHeaderLabels([
+            tr("col_rank"), tr("col_domain"), tr("col_views")
+        ])
         self.statsTable.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.statsTable.setSelectionBehavior(self.statsTable.SelectionBehavior.SelectRows)
 
@@ -107,8 +142,8 @@ class HistoryDialog(QDialog, Ui_HistoryDialog):
     def _clear_history(self) -> None:
         ans = QMessageBox.question(
             self,
-            "Очистка истории",
-            "Вы уверены, что хотите удалить историю посещений за выбранный период?",
+            tr("clear_history_title"),
+            tr("clear_history_prompt"),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if ans == QMessageBox.StandardButton.Yes:
@@ -128,16 +163,16 @@ class HistoryDialog(QDialog, Ui_HistoryDialog):
     def _export_history_csv(self) -> None:
         path, _ = QFileDialog.getSaveFileName(
             self,
-            "Экспорт истории в CSV",
+            tr("btn_export_csv"),
             "surf_history.csv",
-            "CSV файлы (*.csv);;Все файлы (*)",
+            "CSV (*.csv);;All Files (*)",
         )
         if path:
             count = self.db.export_history_to_csv(path)
             QMessageBox.information(
                 self,
-                "Экспорт завершен",
-                f"Успешно экспортировано {count} записей истории в файл:\n{path}",
+                "OK",
+                f"Exported {count} records to:\n{path}",
             )
 
     # --- Обработка закладок ---
@@ -172,32 +207,32 @@ class HistoryDialog(QDialog, Ui_HistoryDialog):
     def _export_bookmarks_csv(self) -> None:
         path, _ = QFileDialog.getSaveFileName(
             self,
-            "Экспорт закладок в CSV",
+            tr("btn_export_csv"),
             "surf_bookmarks.csv",
-            "CSV файлы (*.csv);;Все файлы (*)",
+            "CSV (*.csv);;All Files (*)",
         )
         if path:
             count = self.db.export_bookmarks_to_csv(path)
             QMessageBox.information(
                 self,
-                "Экспорт завершен",
-                f"Успешно экспортировано {count} закладок в файл:\n{path}",
+                "OK",
+                f"Exported {count} bookmarks to:\n{path}",
             )
 
     def _import_bookmarks_csv(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
             self,
-            "Импорт закладок из CSV",
+            tr("btn_import_csv"),
             "",
-            "CSV файлы (*.csv);;Все файлы (*)",
+            "CSV (*.csv);;All Files (*)",
         )
         if path:
             count = self.db.import_bookmarks_from_csv(path)
             self._reload_bookmarks()
             QMessageBox.information(
                 self,
-                "Импорт завершен",
-                f"Успешно добавлено {count} новых закладок из файла:\n{path}",
+                "OK",
+                f"Imported {count} bookmarks from:\n{path}",
             )
 
     # --- Статистика ---

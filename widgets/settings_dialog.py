@@ -5,6 +5,7 @@ from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QColorDialog, QDialog, QFileDialog
 
 from surf.database import Database
+from surf.i18n import get_language, set_language, tr
 
 SEARCH_ENGINES = {
     0: ("Яндекс", "https://yandex.ru/search/?text="),
@@ -52,6 +53,11 @@ class SettingsDialog(QDialog):
 
         auto_hide_menu = self.db.get_setting("menu_bar_auto_hide", "1")
         self.menuBarCombo.setCurrentIndex(0 if auto_hide_menu == "1" else 1)
+
+        lang = self.db.get_setting("language", "ru")
+        set_language(lang)
+        self.langCombo.setCurrentIndex(0 if lang == "ru" else 1)
+        self._retranslate_ui()
 
         self.downloadPathEdit.setText(
             self.db.get_setting("download_folder", os.path.expanduser("~/Downloads"))
@@ -107,8 +113,13 @@ class SettingsDialog(QDialog):
         self.colorBtn.clicked.connect(self._choose_accent_color)
         self.uaCombo.currentIndexChanged.connect(self._on_ua_changed)
         self.proxyTypeCombo.currentIndexChanged.connect(self._toggle_proxy_fields)
+        self.langCombo.currentIndexChanged.connect(self._on_lang_changed)
         self.buttonBox.accepted.connect(self._save_settings)
         self.buttonBox.rejected.connect(self.reject)
+
+    def _on_lang_changed(self, index: int) -> None:
+        set_language("ru" if index == 0 else "en")
+        self._retranslate_ui()
 
     def _on_ua_changed(self, index: int) -> None:
         if index in USER_AGENTS:
@@ -148,6 +159,53 @@ class SettingsDialog(QDialog):
             f"background-color: {hex_color}; color: #ffffff; font-weight: bold; border-radius: 4px; padding: 4px 10px;"
         )
 
+    def _retranslate_ui(self) -> None:
+        self.setWindowTitle(tr("settings_title"))
+        self.settingsTabs.setTabText(0, tr("tab_general"))
+        self.settingsTabs.setTabText(1, tr("tab_privacy"))
+        self.settingsTabs.setTabText(2, tr("tab_proxy"))
+        self.settingsTabs.setTabText(3, tr("tab_appearance"))
+
+        self.homeGroup.setTitle(tr("group_navigation"))
+        self.homeLabel.setText(tr("lbl_homepage"))
+        self.searchLabel.setText(tr("lbl_search_engine"))
+        self.menuLabel.setText(tr("lbl_menu_mode"))
+        self.menuBarCombo.setItemText(0, tr("menu_mode_hide"))
+        self.menuBarCombo.setItemText(1, tr("menu_mode_show"))
+        self.langLabel.setText(tr("lbl_language"))
+
+        self.downloadGroup.setTitle(tr("group_downloads"))
+        self.browseDownloadBtn.setText(tr("btn_browse"))
+
+        self.uaGroup.setTitle(tr("group_user_agent"))
+        self.uaCombo.setItemText(0, tr("ua_desktop"))
+        self.uaCombo.setItemText(1, tr("ua_chrome"))
+        self.uaCombo.setItemText(2, tr("ua_default"))
+        self.uaCombo.setItemText(3, tr("ua_custom"))
+
+        self.historyPrivacyGroup.setTitle(tr("group_history_privacy"))
+        self.saveHistoryCheck.setText(tr("chk_save_history"))
+        self.clearExitCheck.setText(tr("chk_clear_exit"))
+        self.dntCheck.setText(tr("chk_dnt"))
+
+        self.proxyGroup.setTitle(tr("group_proxy"))
+        self.proxyTypeLabel.setText(tr("lbl_proxy_type"))
+        self.proxyTypeCombo.setItemText(0, tr("proxy_none"))
+        self.proxyTypeCombo.setItemText(1, tr("proxy_system"))
+        self.proxyTypeCombo.setItemText(2, tr("proxy_http"))
+        self.proxyTypeCombo.setItemText(3, tr("proxy_socks5"))
+        self.proxyHostLabel.setText(tr("lbl_proxy_host"))
+        self.proxyPortLabel.setText(tr("lbl_proxy_port"))
+        self.proxyUserLabel.setText(tr("lbl_proxy_user"))
+        self.proxyPassLabel.setText(tr("lbl_proxy_pass"))
+
+        self.appearanceGroup.setTitle(tr("group_style"))
+        self.themeLabel.setText(tr("lbl_theme"))
+        self.themeCombo.setItemText(0, tr("theme_dark"))
+        self.themeCombo.setItemText(1, tr("theme_light"))
+        self.colorLabel.setText(tr("lbl_accent"))
+        self.colorBtn.setText(tr("btn_accent"))
+
     def _save_settings(self) -> None:
         # Основные
         homepage = self.homeEdit.text().strip() or "https://ya.ru"
@@ -180,6 +238,11 @@ class SettingsDialog(QDialog):
         self.db.set_setting("proxy_port", str(self.proxyPortSpin.value()))
         self.db.set_setting("proxy_user", self.proxyUserEdit.text().strip())
         self.db.set_setting("proxy_password", self.proxyPassEdit.text())
+
+        # Язык
+        new_lang = "ru" if self.langCombo.currentIndex() == 0 else "en"
+        self.db.set_setting("language", new_lang)
+        set_language(new_lang)
 
         # Оформление
         self.db.set_setting("theme", "dark" if self.themeCombo.currentIndex() == 0 else "light")

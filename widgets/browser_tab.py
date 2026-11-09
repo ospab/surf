@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
 )
 
 from surf.database import Database
+from surf.i18n import tr
 from surf.widgets.reader_view import ReaderViewWidget
 
 
@@ -49,15 +50,15 @@ class SpeedDialWidget(QWidget):
         logo_layout.addWidget(logo_label)
         box_layout.addLayout(logo_layout)
 
-        subtitle_label = QLabel("Быстрый, приватный и легковесный веб-серфинг")
-        subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        subtitle_label.setStyleSheet("font-size: 13px; color: #8f8f9d; margin-bottom: 10px;")
-        box_layout.addWidget(subtitle_label)
+        self.subtitle_label = QLabel(tr("app_subtitle"))
+        self.subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.subtitle_label.setStyleSheet("font-size: 13px; color: #8f8f9d; margin-bottom: 10px;")
+        box_layout.addWidget(self.subtitle_label)
 
         # Поле поиска со скругленными краями (pill-shape)
         self.search_input = QLineEdit()
         self.search_input.setObjectName("speedDialSearch")
-        self.search_input.setPlaceholderText("Искать в интернете или ввести адрес веб-сайта...")
+        self.search_input.setPlaceholderText(tr("search_placeholder"))
         self.search_input.setMinimumHeight(48)
         self.search_input.returnPressed.connect(self._handle_search)
         box_layout.addWidget(self.search_input)

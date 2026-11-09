@@ -11,6 +11,7 @@ DEFAULT_SETTINGS = {
     "search_engine": "https://yandex.ru/search/?text=",
     "theme": "dark",
     "accent_color": "#0060df",
+    "language": "ru",
     "menu_bar_auto_hide": "1",
     "user_agent_type": "firefox",
     "custom_user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0",

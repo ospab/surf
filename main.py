@@ -27,6 +27,7 @@ from PyQt6.QtWidgets import (
 )
 
 from surf.database import Database
+from surf.i18n import get_language, set_language, tr
 from surf.widgets.browser_tab import BrowserTab
 from surf.widgets.download_manager import DownloadManagerDialog
 from surf.widgets.history_dialog import HistoryDialog
@@ -42,12 +43,17 @@ class MainWindow(QMainWindow):
         self.db = Database()
         self.zoom_factor = 1.0
 
+        # Инициализация языка интерфейса (RU / EN)
+        user_lang = self.db.get_setting("language", "ru")
+        set_language(user_lang)
+
         self._setup_network_and_profile()
         self._setup_ui()
         self._setup_shortcuts()
         self._setup_downloads()
         self._apply_theme()
         self._apply_menu_visibility()
+        self._retranslate_ui()
 
         self.add_new_tab()
 
@@ -58,7 +64,6 @@ class MainWindow(QMainWindow):
     def _setup_network_and_profile(self) -> None:
         profile = QWebEngineProfile.defaultProfile()
 
-        # User-Agent по умолчанию (современный десктопный браузер)
         ua_str = self.db.get_setting(
             "custom_user_agent",
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0",
@@ -111,7 +116,7 @@ class MainWindow(QMainWindow):
         self.progress_bar.setVisible(False)
         self.main_layout.addWidget(self.progress_bar)
 
-        # 4. Контейнер отображения страниц (соответствует активной вкладке)
+        # 4. Контейнер страниц
         self.tab_stack = QStackedWidget()
         self.main_layout.addWidget(self.tab_stack)
 
@@ -145,12 +150,11 @@ class MainWindow(QMainWindow):
         self.tab_bar.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.tab_bar.customContextMenuRequested.connect(self._show_tab_context_menu)
 
-        # Кнопка "+" рядом с вкладкой
+        # Кнопка "+" рядом с последней вкладкой
         self.new_tab_btn = QToolButton()
         self.new_tab_btn.setObjectName("newTabBtn")
         self.new_tab_btn.setIcon(self._get_icon("plus"))
         self.new_tab_btn.setIconSize(QSize(14, 14))
-        self.new_tab_btn.setToolTip("Новая вкладка (Ctrl+T)")
         self.new_tab_btn.setFixedSize(26, 24)
         self.new_tab_btn.clicked.connect(lambda: self.add_new_tab())
 
@@ -170,25 +174,21 @@ class MainWindow(QMainWindow):
         self.btn_back = QToolButton()
         self.btn_back.setIcon(self._get_icon("back"))
         self.btn_back.setIconSize(QSize(16, 16))
-        self.btn_back.setToolTip("Назад (Alt+Left)")
         self.btn_back.clicked.connect(self._go_back)
 
         self.btn_forward = QToolButton()
         self.btn_forward.setIcon(self._get_icon("forward"))
         self.btn_forward.setIconSize(QSize(16, 16))
-        self.btn_forward.setToolTip("Вперед (Alt+Right)")
         self.btn_forward.clicked.connect(self._go_forward)
 
         self.btn_reload = QToolButton()
         self.btn_reload.setIcon(self._get_icon("reload"))
         self.btn_reload.setIconSize(QSize(16, 16))
-        self.btn_reload.setToolTip("Обновить (F5 / Ctrl+R)")
         self.btn_reload.clicked.connect(self._reload_current)
 
         self.btn_home = QToolButton()
         self.btn_home.setIcon(self._get_icon("home"))
         self.btn_home.setIconSize(QSize(16, 16))
-        self.btn_home.setToolTip("Домашняя страница (Alt+Home)")
         self.btn_home.clicked.connect(self._go_home)
 
         layout.addWidget(self.btn_back)
@@ -199,7 +199,6 @@ class MainWindow(QMainWindow):
         # Скруглённая адресная строка
         self.address_bar = QLineEdit()
         self.address_bar.setObjectName("addressBar")
-        self.address_bar.setPlaceholderText("Поиск в интернете или ввод URL...")
         self.address_bar.returnPressed.connect(self._navigate_from_address_bar)
 
         self.completer_model = QStringListModel()
@@ -214,25 +213,21 @@ class MainWindow(QMainWindow):
         self.btn_bookmark = QToolButton()
         self.btn_bookmark.setIcon(self._get_icon("star"))
         self.btn_bookmark.setIconSize(QSize(16, 16))
-        self.btn_bookmark.setToolTip("Добавить в закладки (Ctrl+D)")
         self.btn_bookmark.clicked.connect(self._toggle_bookmark)
 
         self.btn_reader = QToolButton()
         self.btn_reader.setIcon(self._get_icon("reader"))
         self.btn_reader.setIconSize(QSize(16, 16))
-        self.btn_reader.setToolTip("Режим чтения (Ctrl+Alt+R)")
         self.btn_reader.clicked.connect(self._toggle_reader_mode)
 
         self.btn_downloads = QToolButton()
         self.btn_downloads.setIcon(self._get_icon("downloads"))
         self.btn_downloads.setIconSize(QSize(16, 16))
-        self.btn_downloads.setToolTip("Загрузки (Ctrl+J)")
         self.btn_downloads.clicked.connect(self._open_downloads_dialog)
 
         self.btn_settings = QToolButton()
         self.btn_settings.setIcon(self._get_icon("settings"))
         self.btn_settings.setIconSize(QSize(16, 16))
-        self.btn_settings.setToolTip("Настройки (Ctrl+,)")
         self.btn_settings.clicked.connect(self._open_settings_dialog)
 
         layout.addWidget(self.btn_bookmark)
@@ -247,109 +242,109 @@ class MainWindow(QMainWindow):
         self.main_menubar.triggered.connect(self._on_menu_action_triggered)
 
         # Файл
-        file_menu = self.main_menubar.addMenu("&Файл")
-        act_new_tab = file_menu.addAction("Новая вкладка")
-        act_new_tab.setShortcut(QKeySequence("Ctrl+T"))
-        act_new_tab.triggered.connect(lambda: self.add_new_tab())
+        self.file_menu = self.main_menubar.addMenu("")
+        self.act_new_tab = self.file_menu.addAction("")
+        self.act_new_tab.setShortcut(QKeySequence("Ctrl+T"))
+        self.act_new_tab.triggered.connect(lambda: self.add_new_tab())
 
-        act_close_tab = file_menu.addAction("Закрыть вкладку")
-        act_close_tab.setShortcut(QKeySequence("Ctrl+W"))
-        act_close_tab.triggered.connect(lambda: self.close_tab(self.tab_bar.currentIndex()))
+        self.act_close_tab = self.file_menu.addAction("")
+        self.act_close_tab.setShortcut(QKeySequence("Ctrl+W"))
+        self.act_close_tab.triggered.connect(lambda: self.close_tab(self.tab_bar.currentIndex()))
 
-        file_menu.addSeparator()
+        self.file_menu.addSeparator()
 
-        act_open_file = file_menu.addAction("Открыть HTML файл...")
-        act_open_file.setShortcut(QKeySequence("Ctrl+O"))
-        act_open_file.triggered.connect(self._open_local_file)
+        self.act_open_file = self.file_menu.addAction("")
+        self.act_open_file.setShortcut(QKeySequence("Ctrl+O"))
+        self.act_open_file.triggered.connect(self._open_local_file)
 
-        act_save_page = file_menu.addAction("Сохранить страницу как...")
-        act_save_page.setShortcut(QKeySequence("Ctrl+S"))
-        act_save_page.triggered.connect(self._save_page)
+        self.act_save_page = self.file_menu.addAction("")
+        self.act_save_page.setShortcut(QKeySequence("Ctrl+S"))
+        self.act_save_page.triggered.connect(self._save_page)
 
-        act_screenshot = file_menu.addAction("Сделать скриншот страницы...")
-        act_screenshot.setShortcut(QKeySequence("Ctrl+Shift+S"))
-        act_screenshot.triggered.connect(self._capture_screenshot)
+        self.act_screenshot = self.file_menu.addAction("")
+        self.act_screenshot.setShortcut(QKeySequence("Ctrl+Shift+S"))
+        self.act_screenshot.triggered.connect(self._capture_screenshot)
 
-        file_menu.addSeparator()
-        act_exit = file_menu.addAction("Выход")
-        act_exit.setShortcut(QKeySequence("Ctrl+Q"))
-        act_exit.triggered.connect(self.close)
+        self.file_menu.addSeparator()
+        self.act_exit = self.file_menu.addAction("")
+        self.act_exit.setShortcut(QKeySequence("Ctrl+Q"))
+        self.act_exit.triggered.connect(self.close)
 
         # Правка
-        edit_menu = self.main_menubar.addMenu("&Правка")
-        act_find = edit_menu.addAction("Найти на этой странице...")
-        act_find.setShortcut(QKeySequence("Ctrl+F"))
-        act_find.triggered.connect(self._show_find_bar)
+        self.edit_menu = self.main_menubar.addMenu("")
+        self.act_find = self.edit_menu.addAction("")
+        self.act_find.setShortcut(QKeySequence("Ctrl+F"))
+        self.act_find.triggered.connect(self._show_find_bar)
 
-        act_copy_url = edit_menu.addAction("Копировать адрес страницы")
-        act_copy_url.setShortcut(QKeySequence("Ctrl+Shift+C"))
-        act_copy_url.triggered.connect(self._copy_current_url)
+        self.act_copy_url = self.edit_menu.addAction("")
+        self.act_copy_url.setShortcut(QKeySequence("Ctrl+Shift+C"))
+        self.act_copy_url.triggered.connect(self._copy_current_url)
 
         # Вид
-        view_menu = self.main_menubar.addMenu("&Вид")
-        act_reader = view_menu.addAction("Режим комфортного чтения")
-        act_reader.setShortcut(QKeySequence("Ctrl+Alt+R"))
-        act_reader.triggered.connect(self._toggle_reader_mode)
+        self.view_menu = self.main_menubar.addMenu("")
+        self.act_reader = self.view_menu.addAction("")
+        self.act_reader.setShortcut(QKeySequence("Ctrl+Alt+R"))
+        self.act_reader.triggered.connect(self._toggle_reader_mode)
 
-        act_source = view_menu.addAction("Исходный код страницы")
-        act_source.setShortcut(QKeySequence("Ctrl+U"))
-        act_source.triggered.connect(self._show_page_source)
+        self.act_source = self.view_menu.addAction("")
+        self.act_source.setShortcut(QKeySequence("Ctrl+U"))
+        self.act_source.triggered.connect(self._show_page_source)
 
-        view_menu.addSeparator()
-        act_zoom_in = view_menu.addAction("Увеличить масштаб")
-        act_zoom_in.setShortcut(QKeySequence("Ctrl+="))
-        act_zoom_in.triggered.connect(self._zoom_in)
+        self.view_menu.addSeparator()
+        self.act_zoom_in = self.view_menu.addAction("")
+        self.act_zoom_in.setShortcut(QKeySequence("Ctrl+="))
+        self.act_zoom_in.triggered.connect(self._zoom_in)
 
-        act_zoom_out = view_menu.addAction("Уменьшить масштаб")
-        act_zoom_out.setShortcut(QKeySequence("Ctrl+-"))
-        act_zoom_out.triggered.connect(self._zoom_out)
+        self.act_zoom_out = self.view_menu.addAction("")
+        self.act_zoom_out.setShortcut(QKeySequence("Ctrl+-"))
+        self.act_zoom_out.triggered.connect(self._zoom_out)
 
-        act_zoom_reset = view_menu.addAction("Сбросить масштаб")
-        act_zoom_reset.setShortcut(QKeySequence("Ctrl+0"))
-        act_zoom_reset.triggered.connect(self._zoom_reset)
+        self.act_zoom_reset = self.view_menu.addAction("")
+        self.act_zoom_reset.setShortcut(QKeySequence("Ctrl+0"))
+        self.act_zoom_reset.triggered.connect(self._zoom_reset)
 
-        view_menu.addSeparator()
-        act_fullscreen = view_menu.addAction("Полноэкранный режим")
-        act_fullscreen.setShortcut(QKeySequence("F11"))
-        act_fullscreen.triggered.connect(self._toggle_fullscreen)
+        self.view_menu.addSeparator()
+        self.act_fullscreen = self.view_menu.addAction("")
+        self.act_fullscreen.setShortcut(QKeySequence("F11"))
+        self.act_fullscreen.triggered.connect(self._toggle_fullscreen)
 
         # Журнал
-        history_menu = self.main_menubar.addMenu("&Журнал")
-        act_history = history_menu.addAction("Показать всю историю")
-        act_history.setShortcut(QKeySequence("Ctrl+H"))
-        act_history.triggered.connect(self._open_history_dialog)
+        self.history_menu = self.main_menubar.addMenu("")
+        self.act_history = self.history_menu.addAction("")
+        self.act_history.setShortcut(QKeySequence("Ctrl+H"))
+        self.act_history.triggered.connect(self._open_history_dialog)
 
-        act_clear_hist = history_menu.addAction("Очистить историю...")
-        act_clear_hist.triggered.connect(self._quick_clear_history)
+        self.act_clear_hist = self.history_menu.addAction("")
+        self.act_clear_hist.triggered.connect(self._quick_clear_history)
 
         # Закладки
-        bm_menu = self.main_menubar.addMenu("&Закладки")
-        act_add_bm = bm_menu.addAction("Добавить страницу в закладки")
-        act_add_bm.setShortcut(QKeySequence("Ctrl+D"))
-        act_add_bm.triggered.connect(self._toggle_bookmark)
+        self.bm_menu = self.main_menubar.addMenu("")
+        self.act_add_bm = self.bm_menu.addAction("")
+        self.act_add_bm.setShortcut(QKeySequence("Ctrl+D"))
+        self.act_add_bm.triggered.connect(self._toggle_bookmark)
 
-        act_manage_bm = bm_menu.addAction("Управление закладками")
-        act_manage_bm.setShortcut(QKeySequence("Ctrl+Shift+O"))
-        act_manage_bm.triggered.connect(self._open_history_dialog)
+        self.act_manage_bm = self.bm_menu.addAction("")
+        self.act_manage_bm.setShortcut(QKeySequence("Ctrl+Shift+O"))
+        self.act_manage_bm.triggered.connect(self._open_history_dialog)
 
         # Инструменты
-        tools_menu = self.main_menubar.addMenu("&Инструменты")
-        act_downloads = tools_menu.addAction("Загрузки")
-        act_downloads.setShortcut(QKeySequence("Ctrl+J"))
-        act_downloads.triggered.connect(self._open_downloads_dialog)
+        self.tools_menu = self.main_menubar.addMenu("")
+        self.act_downloads = self.tools_menu.addAction("")
+        self.act_downloads.setShortcut(QKeySequence("Ctrl+J"))
+        self.act_downloads.triggered.connect(self._open_downloads_dialog)
 
-        act_settings = tools_menu.addAction("Настройки")
-        act_settings.setShortcut(QKeySequence("Ctrl+,"))
-        act_settings.triggered.connect(self._open_settings_dialog)
+        self.act_settings = self.tools_menu.addAction("")
+        self.act_settings.setShortcut(QKeySequence("Ctrl+,"))
+        self.act_settings.triggered.connect(self._open_settings_dialog)
 
         # Справка
-        help_menu = self.main_menubar.addMenu("&Справка")
-        act_help = help_menu.addAction("Справка surf")
-        act_help.setShortcut(QKeySequence("F1"))
-        act_help.triggered.connect(self._open_help)
+        self.help_menu = self.main_menubar.addMenu("")
+        self.act_help = self.help_menu.addAction("")
+        self.act_help.setShortcut(QKeySequence("F1"))
+        self.act_help.triggered.connect(self._open_help)
 
-        act_about = help_menu.addAction("О программе surf")
-        act_about.triggered.connect(self._show_about)
+        self.act_about = self.help_menu.addAction("")
+        self.act_about.triggered.connect(self._show_about)
 
     def _build_find_bar(self) -> None:
         self.find_bar = QWidget()
@@ -358,32 +353,93 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(12, 4, 12, 4)
         layout.setSpacing(8)
 
-        lbl = QLabel("Поиск:")
+        self.find_label = QLabel()
         self.find_input = QLineEdit()
-        self.find_input.setPlaceholderText("Найти на странице...")
         self.find_input.setFixedWidth(240)
         self.find_input.returnPressed.connect(self._find_next)
 
-        btn_find_next = QPushButton("Далее")
-        btn_find_next.clicked.connect(self._find_next)
+        self.btn_find_next = QPushButton()
+        self.btn_find_next.clicked.connect(self._find_next)
 
-        btn_find_prev = QPushButton("Назад")
-        btn_find_prev.clicked.connect(self._find_prev)
+        self.btn_find_prev = QPushButton()
+        self.btn_find_prev.clicked.connect(self._find_prev)
 
         btn_close_find = QPushButton()
         btn_close_find.setIcon(self._get_icon("close"))
         btn_close_find.setFixedSize(24, 24)
         btn_close_find.clicked.connect(self._hide_find_bar)
 
-        layout.addWidget(lbl)
+        layout.addWidget(self.find_label)
         layout.addWidget(self.find_input)
-        layout.addWidget(btn_find_next)
-        layout.addWidget(btn_find_prev)
+        layout.addWidget(self.btn_find_next)
+        layout.addWidget(self.btn_find_prev)
         layout.addStretch()
         layout.addWidget(btn_close_find)
 
         self.find_bar.setVisible(False)
         self.main_layout.addWidget(self.find_bar)
+
+    def _retranslate_ui(self) -> None:
+        # Меню
+        self.file_menu.setTitle(tr("menu_file"))
+        self.act_new_tab.setText(tr("act_new_tab"))
+        self.act_close_tab.setText(tr("act_close_tab"))
+        self.act_open_file.setText(tr("act_open_file"))
+        self.act_save_page.setText(tr("act_save_page"))
+        self.act_screenshot.setText(tr("act_screenshot"))
+        self.act_exit.setText(tr("act_exit"))
+
+        self.edit_menu.setTitle(tr("menu_edit"))
+        self.act_find.setText(tr("act_find"))
+        self.act_copy_url.setText(tr("act_copy_url"))
+
+        self.view_menu.setTitle(tr("menu_view"))
+        self.act_reader.setText(tr("act_reader"))
+        self.act_source.setText(tr("act_source"))
+        self.act_zoom_in.setText(tr("act_zoom_in"))
+        self.act_zoom_out.setText(tr("act_zoom_out"))
+        self.act_zoom_reset.setText(tr("act_zoom_reset"))
+        self.act_fullscreen.setText(tr("act_fullscreen"))
+
+        self.history_menu.setTitle(tr("menu_history"))
+        self.act_history.setText(tr("act_show_history"))
+        self.act_clear_hist.setText(tr("act_clear_history"))
+
+        self.bm_menu.setTitle(tr("menu_bookmarks"))
+        self.act_add_bm.setText(tr("act_add_bm"))
+        self.act_manage_bm.setText(tr("act_manage_bookmarks"))
+
+        self.tools_menu.setTitle(tr("menu_tools"))
+        self.act_downloads.setText(tr("act_downloads"))
+        self.act_settings.setText(tr("act_settings"))
+
+        self.help_menu.setTitle(tr("menu_help"))
+        self.act_help.setText(tr("act_help"))
+        self.act_about.setText(tr("act_about"))
+
+        # Тулбар
+        self.btn_back.setToolTip(tr("tip_back"))
+        self.btn_forward.setToolTip(tr("tip_forward"))
+        self.btn_reload.setToolTip(tr("tip_reload"))
+        self.btn_home.setToolTip(tr("tip_home"))
+        self.address_bar.setPlaceholderText(tr("address_placeholder"))
+        self.btn_bookmark.setToolTip(tr("tip_bookmark"))
+        self.btn_reader.setToolTip(tr("tip_reader"))
+        self.btn_downloads.setToolTip(tr("tip_downloads"))
+        self.btn_settings.setToolTip(tr("tip_settings"))
+        self.new_tab_btn.setToolTip(tr("tip_new_tab"))
+
+        # Панель поиска
+        self.find_label.setText(tr("find_label"))
+        self.find_input.setPlaceholderText(tr("find_placeholder"))
+        self.btn_find_next.setText(tr("find_next"))
+        self.btn_find_prev.setText(tr("find_prev"))
+
+        # Обновление заголовков вкладок без названия
+        for i in range(self.tab_bar.count()):
+            text = self.tab_bar.tabText(i)
+            if text in ("Новая вкладка", "New Tab"):
+                self.tab_bar.setTabText(i, tr("new_tab"))
 
     def _setup_shortcuts(self) -> None:
         QShortcut(QKeySequence("Ctrl+L"), self, self._focus_address_bar)
@@ -433,7 +489,7 @@ class MainWindow(QMainWindow):
     def add_new_tab(self, url: str = "") -> BrowserTab:
         tab = BrowserTab(self.db, self)
         idx = self.tab_stack.addWidget(tab)
-        self.tab_bar.addTab("Новая вкладка")
+        self.tab_bar.addTab(tr("new_tab"))
         self.tab_bar.setCurrentIndex(idx)
 
         tab.title_changed.connect(lambda title, t=tab: self._update_tab_title(t, title))
@@ -488,7 +544,7 @@ class MainWindow(QMainWindow):
         idx = self.tab_stack.indexOf(tab)
         if idx >= 0:
             short_title = (title[:20] + "...") if len(title) > 20 else title
-            self.tab_bar.setTabText(idx, short_title or "Без названия")
+            self.tab_bar.setTabText(idx, short_title or tr("untitled"))
             self.tab_bar.setTabToolTip(idx, title)
             self._refresh_completer()
 
@@ -512,10 +568,10 @@ class MainWindow(QMainWindow):
             return
 
         menu = QMenu(self)
-        act_reload = menu.addAction("Обновить вкладку")
-        act_duplicate = menu.addAction("Дублировать вкладку")
-        act_close = menu.addAction("Закрыть вкладку")
-        act_close_others = menu.addAction("Закрыть другие вкладки")
+        act_reload = menu.addAction(tr("ctx_reload_tab"))
+        act_duplicate = menu.addAction(tr("ctx_duplicate_tab"))
+        act_close = menu.addAction(tr("ctx_close_tab"))
+        act_close_others = menu.addAction(tr("ctx_close_others"))
 
         action = menu.exec(self.tab_bar.mapToGlobal(pos))
         if action == act_reload:
@@ -582,19 +638,19 @@ class MainWindow(QMainWindow):
         if self.db.is_bookmarked(tab.current_url):
             self.db.delete_bookmark_by_url(tab.current_url)
             self._update_bookmark_icon(tab.current_url)
-            self.status_bar.showMessage("Закладка удалена", 2500)
+            self.status_bar.showMessage(tr("status_bookmark_removed"), 2500)
         else:
             title, ok = QInputDialog.getText(
                 self,
-                "Добавить в закладки",
-                "Название страницы:",
+                tr("bookmark_input_title"),
+                tr("bookmark_input_label"),
                 QLineEdit.EchoMode.Normal,
                 tab.current_title,
             )
             if ok and title:
                 self.db.add_bookmark(title, tab.current_url)
                 self._update_bookmark_icon(tab.current_url)
-                self.status_bar.showMessage("Закладка сохранена в Избранное", 2500)
+                self.status_bar.showMessage(tr("status_bookmark_added"), 2500)
 
     def _update_bookmark_icon(self, url: str) -> None:
         if url and self.db.is_bookmarked(url):
@@ -694,25 +750,26 @@ class MainWindow(QMainWindow):
         self._apply_theme()
         self._apply_menu_visibility()
         self._setup_network_and_profile()
+        self._retranslate_ui()
 
     def _quick_clear_history(self) -> None:
         ans = QMessageBox.question(
             self,
-            "Очистить историю",
-            "Удалить всю историю посещений страниц?",
+            tr("clear_history_title"),
+            tr("clear_history_prompt"),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if ans == QMessageBox.StandardButton.Yes:
             self.db.clear_history("all")
             self._refresh_completer()
-            self.status_bar.showMessage("История посещений успешно очищена", 3000)
+            self.status_bar.showMessage(tr("status_history_cleared"), 3000)
 
     def _open_local_file(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
             self,
-            "Открыть файл",
+            tr("open_file_dialog"),
             "",
-            "HTML файлы (*.html *.htm);;Текстовые файлы (*.txt);;Все файлы (*)",
+            "HTML (*.html *.htm);;Text (*.txt);;All Files (*)",
         )
         if path:
             self.add_new_tab(QUrl.fromLocalFile(path).toString())
@@ -724,13 +781,13 @@ class MainWindow(QMainWindow):
 
         path, _ = QFileDialog.getSaveFileName(
             self,
-            "Сохранить веб-страницу как PDF",
+            tr("save_pdf_dialog"),
             "page.pdf",
-            "PDF Документ (*.pdf)",
+            "PDF (*.pdf)",
         )
         if path:
             tab.web_view.page().printToPdf(path)
-            self.status_bar.showMessage(f"Страница сохранена в PDF: {path}", 3000)
+            self.status_bar.showMessage(tr("status_pdf_saved", path=path), 3000)
 
     def _capture_screenshot(self) -> None:
         tab = self.current_tab()
@@ -741,7 +798,7 @@ class MainWindow(QMainWindow):
         tab = self.current_tab()
         if tab and tab.current_url:
             QApplication.clipboard().setText(tab.current_url)
-            self.status_bar.showMessage("URL скопирован в буфер обмена", 2500)
+            self.status_bar.showMessage(tr("status_url_copied"), 2500)
 
     def _open_help(self) -> None:
         self.add_new_tab("surf://help")
@@ -749,17 +806,8 @@ class MainWindow(QMainWindow):
     def _show_about(self) -> None:
         QMessageBox.about(
             self,
-            "О программе surf",
-            "<h3>surf 1.0</h3>"
-            "<p>Строгий веб-браузер на базе PyQt6 и WebEngine со скруглённым интерфейсом.</p>"
-            "<p><b>Особенности:</b></p>"
-            "<ul>"
-            "<li>Многовкладочный интерфейс с прокруткой и компактным сужением</li>"
-            "<li>Режим комфортного чтения без рекламы (Reader Mode)</li>"
-            "<li>Журнал истории, закладок и загрузок на SQLite</li>"
-            "<li>Экспорт и импорт данных в формате CSV</li>"
-            "<li>Настройки прокси, приватности и User-Agent</li>"
-            "</ul>",
+            tr("about_title"),
+            tr("about_text"),
         )
 
     # --- Загрузка файлов ---
@@ -771,9 +819,9 @@ class MainWindow(QMainWindow):
 
         file_path, _ = QFileDialog.getSaveFileName(
             self,
-            "Сохранить загружаемый файл",
+            tr("save_download_dialog"),
             full_path,
-            "Все файлы (*)",
+            "All Files (*)",
         )
         if not file_path:
             download.cancel()
@@ -784,12 +832,13 @@ class MainWindow(QMainWindow):
         download.accept()
 
         url_str = download.url().toString()
-        self.status_bar.showMessage(f"Началась загрузка: {os.path.basename(file_path)}", 4000)
+        name = os.path.basename(file_path)
+        self.status_bar.showMessage(tr("status_download_started", name=name), 4000)
 
         def on_finished():
             size = download.totalBytes()
-            self.db.add_download(os.path.basename(file_path), file_path, url_str, size, "Завершено")
-            self.status_bar.showMessage(f"Загрузка завершена: {os.path.basename(file_path)}", 5000)
+            self.db.add_download(name, file_path, url_str, size, "Завершено" if get_language() == "ru" else "Completed")
+            self.status_bar.showMessage(tr("status_download_finished", name=name), 5000)
 
         download.isFinishedChanged.connect(on_finished)
 

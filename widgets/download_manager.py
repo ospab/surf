@@ -14,13 +14,14 @@ from PyQt6.QtWidgets import (
 )
 
 from surf.database import Database
+from surf.i18n import tr
 
 
 class DownloadManagerDialog(QDialog):
     def __init__(self, db: Database, parent=None):
         super().__init__(parent)
         self.db = db
-        self.setWindowTitle("Загрузки")
+        self.setWindowTitle(tr("downloads_title"))
         self.resize(680, 400)
         self._init_ui()
         self.reload_downloads()
@@ -30,7 +31,9 @@ class DownloadManagerDialog(QDialog):
 
         self.table = QTableWidget()
         self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(["Имя файла", "Размер", "Статус", "Дата", "Путь"])
+        self.table.setHorizontalHeaderLabels([
+            tr("col_dl_name"), tr("col_dl_size"), tr("col_dl_status"), tr("col_dl_time"), tr("col_dl_path")
+        ])
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
         self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
@@ -38,9 +41,9 @@ class DownloadManagerDialog(QDialog):
         layout.addWidget(self.table)
 
         btn_layout = QHBoxLayout()
-        self.open_folder_btn = QPushButton("Открыть папку с файлом")
-        self.clear_btn = QPushButton("Очистить список")
-        self.close_btn = QPushButton("Закрыть")
+        self.open_folder_btn = QPushButton(tr("btn_open_folder"))
+        self.clear_btn = QPushButton(tr("btn_clear_list"))
+        self.close_btn = QPushButton(tr("btn_close"))
 
         btn_layout.addWidget(self.open_folder_btn)
         btn_layout.addWidget(self.clear_btn)
@@ -57,8 +60,9 @@ class DownloadManagerDialog(QDialog):
         downloads = self.db.get_downloads()
         self.table.setRowCount(len(downloads))
 
+        unit = "MB" if tr("col_dl_size") == "Size" else "МБ"
         for row_idx, d in enumerate(downloads):
-            size_mb = f"{d['total_bytes'] / (1024 * 1024):.2f} МБ" if d["total_bytes"] > 0 else "—"
+            size_mb = f"{d['total_bytes'] / (1024 * 1024):.2f} {unit}" if d["total_bytes"] > 0 else "—"
             self.table.setItem(row_idx, 0, QTableWidgetItem(d["file_name"]))
             self.table.setItem(row_idx, 1, QTableWidgetItem(size_mb))
             self.table.setItem(row_idx, 2, QTableWidgetItem(d["status"]))
@@ -74,7 +78,7 @@ class DownloadManagerDialog(QDialog):
         if os.path.exists(folder):
             QDesktopServices.openUrl(QUrl.fromLocalFile(folder))
         else:
-            QMessageBox.warning(self, "Ошибка", f"Папка не найдена:\n{folder}")
+            QMessageBox.warning(self, "Error", f"Folder not found:\n{folder}")
 
     def _clear_list(self) -> None:
         self.db.clear_downloads()
