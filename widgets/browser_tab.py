@@ -1,4 +1,5 @@
 import html
+import urllib.parse
 from urllib.parse import urlparse
 
 from PyQt6.QtCore import QEvent, Qt, QUrl, pyqtSignal
@@ -20,6 +21,22 @@ from PyQt6.QtWidgets import (
 from surf.database import Database
 from surf.i18n import tr
 from surf.widgets.reader_view import ReaderViewWidget
+
+
+def format_search_url(engine_template: str, query: str) -> str:
+    """Форматирует URL поискового запроса с поддержкой шаблонов %s, {query} и прямого добавления."""
+    encoded_query = urllib.parse.quote_plus(query)
+    if "%s" in engine_template:
+        return engine_template.replace("%s", encoded_query)
+    elif "{query}" in engine_template:
+        return engine_template.replace("{query}", encoded_query)
+    else:
+        if not (engine_template.endswith("=") or engine_template.endswith("/") or engine_template.endswith("?")):
+            if "?" in engine_template:
+                return f"{engine_template}&q={encoded_query}"
+            else:
+                return f"{engine_template}?q={encoded_query}"
+        return f"{engine_template}{encoded_query}"
 
 
 class BrowserPage(QWebEnginePage):
@@ -90,8 +107,8 @@ class SpeedDialWidget(QWidget):
         if "." in query and " " not in query:
             url = query if query.startswith("http://") or query.startswith("https://") else f"https://{query}"
         else:
-            engine = self.db.get_setting("search_engine", "https://yandex.ru/search/?text=")
-            url = f"{engine}{query}"
+            engine = self.db.get_setting("search_engine", "https://www.google.com/search?q=")
+            url = format_search_url(engine, query)
         self.open_url.emit(url)
 
 
@@ -160,8 +177,8 @@ class BrowserTab(QWidget):
             if "." in url and " " not in url:
                 url = f"https://{url}"
             else:
-                engine = self.db.get_setting("search_engine", "https://yandex.ru/search/?text=")
-                url = f"{engine}{url}"
+                engine = self.db.get_setting("search_engine", "https://www.google.com/search?q=")
+                url = format_search_url(engine, url)
 
         self.current_url = url
         self.stack.setCurrentIndex(0)

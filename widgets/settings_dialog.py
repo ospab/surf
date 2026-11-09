@@ -8,9 +8,10 @@ from surf.database import Database
 from surf.i18n import get_language, set_language, tr
 
 SEARCH_ENGINES = {
-    0: ("Яндекс", "https://yandex.ru/search/?text="),
-    1: ("Google", "https://www.google.com/search?q="),
-    2: ("DuckDuckGo", "https://duckduckgo.com/?q="),
+    0: ("google", "Google", "https://www.google.com/search?q="),
+    1: ("yandex", "Яндекс", "https://yandex.ru/search/?text="),
+    2: ("duckduckgo", "DuckDuckGo", "https://duckduckgo.com/?q="),
+    3: ("bing", "Bing", "https://www.bing.com/search?q="),
 }
 
 USER_AGENTS = {
@@ -44,13 +45,26 @@ class SettingsDialog(QDialog):
 
     def _load_current_settings(self) -> None:
         # Основные
-        self.homeEdit.setText(self.db.get_setting("homepage", "https://ya.ru"))
+        self.homeEdit.setText(self.db.get_setting("homepage", "https://www.google.com"))
 
-        current_engine = self.db.get_setting("search_engine", "https://yandex.ru/search/?text=")
-        for idx, (_, url) in SEARCH_ENGINES.items():
-            if url == current_engine:
-                self.searchCombo.setCurrentIndex(idx)
+        current_engine = self.db.get_setting("search_engine", "https://www.google.com/search?q=")
+        engine_type = self.db.get_setting("search_engine_type", "google")
+        custom_engine = self.db.get_setting("custom_search_engine", "https://www.google.com/search?q=")
+
+        found_idx = None
+        for idx, (code, _, url) in SEARCH_ENGINES.items():
+            if code == engine_type or url == current_engine:
+                found_idx = idx
                 break
+
+        if found_idx is not None:
+            self.searchCombo.setCurrentIndex(found_idx)
+            self.searchCustomEdit.setText(SEARCH_ENGINES[found_idx][2])
+            self.searchCustomEdit.setReadOnly(True)
+        else:
+            self.searchCombo.setCurrentIndex(4)  # Пользовательский
+            self.searchCustomEdit.setText(current_engine or custom_engine)
+            self.searchCustomEdit.setReadOnly(False)
 
         auto_hide_menu = self.db.get_setting("menu_bar_auto_hide", "1")
         self.menuBarCombo.setCurrentIndex(0 if auto_hide_menu == "1" else 1)
@@ -110,11 +124,29 @@ class SettingsDialog(QDialog):
     def _connect_signals(self) -> None:
         self.browseDownloadBtn.clicked.connect(self._choose_download_dir)
         self.colorBtn.clicked.connect(self._choose_accent_color)
+        self.searchCombo.currentIndexChanged.connect(self._on_search_engine_changed)
         self.uaCombo.currentIndexChanged.connect(self._on_ua_changed)
         self.proxyTypeCombo.currentIndexChanged.connect(self._toggle_proxy_fields)
         self.langCombo.currentIndexChanged.connect(self._on_lang_changed)
         self.buttonBox.accepted.connect(self._save_settings)
         self.buttonBox.rejected.connect(self.reject)
+
+    def _on_search_engine_changed(self, index: int) -> None:
+        if index in SEARCH_ENGINES:
+            self.searchCustomEdit.setText(SEARCH_ENGINES[index][2])
+            self.searchCustomEdit.setReadOnly(True)
+        else:
+            self.searchCustomEdit.setReadOnly(False)
+            curr = self.searchCustomEdit.text().strip()
+            preset_urls = [e[2] for e in SEARCH_ENGINES.values()]
+            if not curr or curr in preset_urls:
+                custom_saved = self.db.get_setting("custom_search_engine", "")
+                if custom_saved and custom_saved not in preset_urls:
+                    self.searchCustomEdit.setText(custom_saved)
+                else:
+                    self.searchCustomEdit.setText("https://")
+            self.searchCustomEdit.setFocus()
+            self.searchCustomEdit.selectAll()
 
     def _on_lang_changed(self, index: int) -> None:
         set_language("ru" if index == 0 else "en")
@@ -168,6 +200,13 @@ class SettingsDialog(QDialog):
         self.homeGroup.setTitle(tr("group_navigation"))
         self.homeLabel.setText(tr("lbl_homepage"))
         self.searchLabel.setText(tr("lbl_search_engine"))
+        self.searchCustomLabel.setText(tr("lbl_search_url"))
+        self.searchCombo.setItemText(0, tr("search_engine_google"))
+        self.searchCombo.setItemText(1, tr("search_engine_yandex"))
+        self.searchCombo.setItemText(2, tr("search_engine_duckduckgo"))
+        self.searchCombo.setItemText(3, tr("search_engine_bing"))
+        self.searchCombo.setItemText(4, tr("search_engine_custom"))
+        self.searchCustomEdit.setPlaceholderText(tr("search_custom_placeholder"))
         self.menuLabel.setText(tr("lbl_menu_mode"))
         self.menuBarCombo.setItemText(0, tr("menu_mode_hide"))
         self.menuBarCombo.setItemText(1, tr("menu_mode_show"))
@@ -208,10 +247,19 @@ class SettingsDialog(QDialog):
 
     def _save_settings(self) -> None:
         # Основные
-        homepage = self.homeEdit.text().strip() or "https://ya.ru"
+        homepage = self.homeEdit.text().strip() or "https://www.google.com"
         self.db.set_setting("homepage", homepage)
 
-        engine_url = SEARCH_ENGINES.get(self.searchCombo.currentIndex(), ("Яндекс", "https://yandex.ru/search/?text="))[1]
+        search_idx = self.searchCombo.currentIndex()
+        if search_idx in SEARCH_ENGINES:
+            engine_type = SEARCH_ENGINES[search_idx][0]
+            engine_url = SEARCH_ENGINES[search_idx][2]
+        else:
+            engine_type = "custom"
+            engine_url = self.searchCustomEdit.text().strip() or "https://www.google.com/search?q="
+            self.db.set_setting("custom_search_engine", engine_url)
+
+        self.db.set_setting("search_engine_type", engine_type)
         self.db.set_setting("search_engine", engine_url)
         self.db.set_setting("menu_bar_auto_hide", "1" if self.menuBarCombo.currentIndex() == 0 else "0")
         self.db.set_setting("download_folder", self.downloadPathEdit.text())

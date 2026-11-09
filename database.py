@@ -7,8 +7,10 @@ from urllib.parse import urlparse
 DEFAULT_DB_FILE = "surf.db"
 
 DEFAULT_SETTINGS = {
-    "homepage": "https://ya.ru",
-    "search_engine": "https://yandex.ru/search/?text=",
+    "homepage": "https://www.google.com",
+    "search_engine": "https://www.google.com/search?q=",
+    "search_engine_type": "google",
+    "custom_search_engine": "https://www.google.com/search?q=",
     "theme": "dark",
     "accent_color": "#0060df",
     "language": "ru",
@@ -93,6 +95,21 @@ class Database:
                     "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)",
                     (key, val),
                 )
+
+            # Миграция: поисковая система по умолчанию - Google
+            cursor.execute("SELECT value FROM settings WHERE key = 'search_engine'")
+            row = cursor.fetchone()
+            if row and row[0] == "https://yandex.ru/search/?text=":
+                cursor.execute(
+                    "UPDATE settings SET value = 'https://www.google.com/search?q=' WHERE key = 'search_engine'"
+                )
+                cursor.execute(
+                    "UPDATE settings SET value = 'google' WHERE key = 'search_engine_type'"
+                )
+                cursor.execute(
+                    "UPDATE settings SET value = 'https://www.google.com' WHERE key = 'homepage' AND value = 'https://ya.ru'"
+                )
+
             conn.commit()
 
     # --- История ---

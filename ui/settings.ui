@@ -40,7 +40,7 @@
           <item row="0" column="1">
            <widget class="QLineEdit" name="homeEdit">
             <property name="placeholderText">
-             <string>https://ya.ru</string>
+             <string>https://www.google.com</string>
             </property>
            </widget>
           </item>
@@ -55,12 +55,12 @@
            <widget class="QComboBox" name="searchCombo">
             <item>
              <property name="text">
-              <string>Яндекс</string>
+              <string>Google (по умолчанию)</string>
              </property>
             </item>
             <item>
              <property name="text">
-              <string>Google</string>
+              <string>Яндекс</string>
              </property>
             </item>
             <item>
@@ -68,16 +68,40 @@
               <string>DuckDuckGo</string>
              </property>
             </item>
+            <item>
+             <property name="text">
+              <string>Bing</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Пользовательский...</string>
+             </property>
+            </item>
            </widget>
           </item>
           <item row="2" column="0">
+           <widget class="QLabel" name="searchCustomLabel">
+            <property name="text">
+             <string>URL поиска:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QLineEdit" name="searchCustomEdit">
+            <property name="placeholderText">
+             <string>https://www.google.com/search?q= (%s для запроса)</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0">
            <widget class="QLabel" name="menuLabel">
             <property name="text">
              <string>Строка меню (Alt):</string>
             </property>
            </widget>
           </item>
-          <item row="2" column="1">
+          <item row="3" column="1">
            <widget class="QComboBox" name="menuBarCombo">
             <item>
              <property name="text">
@@ -91,14 +115,14 @@
             </item>
            </widget>
           </item>
-          <item row="3" column="0">
+          <item row="4" column="0">
            <widget class="QLabel" name="langLabel">
             <property name="text">
              <string>Язык интерфейса / Language:</string>
             </property>
            </widget>
           </item>
-          <item row="3" column="1">
+          <item row="4" column="1">
            <widget class="QComboBox" name="langCombo">
             <item>
              <property name="text">
