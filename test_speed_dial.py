@@ -45,29 +45,22 @@ except ModuleNotFoundError:
     )
 
 def run_tests():
-    print("=== 1. Testing Database Initialization and Seeding ===")
+    print("=== 1. Testing Database Initialization and Clean Shortcuts ===")
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
         temp_db_path = f.name
 
     try:
         db = Database(temp_db_path)
         tiles = db.get_speed_dial_tiles()
-        assert len(tiles) == 6, f"Expected 6 default tiles, got {len(tiles)}"
-        titles = [t["title"] for t in tiles]
-        assert "Google" in titles
-        assert "GitHub" in titles
-        assert "YouTube" in titles
-        assert "Habr" in titles
-        assert "Wikipedia" in titles
-        assert "Яндекс" in titles
-        print("  -> Default 6 tiles seeded successfully:", titles)
+        assert len(tiles) == 0, f"Expected 0 default tiles (clean initial shortcuts), got {len(tiles)}"
+        print("  -> Clean initial shortcuts verified: tiles count =", len(tiles))
 
         print("\n=== 2. Testing Database CRUD ===")
         # Add tile
         new_id = db.add_speed_dial_tile("OpenAI", "https://openai.com")
         assert new_id > 0, "add_speed_dial_tile failed"
         tiles = db.get_speed_dial_tiles()
-        assert len(tiles) == 7
+        assert len(tiles) == 1
         added = [t for t in tiles if t["id"] == new_id][0]
         assert added["title"] == "OpenAI"
         assert added["url"] == "https://openai.com"
@@ -86,15 +79,19 @@ def run_tests():
         ok = db.delete_speed_dial_tile(new_id)
         assert ok is True
         tiles = db.get_speed_dial_tiles()
-        assert len(tiles) == 6
+        assert len(tiles) == 0
         print("  -> Delete tile OK")
 
         print("\n=== 3. Testing SpeedDialWidget UI & Signals ===")
         widget = SpeedDialWidget(db)
-        assert widget.tiles_layout.count() == 7  # 6 tiles + 1 add card
-        print("  -> SpeedDialWidget instantiated with 7 items in grid")
+        assert widget.tiles_layout.count() == 1  # 0 tiles + 1 add card
+        print("  -> SpeedDialWidget instantiated with 1 item (Add Card) in grid")
 
-        # Test click on card
+        # Test adding a tile and clicking on card
+        new_id2 = db.add_speed_dial_tile("GitHub", "https://github.com")
+        widget.refresh_tiles()
+        assert widget.tiles_layout.count() == 2  # 1 tile + 1 add card
+
         opened_urls = []
         widget.open_url.connect(lambda url: opened_urls.append(url))
 
@@ -106,7 +103,7 @@ def run_tests():
         first_card.mousePressEvent(press_event)
         first_card.mouseReleaseEvent(release_event)
         assert len(opened_urls) == 1
-        assert "google.com" in opened_urls[0]
+        assert "github.com" in opened_urls[0]
         print(f"  -> Tile clicked and emitted open_url: {opened_urls[0]}")
 
         print("\n=== 4. Testing Fallback to Top Visited History ===")

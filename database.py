@@ -30,14 +30,7 @@ DEFAULT_SETTINGS = {
     "restore_session_on_startup": "1",
 }
 
-DEFAULT_SPEED_DIAL_TILES = [
-    {"title": "Google", "url": "https://www.google.com", "icon": "google"},
-    {"title": "GitHub", "url": "https://github.com", "icon": "github"},
-    {"title": "YouTube", "url": "https://www.youtube.com", "icon": "youtube"},
-    {"title": "Habr", "url": "https://habr.com", "icon": "habr"},
-    {"title": "Wikipedia", "url": "https://ru.wikipedia.org", "icon": "wikipedia"},
-    {"title": "Яндекс", "url": "https://ya.ru", "icon": "yandex"},
-]
+DEFAULT_SPEED_DIAL_TILES = []
 
 
 class Database:
@@ -140,12 +133,8 @@ class Database:
             init_row = cursor.fetchone()
             dial_initialized = init_row is not None and init_row["value"] == "1"
 
-            if not has_tiles and not dial_initialized:
-                for pos, tile in enumerate(DEFAULT_SPEED_DIAL_TILES):
-                    cursor.execute(
-                        "INSERT INTO speed_dial_tiles (title, url, icon, position) VALUES (?, ?, ?, ?)",
-                        (tile["title"], tile["url"], tile.get("icon", ""), pos),
-                    )
+            if not dial_initialized:
+                # На новом браузере оставляем список шорткатов чистым/пустым
                 cursor.execute(
                     "INSERT OR REPLACE INTO settings (key, value) VALUES ('speed_dial_initialized', '1')"
                 )

@@ -18,6 +18,7 @@ from PyQt6.QtWebEngineCore import (
     QWebEngineDownloadRequest,
     QWebEnginePage,
     QWebEngineProfile,
+    QWebEngineScript,
 )
 from PyQt6.QtWidgets import (
     QApplication,
@@ -84,7 +85,7 @@ class ZoomWheelFilter(QObject):
 
 
 class ClosableTabBar(QTabBar):
-    """Панель вкладок в стиле Firefox Proton: фавиконы, индикатор аудио/mute, кнопка закрытия, отрыв вкладок."""
+    """Фирменная панель вкладок surf: фавиконы, индикатор аудио/mute, кнопка закрытия, отрыв вкладок."""
 
     tabAudioMuteRequested = pyqtSignal(int)
     tabDetachRequested = pyqtSignal(int, QPoint)
@@ -438,18 +439,49 @@ class MainWindow(QMainWindow):
             self.profile = QWebEngineProfile.defaultProfile()
 
         # Фирменный User-Agent surf с полной веб-совместимостью
+        default_ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Surf/1.0"
         ua_type = self.db.get_setting("user_agent_type", "surf")
-        if ua_type == "surf" and "Surf/1.0" not in self.db.get_setting("custom_user_agent", ""):
-            self.db.set_setting(
-                "custom_user_agent",
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Surf/1.0",
-            )
+        if ua_type in ("surf", "surf_pure"):
+            self.db.set_setting("user_agent_type", "surf")
+            self.db.set_setting("custom_user_agent", default_ua)
 
-        ua_str = self.db.get_setting(
-            "custom_user_agent",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Surf/1.0",
-        )
+        ua_str = self.db.get_setting("custom_user_agent", default_ua)
         self.profile.setHttpUserAgent(ua_str)
+
+        # Фирменная инъекция брендинга surf и ospab foundation в объект navigator:
+        # Убирает упоминания Mozilla, Netscape, Gecko и Google Inc. на сайтах проверки (internet.yandex.ru и др.)
+        branding_script = QWebEngineScript()
+        branding_script.setName("surf_branding_overrides")
+        branding_script.setSourceCode("""
+        (function() {
+            try {
+                Object.defineProperty(navigator, 'vendor', {
+                    get: () => 'ospab foundation',
+                    configurable: true,
+                    enumerable: true
+                });
+                Object.defineProperty(navigator, 'appCodeName', {
+                    get: () => 'Surf',
+                    configurable: true,
+                    enumerable: true
+                });
+                Object.defineProperty(navigator, 'appName', {
+                    get: () => 'Surf Browser',
+                    configurable: true,
+                    enumerable: true
+                });
+                Object.defineProperty(navigator, 'product', {
+                    get: () => 'SurfEngine',
+                    configurable: true,
+                    enumerable: true
+                });
+            } catch (e) {}
+        })();
+        """)
+        branding_script.setInjectionPoint(QWebEngineScript.InjectionPoint.DocumentCreation)
+        branding_script.setWorldId(QWebEngineScript.ScriptWorldId.MainWorld)
+        branding_script.setRunsOnSubFrames(True)
+        self.profile.scripts().insert(branding_script)
 
         folder = self.db.get_setting(
             "download_folder",
@@ -504,7 +536,7 @@ class MainWindow(QMainWindow):
 
         self._build_menu()
 
-        # 1. Линия парящих вкладок НАД панелью адреса (Firefox Proton)
+        # 1. Линия парящих вкладок НАД панелью адреса (surf)
         self._build_tab_strip()
 
         # 2. Панель навигации со встроенным AwesomeBar
@@ -652,7 +684,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.btn_downloads)
         layout.addWidget(self.btn_settings)
 
-        # Бейдж приватного режима (в стиле Firefox Private Window)
+        # Бейдж приватного режима (surf Private Window)
         if self.is_private:
             self.lbl_private = QLabel(f" {tr('private_badge')} ")
             self.lbl_private.setStyleSheet(
@@ -795,7 +827,7 @@ class MainWindow(QMainWindow):
         self.act_about.triggered.connect(self._show_about)
 
     def _show_hamburger_menu(self) -> None:
-        """Всплывающее меню Firefox-стиля при клике на гамбургер ≡."""
+        """Всплывающее главное меню при клике на гамбургер ≡."""
         menu = QMenu(self)
 
         act_nt = menu.addAction(tr("act_new_tab"))

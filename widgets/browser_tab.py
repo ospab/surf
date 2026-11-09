@@ -42,10 +42,22 @@ try:
     from surf.database import Database
     from surf.i18n import tr
     from surf.widgets.reader_view import ReaderViewWidget
+    from surf.utils.favicon_service import (
+        FaviconService,
+        create_circular_favicon_badge,
+        generate_fallback_badge,
+        get_clean_domain,
+    )
 except ModuleNotFoundError:
     from database import Database
     from i18n import tr
     from widgets.reader_view import ReaderViewWidget
+    from utils.favicon_service import (
+        FaviconService,
+        create_circular_favicon_badge,
+        generate_fallback_badge,
+        get_clean_domain,
+    )
 
 
 def format_search_url(engine_template: str, query: str) -> str:
@@ -79,19 +91,14 @@ class BrowserPage(QWebEnginePage):
 
 
 def generate_tile_badge(title: str, url: str, is_add_btn: bool = False, is_dark: bool = True) -> QPixmap:
-    """Генерирует высокочеткую круглую иконку/монограмму для плитки быстрого доступа."""
-    pixmap = QPixmap(84, 84)
-    pixmap.fill(Qt.GlobalColor.transparent)
-    pixmap.setDevicePixelRatio(2.0)
-
-    painter = QPainter(pixmap)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
-    painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-
-    circle_rect = QRectF(2, 2, 38, 38)
-
+    """Генерирует высокочеткую круглую иконку для плитки быстрого доступа."""
     if is_add_btn:
+        pixmap = QPixmap(84, 84)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        pixmap.setDevicePixelRatio(2.0)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        circle_rect = QRectF(2, 2, 38, 38)
         bg_col = QColor("#2a2a35" if is_dark else "#e5e5ea")
         border_col = QColor("#3f3f50" if is_dark else "#d1d1d6")
         painter.setBrush(QBrush(bg_col))
@@ -105,94 +112,12 @@ def generate_tile_badge(title: str, url: str, is_add_btn: bool = False, is_dark:
         painter.end()
         return pixmap
 
-    url_lower = url.lower()
-    domain = ""
-    try:
-        domain = urlparse(url).netloc.lower()
-        if domain.startswith("www."):
-            domain = domain[4:]
-    except Exception:
-        pass
+    cached_icon = FaviconService.instance().get_cached(url)
+    if cached_icon is not None and not cached_icon.isNull():
+        return create_circular_favicon_badge(cached_icon, is_dark=is_dark)
 
-    if "google." in url_lower:
-        painter.setBrush(QBrush(QColor("#ffffff")))
-        painter.setPen(QPen(QColor("#3a3a48" if is_dark else "#e0e0e0"), 1))
-        painter.drawEllipse(circle_rect)
-        painter.setPen(QColor("#4285f4"))
-        font = QFont("Arial", 18, QFont.Weight.Bold)
-        painter.setFont(font)
-        painter.drawText(circle_rect, Qt.AlignmentFlag.AlignCenter, "G")
-    elif "github." in url_lower:
-        painter.setBrush(QBrush(QColor("#24292e")))
-        painter.setPen(QPen(QColor("#404448"), 1))
-        painter.drawEllipse(circle_rect)
-        painter.setPen(QColor("#ffffff"))
-        font = QFont("Arial", 12, QFont.Weight.Bold)
-        painter.setFont(font)
-        painter.drawText(circle_rect, Qt.AlignmentFlag.AlignCenter, "GH")
-    elif "youtube." in url_lower or "youtu.be" in url_lower:
-        painter.setBrush(QBrush(QColor("#ff0000")))
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawEllipse(circle_rect)
-        painter.setBrush(QBrush(QColor("#ffffff")))
-        path = QPainterPath()
-        path.moveTo(17, 15)
-        path.lineTo(27, 21)
-        path.lineTo(17, 27)
-        path.closeSubpath()
-        painter.drawPath(path)
-    elif "habr." in url_lower:
-        painter.setBrush(QBrush(QColor("#65a3be")))
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawEllipse(circle_rect)
-        painter.setPen(QColor("#ffffff"))
-        font = QFont("Arial", 17, QFont.Weight.Bold)
-        painter.setFont(font)
-        painter.drawText(circle_rect, Qt.AlignmentFlag.AlignCenter, "H")
-    elif "wikipedia." in url_lower:
-        painter.setBrush(QBrush(QColor("#f8f9fa")))
-        painter.setPen(QPen(QColor("#444452" if is_dark else "#c8ccd1"), 1))
-        painter.drawEllipse(circle_rect)
-        painter.setPen(QColor("#202122"))
-        font = QFont("Times New Roman", 18, QFont.Weight.Bold)
-        painter.setFont(font)
-        painter.drawText(circle_rect, Qt.AlignmentFlag.AlignCenter, "W")
-    elif "ya.ru" in url_lower or "yandex." in url_lower:
-        painter.setBrush(QBrush(QColor("#fc3f1d")))
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawEllipse(circle_rect)
-        painter.setPen(QColor("#ffffff"))
-        font = QFont("Arial", 17, QFont.Weight.Bold)
-        painter.setFont(font)
-        painter.drawText(circle_rect, Qt.AlignmentFlag.AlignCenter, "Я")
-    else:
-        palette = [
-            "#0060df", "#00875a", "#e53e3e", "#805ad5",
-            "#dd6b20", "#319795", "#0284c7", "#d946ef",
-            "#059669", "#d97706", "#2563eb", "#7c3aed"
-        ]
-        key = domain or title or url
-        color_hex = palette[abs(hash(key)) % len(palette)]
-        painter.setBrush(QBrush(QColor(color_hex)))
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawEllipse(circle_rect)
-
-        letter = ""
-        clean_name = title.strip() or domain.strip()
-        for ch in clean_name:
-            if ch.isalnum():
-                letter = ch.upper()
-                break
-        if not letter:
-            letter = "?"
-
-        painter.setPen(QColor("#ffffff"))
-        font = QFont("Arial", 16, QFont.Weight.Bold)
-        painter.setFont(font)
-        painter.drawText(circle_rect, Qt.AlignmentFlag.AlignCenter, letter)
-
-    painter.end()
-    return pixmap
+    domain = get_clean_domain(url)
+    return generate_fallback_badge(title, domain, is_dark=is_dark)
 
 
 class SpeedDialEditDialog(QDialog):
@@ -279,7 +204,7 @@ class SpeedDialEditDialog(QDialog):
 
 
 class SpeedDialCard(QFrame):
-    """Интерактивная плитка веб-сайта в стиле Firefox Proton / Chrome."""
+    """Интерактивная плитка веб-сайта с реальной фавиконкой с сайта."""
 
     clicked = pyqtSignal(str)
     open_new_tab = pyqtSignal(str)
@@ -292,10 +217,21 @@ class SpeedDialCard(QFrame):
         self.tile_data = tile_data
         self.is_dark = is_dark
         self._pressed = False
+        self.domain = get_clean_domain(self.tile_data.get("url", ""))
         self.setObjectName("speedDialCard")
         self.setFixedSize(110, 92)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self._init_ui()
+
+        # Автоматическое подтягивание фавиконки сайта
+        FaviconService.instance().favicon_loaded.connect(self._on_favicon_loaded)
+        if self.domain:
+            FaviconService.instance().request_favicon(self.domain)
+
+    def _on_favicon_loaded(self, domain: str, pixmap: QPixmap) -> None:
+        if domain == self.domain and not pixmap.isNull():
+            badge = create_circular_favicon_badge(pixmap, is_dark=self.is_dark)
+            self.icon_label.setPixmap(badge)
 
     def _init_ui(self) -> None:
         layout = QVBoxLayout(self)
@@ -850,6 +786,10 @@ class BrowserTab(QWidget):
     def _on_icon_changed(self, icon: QIcon) -> None:
         if self.stack.currentIndex() == 0:
             self.icon_changed.emit(icon)
+            if self.current_url and not self.current_url.startswith("surf://"):
+                pix = icon.pixmap(64, 64)
+                if not pix.isNull():
+                    FaviconService.instance().save_to_cache(self.current_url, pix)
 
     def _on_load_finished(self, ok: bool) -> None:
         if ok and self.current_url and not self.current_url.startswith("surf://") and not self.profile.isOffTheRecord():

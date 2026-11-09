@@ -233,7 +233,7 @@ TRANSLATIONS = {
         "reader_close_btn": "Закрыть чтение",
         "reader_source_label": "Источник:",
 
-        # Приватность, SSL, контекстное меню и интерфейс Firefox
+        # Приватность, SSL, контекстное меню и интерфейс surf
         "menu_new_private_window": "Новое приватное окно",
         "private_badge": "Приватный режим",
         "private_window_title": "surf (Приватный режим)",
@@ -509,7 +509,7 @@ TRANSLATIONS = {
         "reader_close_btn": "Close Reader",
         "reader_source_label": "Source:",
 
-        # Privacy, SSL, context menu and Firefox interface
+        # Privacy, SSL, context menu and surf interface
         "menu_new_private_window": "New Private Window",
         "private_badge": "Private Browsing",
         "private_window_title": "surf (Private Browsing)",

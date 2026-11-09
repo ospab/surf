@@ -27,3 +27,4 @@ surf.db
 *.csv
 .pytest_cache/
 *.log
+cache/

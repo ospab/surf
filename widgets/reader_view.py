@@ -255,7 +255,7 @@ class ReaderViewWidget(QWidget):
         </head>
         <body>
             <h1>Браузер surf</h1>
-            <p><strong>surf</strong> — полнофункциональный легковесный веб-браузер со строгим стилем Firefox, разработанный на PyQt6.</p>
+            <p><strong>surf</strong> — полнофункциональный легковесный веб-браузер, созданный <b>ospab foundation</b> на базе PyQt6 и современного движка рендеринга.</p>
             
             <h2>Горячие клавиши</h2>
             <table>

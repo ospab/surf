@@ -99,7 +99,7 @@ def fetch_certificate_details(url: str, timeout: float = 3.5) -> dict:
 
 
 class CertificateDialog(QDialog):
-    """Информативное диалоговое окно в стиле Firefox со всеми деталями SSL/TLS сертификата."""
+    """Информативное диалоговое окно со всеми деталями SSL/TLS сертификата узла."""
 
     def __init__(self, url: str, cert_data: dict | None = None, parent=None):
         super().__init__(parent)

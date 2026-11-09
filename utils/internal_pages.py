@@ -39,7 +39,7 @@ def register_surf_scheme() -> None:
 
 
 def get_base_css(is_dark: bool, accent: str = "#0060df") -> str:
-    """Возвращает общие стили для внутренних страниц в стиле Firefox Proton / surf."""
+    """Возвращает общие стили для внутренних страниц surf."""
     if is_dark:
         bg = "#1c1b22"
         card_bg = "#2b2a33"
@@ -301,16 +301,16 @@ def render_pages_directory(is_dark: bool, accent: str = "#0060df") -> str:
 
 
 def render_about_page(db: Database, is_dark: bool, accent: str = "#0060df") -> str:
-    """Генерирует страницу surf://about с подробными версиями всех компонентов."""
+    """Генерирует страницу surf://about в элегантном центрированном дизайне с брендингом ospab foundation."""
     is_ru = get_language() == "ru"
-    title = "О программе surf" if is_ru else "About surf Browser"
+    title = "О программе surf" if is_ru else "About surf"
 
     import PyQt6
     from PyQt6.QtCore import PYQT_VERSION_STR, QT_VERSION_STR
 
     ua_str = db.get_setting(
         "custom_user_agent",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Surf/1.0",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Surf/1.0",
     )
     search_eng = db.get_setting("search_engine", "https://www.google.com/search?q=")
     dl_folder = db.get_setting("download_folder", os.path.join(os.path.expanduser("~"), "Downloads"))
@@ -320,54 +320,204 @@ def render_about_page(db: Database, is_dark: bool, accent: str = "#0060df") -> s
     <head>
         <meta charset="utf-8">
         <title>{title}</title>
-        <style>{get_base_css(is_dark, accent)}</style>
+        <style>
+            {get_base_css(is_dark, accent)}
+            body {{
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                min-height: 90vh;
+                padding: 40px 20px;
+            }}
+            .about-container {{
+                width: 100%;
+                max-width: 620px;
+                margin: 0 auto;
+            }}
+            .about-card {{
+                background: var(--card-bg);
+                border: 1px solid var(--border);
+                border-radius: 16px;
+                padding: 42px 36px 36px 36px;
+                text-align: center;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+            }}
+            .logo-icon {{
+                width: 76px;
+                height: 76px;
+                margin: 0 auto 16px auto;
+                border-radius: 22px;
+                background: linear-gradient(135deg, {accent} 0%, #00c6ff 100%);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #ffffff;
+                font-size: 34px;
+                font-weight: 800;
+                letter-spacing: -1px;
+                box-shadow: 0 6px 20px rgba(0, 96, 223, 0.35);
+            }}
+            .app-title {{
+                font-size: 36px;
+                font-weight: 800;
+                letter-spacing: -0.5px;
+                margin-bottom: 2px;
+            }}
+            .app-version {{
+                font-size: 14px;
+                color: var(--text-muted);
+                margin-bottom: 20px;
+            }}
+            .version-pill {{
+                background: rgba(0, 96, 223, 0.14);
+                color: {accent};
+                border: 1px solid rgba(0, 96, 223, 0.3);
+                padding: 2px 8px;
+                border-radius: 12px;
+                font-size: 12px;
+                font-weight: 600;
+                margin-left: 6px;
+            }}
+            .update-banner {{
+                display: inline-flex;
+                align-items: center;
+                gap: 12px;
+                background: rgba(16, 185, 129, 0.1);
+                border: 1px solid rgba(16, 185, 129, 0.28);
+                border-radius: 12px;
+                padding: 10px 18px;
+                margin-bottom: 22px;
+                text-align: left;
+            }}
+            .check-badge {{
+                width: 26px;
+                height: 26px;
+                border-radius: 50%;
+                background: #10b981;
+                color: white;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 14px;
+                font-weight: bold;
+                flex-shrink: 0;
+            }}
+            .update-text {{
+                font-size: 13px;
+                font-weight: 600;
+                color: #10b981;
+            }}
+            .update-sub {{
+                font-size: 11px;
+                color: var(--text-muted);
+            }}
+            .app-motto {{
+                font-size: 14px;
+                line-height: 1.6;
+                color: var(--text);
+                margin-bottom: 12px;
+            }}
+            .app-org {{
+                font-size: 13px;
+                color: var(--text-muted);
+                line-height: 1.5;
+                margin-bottom: 22px;
+            }}
+            .app-links {{
+                display: flex;
+                justify-content: center;
+                flex-wrap: wrap;
+                gap: 16px;
+                padding-top: 18px;
+                border-top: 1px solid var(--border);
+                margin-bottom: 20px;
+            }}
+            .app-links a {{
+                color: var(--accent);
+                text-decoration: none;
+                font-size: 13px;
+                font-weight: 500;
+            }}
+            .app-links a:hover {{
+                text-decoration: underline;
+            }}
+            .specs-box {{
+                text-align: left;
+                background: var(--code-bg);
+                border: 1px solid var(--border);
+                border-radius: 10px;
+                padding: 14px 18px;
+                font-size: 12px;
+            }}
+            .specs-box summary {{
+                cursor: pointer;
+                font-weight: 600;
+                color: var(--text-muted);
+                outline: none;
+            }}
+            .specs-table {{
+                width: 100%;
+                margin-top: 12px;
+                border-collapse: collapse;
+            }}
+            .specs-table td {{
+                padding: 5px 0;
+                color: var(--text);
+                border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            }}
+            .specs-table td.dim {{
+                color: var(--text-muted);
+                width: 170px;
+            }}
+        </style>
     </head>
     <body>
-        <div class="container">
-            <div class="header">
-                <div class="header-left">
-                    <span class="logo-badge">surf 1.0</span>
+        <div class="about-container">
+            <div class="about-card">
+                <div class="logo-icon">surf</div>
+                <div class="app-title">surf</div>
+                <div class="app-version">
+                    1.0.0 (64-бит)
+                    <span class="version-pill">{"Стабильный канал" if is_ru else "Stable Channel"}</span>
+                </div>
+
+                <div class="update-banner">
+                    <div class="check-badge">✓</div>
                     <div>
-                        <div class="header-title">{title}</div>
-                        <div class="header-subtitle">{"Быстрый, приватный веб-браузер на базе PyQt6 и WebEngine" if is_ru else "Fast, private PyQt6 WebEngine browser"}</div>
+                        <div class="update-text">{"Браузер surf обновлён" if is_ru else "surf is up to date"}</div>
+                        <div class="update-sub">{"Канал обновлений: Release • ospab foundation" if is_ru else "Update channel: Release • ospab foundation"}</div>
                     </div>
                 </div>
-                <a href="surf://pages" class="nav-link">← {"Каталог страниц" if is_ru else "Pages Directory"}</a>
-            </div>
 
-            <div class="card">
-                <div class="card-title">📦 {"Сведения о сборке и компонентах" if is_ru else "Build & Components Details"}</div>
-                <table>
-                    <tr><td width="200"><b>{"Название" if is_ru else "Application"}</b></td><td>surf Browser</td></tr>
-                    <tr><td><b>{"Версия" if is_ru else "Version"}</b></td><td><span class="badge badge-info">1.0.0 Stable</span> (Desktop Edition)</td></tr>
-                    <tr><td><b>{"Движок рендеринга" if is_ru else "Rendering Engine"}</b></td><td>QtWebEngine / Chromium Core</td></tr>
-                    <tr><td><b>{"Версия PyQt6" if is_ru else "PyQt6 Version"}</b></td><td>{PYQT_VERSION_STR}</td></tr>
-                    <tr><td><b>{"Версия Qt" if is_ru else "Qt Version"}</b></td><td>{QT_VERSION_STR}</td></tr>
-                    <tr><td><b>{"Интерпретатор Python" if is_ru else "Python Runtime"}</b></td><td>{platform.python_version()} ({platform.python_implementation()})</td></tr>
-                    <tr><td><b>{"Операционная система" if is_ru else "Operating System"}</b></td><td>{platform.system()} {platform.release()} ({platform.architecture()[0]})</td></tr>
-                    <tr><td><b>{"Управление окнами" if is_ru else "Window Manager"}</b></td><td>Windows DWM API (Immersive Dark Mode, Themed Titlebar)</td></tr>
-                    <tr><td><b>{"База данных" if is_ru else "Local Storage"}</b></td><td>SQLite 3 (surf.db)</td></tr>
-                    <tr><td><b>{"Папка загрузок" if is_ru else "Download Folder"}</b></td><td><code>{html.escape(dl_folder)}</code></td></tr>
-                    <tr><td><b>{"Поисковик по умолчанию" if is_ru else "Default Search Engine"}</b></td><td><code>{html.escape(search_eng)}</code></td></tr>
-                </table>
-            </div>
+                <div class="app-motto">
+                    {"Быстрый, приватный и независимый веб-серфинг нового поколения." if is_ru else "Fast, private, and independent web browsing experience."}
+                </div>
 
-            <div class="card">
-                <div class="card-title">🌐 {"Идентификация (User-Agent)" if is_ru else "HTTP User-Agent"}</div>
-                <p style="font-size: 13px; font-family: Consolas, monospace; background: var(--code-bg); padding: 12px; border-radius: 8px; border: 1px solid var(--border); word-break: break-all;">
-                    {html.escape(ua_str)}
-                </p>
-            </div>
+                <div class="app-org">
+                    {"Создано и поддерживается организацией <b>ospab foundation</b> и сообществом независимых разработчиков открытого исходного кода." if is_ru else "Built and maintained by <b>ospab foundation</b> and the open-source community."}
+                </div>
 
-            <div class="card">
-                <div class="card-title">✨ {"Ключевые возможности surf" if is_ru else "Key Features"}</div>
-                <ul style="padding-left: 20px; font-size: 13px; color: var(--text-muted); line-height: 1.8;">
-                    <li>{"Интерфейс в стиле Firefox Proton: парящие скруглённые вкладки с фавиконами и индикатором звука" if is_ru else "Firefox Proton floating tabs with favicons and audio mute toggle"}</li>
-                    <li>{"Адресная строка AwesomeBar со встроенным SSL-сертификатом, защитой от отслеживания, режимом чтения и закладками" if is_ru else "Integrated AwesomeBar with SSL inspection, ETP shield, reader mode, and star bookmarks"}</li>
-                    <li>{"Устранение белых вспышек (White Flash) при переходе по страницам" if is_ru else "Elimination of white flash on page loads and tab transitions"}</li>
-                    <li>{"Enhanced Tracking Protection: перехват и блокировка 26+ рекламных и трекинговых сетей" if is_ru else "Enhanced Tracking Protection blocking 26+ advertising and tracker networks"}</li>
-                    <li>{"Приватный режим (Ctrl+Shift+P) с изолированным профилем и отсутствием следов в истории" if is_ru else "Private Window mode (Ctrl+Shift+P) with isolated OTR profile"}</li>
-                </ul>
+                <div class="app-links">
+                    <a href="surf://pages">{"Все страницы surf://" if is_ru else "Pages Directory"}</a>
+                    <a href="surf://settings">{"Настройки" if is_ru else "Settings"}</a>
+                    <a href="surf://protection">{"Защита от трекеров" if is_ru else "Tracking Protection"}</a>
+                    <a href="surf://gpu">{"Графика и GPU" if is_ru else "Graphics & GPU"}</a>
+                    <a href="surf://help">{"Справка" if is_ru else "Help & Docs"}</a>
+                </div>
+
+                <details class="specs-box">
+                    <summary>{"Сведения о сборке и среде выполнения" if is_ru else "Build & Runtime Details"}</summary>
+                    <table class="specs-table">
+                        <tr><td class="dim">{"Организация" if is_ru else "Organization"}</td><td><b>ospab foundation</b></td></tr>
+                        <tr><td class="dim">{"Движок рендеринга" if is_ru else "Rendering Engine"}</td><td>SurfEngine (Chromium / QtWebEngine Core)</td></tr>
+                        <tr><td class="dim">{"Среда выполнения" if is_ru else "Runtime"}</td><td>Python {platform.python_version()} • PyQt6 {PYQT_VERSION_STR} • Qt {QT_VERSION_STR}</td></tr>
+                        <tr><td class="dim">{"Платформа" if is_ru else "Operating System"}</td><td>{platform.system()} {platform.release()} ({platform.architecture()[0]})</td></tr>
+                        <tr><td class="dim">{"Менеджер окон" if is_ru else "Window Manager"}</td><td>Windows DWM API (Themed DWM Frame & Immersive Dark Mode)</td></tr>
+                        <tr><td class="dim">{"База данных" if is_ru else "Local Storage"}</td><td>SQLite3 (surf.db)</td></tr>
+                        <tr><td class="dim">{"Идентификация" if is_ru else "User-Agent"}</td><td style="font-family: Consolas, monospace; font-size: 11px; word-break: break-all;">{html.escape(ua_str)}</td></tr>
+                    </table>
+                </details>
             </div>
         </div>
     </body>

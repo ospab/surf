@@ -27,7 +27,7 @@ QTabBar {
     qproperty-drawBase: 0;
 }
 
-/* Парящие вкладки в стиле Firefox Proton */
+/* Парящие вкладки surf */
 QTabBar::tab {
     background-color: transparent;
     color: #a4a4b2;
