@@ -10,7 +10,7 @@ if CURRENT_DIR not in sys.path:
 if PARENT_DIR not in sys.path:
     sys.path.insert(0, PARENT_DIR)
 
-from PyQt6.QtCore import QByteArray, QEvent, QObject, QPoint, QSize, QStringListModel, Qt, QUrl
+from PyQt6.QtCore import QByteArray, QEvent, QObject, QPoint, QSize, QStringListModel, Qt, QUrl, pyqtSignal
 from PyQt6.QtGui import QAction, QColor, QFont, QIcon, QKeySequence, QPainter, QPixmap, QShortcut
 from PyQt6.QtNetwork import QNetworkProxy
 from PyQt6.QtSvg import QSvgRenderer
@@ -43,6 +43,7 @@ from PyQt6.QtWidgets import (
 try:
     from surf.database import Database
     from surf.i18n import get_language, set_language, tr
+    from surf.utils.adblock import TrackingProtectionInterceptor
     from surf.widgets.browser_tab import BrowserTab
     from surf.widgets.download_manager import DownloadManagerDialog
     from surf.widgets.history_dialog import HistoryDialog
@@ -50,6 +51,7 @@ try:
 except ModuleNotFoundError:
     from database import Database
     from i18n import get_language, set_language, tr
+    from utils.adblock import TrackingProtectionInterceptor
     from widgets.browser_tab import BrowserTab
     from widgets.download_manager import DownloadManagerDialog
     from widgets.history_dialog import HistoryDialog
@@ -73,77 +75,137 @@ class ZoomWheelFilter(QObject):
 
 
 class ClosableTabBar(QTabBar):
-    """Панель вкладок с контрастной кнопкой закрытия и правильными отступами."""
+    """Панель вкладок в стиле Firefox Proton: фавиконы, индикатор аудио/mute, кнопка закрытия."""
+
+    tabAudioMuteRequested = pyqtSignal(int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setTabsClosable(False)
+        self.setIconSize(QSize(16, 16))
         self._is_dark = True
         icon_dir = os.path.join(os.path.dirname(__file__), "resources", "icons")
         self._close_icon_dark = QIcon(os.path.join(icon_dir, "close_dark.svg"))
         self._close_icon_light = QIcon(os.path.join(icon_dir, "close_light.svg"))
+        self._vol_icon = QIcon(os.path.join(icon_dir, "volume-2.svg"))
+        self._vol_x_icon = QIcon(os.path.join(icon_dir, "volume-x.svg"))
+        self._audio_states: dict[int, tuple[bool, bool]] = {}
 
-    def set_theme_mode(self, is_dark: bool) -> None:
+    def set_theme_mode(self, is_dark: bool, vol_icon: QIcon | None = None, vol_x_icon: QIcon | None = None) -> None:
         self._is_dark = is_dark
-        icon = self._close_icon_dark if is_dark else self._close_icon_light
+        if vol_icon and not vol_icon.isNull():
+            self._vol_icon = vol_icon
+        if vol_x_icon and not vol_x_icon.isNull():
+            self._vol_x_icon = vol_x_icon
+
+        close_icon = self._close_icon_dark if is_dark else self._close_icon_light
         for i in range(self.count()):
-            btn = self.tabButton(i, QTabBar.ButtonPosition.RightSide)
-            if btn and isinstance(btn, QToolButton):
-                btn.setIcon(icon)
+            container = self.tabButton(i, QTabBar.ButtonPosition.RightSide)
+            if container:
+                btn_close = container.findChild(QToolButton, "tabCloseBtn")
+                if btn_close:
+                    btn_close.setIcon(close_icon)
+                btn_audio = container.findChild(QToolButton, "tabAudioBtn")
+                if btn_audio and btn_audio.isVisible():
+                    _, muted = self._audio_states.get(i, (False, False))
+                    btn_audio.setIcon(self._vol_x_icon if muted else self._vol_icon)
 
     def retranslate_close_buttons(self) -> None:
-        tip = tr("act_close_tab")
+        tip_close = tr("act_close_tab")
         for i in range(self.count()):
-            btn = self.tabButton(i, QTabBar.ButtonPosition.RightSide)
-            if btn and isinstance(btn, QToolButton):
-                btn.setToolTip(tip)
+            container = self.tabButton(i, QTabBar.ButtonPosition.RightSide)
+            if container:
+                btn_close = container.findChild(QToolButton, "tabCloseBtn")
+                if btn_close:
+                    btn_close.setToolTip(tip_close)
+                btn_audio = container.findChild(QToolButton, "tabAudioBtn")
+                if btn_audio:
+                    _, muted = self._audio_states.get(i, (False, False))
+                    btn_audio.setToolTip(tr("tip_unmute_tab") if muted else tr("tip_mute_tab"))
 
     def tabInserted(self, index: int) -> None:
         super().tabInserted(index)
-        btn = QToolButton(self)
-        btn.setObjectName("tabCloseBtn")
-        btn.setIcon(self._close_icon_dark if self._is_dark else self._close_icon_light)
-        btn.setIconSize(QSize(12, 12))
-        btn.setFixedSize(18, 18)
-        btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn.setToolTip(tr("act_close_tab"))
-        btn.clicked.connect(lambda _, b=btn: self._on_close_clicked(b))
-        self.setTabButton(index, QTabBar.ButtonPosition.RightSide, btn)
+        new_audio = {}
+        for k, v in self._audio_states.items():
+            if k >= index:
+                new_audio[k + 1] = v
+            else:
+                new_audio[k] = v
+        self._audio_states = new_audio
 
-    def _on_close_clicked(self, btn: QToolButton) -> None:
+        container = QWidget(self)
+        layout = QHBoxLayout(container)
+        layout.setContentsMargins(0, 0, 4, 0)
+        layout.setSpacing(2)
+
+        btn_audio = QToolButton(container)
+        btn_audio.setObjectName("tabAudioBtn")
+        btn_audio.setFixedSize(18, 18)
+        btn_audio.setIconSize(QSize(12, 12))
+        btn_audio.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_audio.setVisible(False)
+        btn_audio.clicked.connect(lambda _, c=container: self._on_audio_clicked(c))
+        layout.addWidget(btn_audio)
+
+        btn_close = QToolButton(container)
+        btn_close.setObjectName("tabCloseBtn")
+        btn_close.setIcon(self._close_icon_dark if self._is_dark else self._close_icon_light)
+        btn_close.setIconSize(QSize(12, 12))
+        btn_close.setFixedSize(18, 18)
+        btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_close.setToolTip(tr("act_close_tab"))
+        btn_close.clicked.connect(lambda _, c=container: self._on_close_clicked(c))
+        layout.addWidget(btn_close)
+
+        self.setTabButton(index, QTabBar.ButtonPosition.RightSide, container)
+
+    def tabRemoved(self, index: int) -> None:
+        super().tabRemoved(index)
+        new_audio = {}
+        for k, v in self._audio_states.items():
+            if k < index:
+                new_audio[k] = v
+            elif k > index:
+                new_audio[k - 1] = v
+        self._audio_states = new_audio
+
+    def set_tab_audio(self, index: int, audible: bool, muted: bool) -> None:
+        self._audio_states[index] = (audible, muted)
+        container = self.tabButton(index, QTabBar.ButtonPosition.RightSide)
+        if not container:
+            return
+        btn_audio = container.findChild(QToolButton, "tabAudioBtn")
+        if not btn_audio:
+            return
+        if audible or muted:
+            btn_audio.setVisible(True)
+            btn_audio.setIcon(self._vol_x_icon if muted else self._vol_icon)
+            btn_audio.setToolTip(tr("tip_unmute_tab") if muted else tr("tip_mute_tab"))
+        else:
+            btn_audio.setVisible(False)
+
+    def _on_close_clicked(self, container: QWidget) -> None:
         for i in range(self.count()):
-            if self.tabButton(i, QTabBar.ButtonPosition.RightSide) == btn:
+            if self.tabButton(i, QTabBar.ButtonPosition.RightSide) == container:
                 self.tabCloseRequested.emit(i)
                 break
 
-    def tabLayoutChange(self) -> None:
-        super().tabLayoutChange()
-        self._adjust_close_buttons()
-
-    def resizeEvent(self, event) -> None:
-        super().resizeEvent(event)
-        self._adjust_close_buttons()
-
-    def paintEvent(self, event) -> None:
-        self._adjust_close_buttons()
-        super().paintEvent(event)
-
-    def _adjust_close_buttons(self) -> None:
+    def _on_audio_clicked(self, container: QWidget) -> None:
         for i in range(self.count()):
-            btn = self.tabButton(i, QTabBar.ButtonPosition.RightSide)
-            if btn:
-                r = self.tabRect(i)
-                # Отступ 8px от правого края вкладки, чтобы не налезать на скругление
-                target_x = r.right() - btn.width() - 8
-                target_y = r.top() + (r.height() - btn.height()) // 2
-                if btn.x() != target_x or btn.y() != target_y:
-                    btn.move(target_x, target_y)
+            if self.tabButton(i, QTabBar.ButtonPosition.RightSide) == container:
+                self.tabAudioMuteRequested.emit(i)
+                break
 
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    _open_windows: list["MainWindow"] = []
+
+    def __init__(self, is_private: bool = False):
         super().__init__()
-        self.setWindowTitle("surf")
+        self.is_private = is_private
+        MainWindow._open_windows.append(self)
+
+        self.setWindowTitle(tr("private_window_title") if self.is_private else tr("app_title"))
         self.resize(1200, 800)
 
         self.db = Database()
@@ -171,6 +233,36 @@ class MainWindow(QMainWindow):
 
         self.add_new_tab()
 
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        self._apply_dwm_titlebar()
+
+    def _apply_dwm_titlebar(self) -> None:
+        """Стилизует заголовок окна Windows (Title Bar), убирая чёрную полосу."""
+        if sys.platform != "win32":
+            return
+        try:
+            import ctypes
+            from ctypes import byref, c_int, sizeof
+
+            hwnd = int(self.winId())
+            is_dark = self.db.get_setting("theme", "dark") == "dark"
+
+            # 1. Тёмная/светлая тема для системных кнопок заголовка (DWMWA_USE_IMMERSIVE_DARK_MODE = 20)
+            val = c_int(1 if is_dark else 0)
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(hwnd, 20, byref(val), sizeof(val))
+
+            # 2. Цвет плашки заголовка Windows (DWMWA_CAPTION_COLOR = 35) в формате BGR (0x00BBGGRR)
+            # Тёмная тема: #1c1b22 -> 0x00221B1C; Светлая: #e5e5ea -> 0x00EAE5E5
+            caption_color = c_int(0x00221B1C if is_dark else 0x00EAE5E5)
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(hwnd, 35, byref(caption_color), sizeof(caption_color))
+
+            # 3. Цвет текста заголовка (DWMWA_TEXT_COLOR = 36)
+            text_color = c_int(0x00FEFBFB if is_dark else 0x001A1415)
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(hwnd, 36, byref(text_color), sizeof(text_color))
+        except Exception:
+            pass
+
     def _get_icon(self, name: str) -> QIcon:
         is_dark = self.db.get_setting("theme", "dark") == "dark"
         return self._render_themed_icon(name, is_dark)
@@ -190,6 +282,7 @@ class MainWindow(QMainWindow):
         if not is_dark:
             svg_text = svg_text.replace("#cfcfd8", stroke_color)
             svg_text = svg_text.replace("#ffffff", stroke_color)
+            svg_text = svg_text.replace("#fbfbfe", stroke_color)
             svg_text = svg_text.replace('stroke="white"', f'stroke="{stroke_color}"')
             if name == "star_filled":
                 accent = self.db.get_setting("accent_color", "#e5a50a")
@@ -213,28 +306,39 @@ class MainWindow(QMainWindow):
         return icon
 
     def _setup_network_and_profile(self) -> None:
-        profile = QWebEngineProfile.defaultProfile()
+        if self.is_private:
+            self.profile = QWebEngineProfile(self)
+        else:
+            self.profile = QWebEngineProfile.defaultProfile()
 
         # Фирменный User-Agent surf с полной веб-совместимостью
         ua_type = self.db.get_setting("user_agent_type", "surf")
         if ua_type == "surf" and "Surf/1.0" not in self.db.get_setting("custom_user_agent", ""):
             self.db.set_setting(
                 "custom_user_agent",
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Surf/1.0"
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Surf/1.0",
             )
 
         ua_str = self.db.get_setting(
             "custom_user_agent",
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Surf/1.0",
         )
-        profile.setHttpUserAgent(ua_str)
+        self.profile.setHttpUserAgent(ua_str)
 
         folder = self.db.get_setting(
             "download_folder",
             os.path.join(os.path.expanduser("~"), "Downloads"),
         )
         os.makedirs(folder, exist_ok=True)
-        profile.setDownloadPath(folder)
+        self.profile.setDownloadPath(folder)
+
+        # Enhanced Tracking Protection (ETP) - перехватчик трекеров
+        if TrackingProtectionInterceptor is not None:
+            self.tracking_interceptor = TrackingProtectionInterceptor(self)
+            self.profile.setUrlRequestInterceptor(self.tracking_interceptor)
+            self.tracking_interceptor.blocked_count_changed.connect(self._on_blocked_count_changed)
+        else:
+            self.tracking_interceptor = None
 
         self._apply_network_proxy()
 
@@ -270,10 +374,10 @@ class MainWindow(QMainWindow):
 
         self._build_menu()
 
-        # 1. Линия вкладок НАД панелью адреса
+        # 1. Линия парящих вкладок НАД панелью адреса (Firefox Proton)
         self._build_tab_strip()
 
-        # 2. Панель навигации
+        # 2. Панель навигации со встроенным AwesomeBar
         self._build_toolbar()
 
         # 3. Тонкий прогресс-бар загрузки
@@ -307,7 +411,7 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(6, 2, 6, 0)
         layout.setSpacing(4)
 
-        # Панель вкладок со сжатием и прокруткой при 50-200 вкладках
+        # Панель вкладок со сжатием и прокруткой
         self.tab_bar = ClosableTabBar()
         self.tab_bar.setDocumentMode(True)
         self.tab_bar.setMovable(True)
@@ -317,6 +421,7 @@ class MainWindow(QMainWindow):
 
         self.tab_bar.currentChanged.connect(self._on_tab_bar_current_changed)
         self.tab_bar.tabCloseRequested.connect(self.close_tab)
+        self.tab_bar.tabAudioMuteRequested.connect(self._toggle_tab_audio_mute)
         self.tab_bar.tabMoved.connect(self._on_tab_moved)
         self.tab_bar.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.tab_bar.customContextMenuRequested.connect(self._show_tab_context_menu)
@@ -340,7 +445,7 @@ class MainWindow(QMainWindow):
         self.nav_toolbar.setObjectName("navToolbar")
         layout = QHBoxLayout(self.nav_toolbar)
         layout.setContentsMargins(8, 3, 8, 3)
-        layout.setSpacing(4)
+        layout.setSpacing(6)
 
         self.btn_back = QToolButton()
         self.btn_back.setIcon(self._get_icon("back"))
@@ -367,10 +472,28 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.btn_reload)
         layout.addWidget(self.btn_home)
 
-        # Скруглённая адресная строка
+        # Скруглённая адресная строка AwesomeBar со встроенными экшенами (SSL, Shield, Reader, Star)
         self.address_bar = QLineEdit()
         self.address_bar.setObjectName("addressBar")
         self.address_bar.returnPressed.connect(self._navigate_from_address_bar)
+
+        # Ведущие кнопки (слева): SSL замок и Защита от отслеживания (Shield)
+        self.act_ssl = self.address_bar.addAction(self._get_icon("lock"), QLineEdit.ActionPosition.LeadingPosition)
+        self.act_ssl.setToolTip(tr("tip_ssl_secure"))
+        self.act_ssl.triggered.connect(self._show_security_info)
+
+        self.act_shield = self.address_bar.addAction(self._get_icon("shield"), QLineEdit.ActionPosition.LeadingPosition)
+        self.act_shield.setToolTip(tr("tip_shield_protection"))
+        self.act_shield.triggered.connect(self._show_tracking_protection_dialog)
+
+        # Завершающие кнопки (справа): Режим чтения и Закладка со звездой
+        self.act_reader = self.address_bar.addAction(self._get_icon("reader"), QLineEdit.ActionPosition.TrailingPosition)
+        self.act_reader.setToolTip(tr("tip_reader"))
+        self.act_reader.triggered.connect(self._toggle_reader_mode)
+
+        self.act_star = self.address_bar.addAction(self._get_icon("star"), QLineEdit.ActionPosition.TrailingPosition)
+        self.act_star.setToolTip(tr("tip_bookmark"))
+        self.act_star.triggered.connect(self._toggle_bookmark)
 
         self.completer_model = QStringListModel()
         self.completer = QCompleter(self.completer_model, self)
@@ -380,16 +503,6 @@ class MainWindow(QMainWindow):
         self._refresh_completer()
 
         layout.addWidget(self.address_bar)
-
-        self.btn_bookmark = QToolButton()
-        self.btn_bookmark.setIcon(self._get_icon("star"))
-        self.btn_bookmark.setIconSize(QSize(16, 16))
-        self.btn_bookmark.clicked.connect(self._toggle_bookmark)
-
-        self.btn_reader = QToolButton()
-        self.btn_reader.setIcon(self._get_icon("reader"))
-        self.btn_reader.setIconSize(QSize(16, 16))
-        self.btn_reader.clicked.connect(self._toggle_reader_mode)
 
         self.btn_downloads = QToolButton()
         self.btn_downloads.setIcon(self._get_icon("downloads"))
@@ -401,10 +514,25 @@ class MainWindow(QMainWindow):
         self.btn_settings.setIconSize(QSize(16, 16))
         self.btn_settings.clicked.connect(self._open_settings_dialog)
 
-        layout.addWidget(self.btn_bookmark)
-        layout.addWidget(self.btn_reader)
         layout.addWidget(self.btn_downloads)
         layout.addWidget(self.btn_settings)
+
+        # Бейдж приватного режима (в стиле Firefox Private Window)
+        if self.is_private:
+            self.lbl_private = QLabel(f" {tr('private_badge')} ")
+            self.lbl_private.setStyleSheet(
+                "background-color: #7c3aed; color: #ffffff; border-radius: 4px; font-weight: bold; font-size: 11px; padding: 2px 6px;"
+            )
+            layout.addWidget(self.lbl_private)
+
+        # Кнопка меню-гамбургер (≡)
+        self.btn_menu = QToolButton()
+        self.btn_menu.setObjectName("btnMenu")
+        self.btn_menu.setIcon(self._get_icon("menu_burger"))
+        self.btn_menu.setIconSize(QSize(16, 16))
+        self.btn_menu.setToolTip(tr("tip_menu_surf"))
+        self.btn_menu.clicked.connect(self._show_hamburger_menu)
+        layout.addWidget(self.btn_menu)
 
         self.main_layout.addWidget(self.nav_toolbar)
 
@@ -417,6 +545,10 @@ class MainWindow(QMainWindow):
         self.act_new_tab = self.file_menu.addAction("")
         self.act_new_tab.setShortcut(QKeySequence("Ctrl+T"))
         self.act_new_tab.triggered.connect(lambda: self.add_new_tab())
+
+        self.act_new_private = self.file_menu.addAction("")
+        self.act_new_private.setShortcut(QKeySequence("Ctrl+Shift+P"))
+        self.act_new_private.triggered.connect(self._open_private_window)
 
         self.act_close_tab = self.file_menu.addAction("")
         self.act_close_tab.setShortcut(QKeySequence("Ctrl+W"))
@@ -453,15 +585,15 @@ class MainWindow(QMainWindow):
 
         # Вид
         self.view_menu = self.main_menubar.addMenu("")
-        self.act_reader = self.view_menu.addAction("")
-        self.act_reader.setShortcut(QKeySequence("Ctrl+Alt+R"))
-        self.act_reader.triggered.connect(self._toggle_reader_mode)
+        self.act_reader_menu = self.view_menu.addAction("")
+        self.act_reader_menu.setShortcut(QKeySequence("Ctrl+Alt+R"))
+        self.act_reader_menu.triggered.connect(self._toggle_reader_mode)
 
         self.act_source = self.view_menu.addAction("")
         self.act_source.setShortcut(QKeySequence("Ctrl+U"))
         self.act_source.triggered.connect(self._show_page_source)
 
-        view_menu_sep = self.view_menu.addSeparator()
+        self.view_menu.addSeparator()
         self.act_zoom_in = self.view_menu.addAction("")
         self.act_zoom_in.setShortcuts([QKeySequence("Ctrl++"), QKeySequence("Ctrl+="), QKeySequence("Ctrl+Shift+=")])
         self.act_zoom_in.triggered.connect(self._zoom_in)
@@ -520,6 +652,77 @@ class MainWindow(QMainWindow):
         self.act_about = self.help_menu.addAction("")
         self.act_about.triggered.connect(self._show_about)
 
+    def _show_hamburger_menu(self) -> None:
+        """Всплывающее меню Firefox-стиля при клике на гамбургер ≡."""
+        menu = QMenu(self)
+
+        act_nt = menu.addAction(tr("act_new_tab"))
+        act_nt.setShortcut(QKeySequence("Ctrl+T"))
+        act_nt.triggered.connect(lambda: self.add_new_tab())
+
+        act_np = menu.addAction(tr("menu_new_private_window"))
+        act_np.setShortcut(QKeySequence("Ctrl+Shift+P"))
+        act_np.triggered.connect(self._open_private_window)
+
+        menu.addSeparator()
+
+        zoom_menu = menu.addMenu(tr("menu_view"))
+        act_zin = zoom_menu.addAction(tr("act_zoom_in"))
+        act_zin.triggered.connect(self._zoom_in)
+        act_zout = zoom_menu.addAction(tr("act_zoom_out"))
+        act_zout.triggered.connect(self._zoom_out)
+        act_zreset = zoom_menu.addAction(tr("act_zoom_reset"))
+        act_zreset.triggered.connect(self._zoom_reset)
+        act_full = zoom_menu.addAction(tr("act_fullscreen"))
+        act_full.triggered.connect(self._toggle_fullscreen)
+
+        menu.addSeparator()
+
+        act_bms = menu.addAction(tr("menu_bookmarks"))
+        act_bms.setShortcut(QKeySequence("Ctrl+Shift+O"))
+        act_bms.triggered.connect(self._open_history_dialog)
+
+        act_hist = menu.addAction(tr("menu_history"))
+        act_hist.setShortcut(QKeySequence("Ctrl+H"))
+        act_hist.triggered.connect(self._open_history_dialog)
+
+        act_dl = menu.addAction(tr("act_downloads"))
+        act_dl.setShortcut(QKeySequence("Ctrl+J"))
+        act_dl.triggered.connect(self._open_downloads_dialog)
+
+        menu.addSeparator()
+
+        act_find = menu.addAction(tr("act_find"))
+        act_find.setShortcut(QKeySequence("Ctrl+F"))
+        act_find.triggered.connect(self._show_find_bar)
+
+        act_save = menu.addAction(tr("act_save_page"))
+        act_save.setShortcut(QKeySequence("Ctrl+S"))
+        act_save.triggered.connect(self._save_page)
+
+        act_shot = menu.addAction(tr("act_screenshot"))
+        act_shot.setShortcut(QKeySequence("Ctrl+Shift+S"))
+        act_shot.triggered.connect(self._capture_screenshot)
+
+        menu.addSeparator()
+
+        act_sett = menu.addAction(tr("act_settings"))
+        act_sett.setShortcut(QKeySequence("Ctrl+,"))
+        act_sett.triggered.connect(self._open_settings_dialog)
+
+        act_help = menu.addAction(tr("act_help"))
+        act_help.triggered.connect(self._open_help)
+
+        act_about = menu.addAction(tr("act_about"))
+        act_about.triggered.connect(self._show_about)
+
+        menu.addSeparator()
+        act_exit = menu.addAction(tr("act_exit"))
+        act_exit.setShortcut(QKeySequence("Ctrl+Q"))
+        act_exit.triggered.connect(self.close)
+
+        menu.exec(self.btn_menu.mapToGlobal(QPoint(0, self.btn_menu.height())))
+
     def _build_find_bar(self) -> None:
         self.find_bar = QWidget()
         self.find_bar.setObjectName("findBar")
@@ -557,6 +760,7 @@ class MainWindow(QMainWindow):
         # Меню
         self.file_menu.setTitle(tr("menu_file"))
         self.act_new_tab.setText(tr("act_new_tab"))
+        self.act_new_private.setText(tr("menu_new_private_window"))
         self.act_close_tab.setText(tr("act_close_tab"))
         self.act_open_file.setText(tr("act_open_file"))
         self.act_save_page.setText(tr("act_save_page"))
@@ -568,7 +772,7 @@ class MainWindow(QMainWindow):
         self.act_copy_url.setText(tr("act_copy_url"))
 
         self.view_menu.setTitle(tr("menu_view"))
-        self.act_reader.setText(tr("act_reader"))
+        self.act_reader_menu.setText(tr("act_reader"))
         self.act_source.setText(tr("act_source"))
         self.act_zoom_in.setText(tr("act_zoom_in"))
         self.act_zoom_out.setText(tr("act_zoom_out"))
@@ -598,12 +802,19 @@ class MainWindow(QMainWindow):
         self.btn_reload.setToolTip(tr("tip_reload"))
         self.btn_home.setToolTip(tr("tip_home"))
         self.address_bar.setPlaceholderText(tr("address_placeholder"))
-        self.btn_bookmark.setToolTip(tr("tip_bookmark"))
-        self.btn_reader.setToolTip(tr("tip_reader"))
         self.btn_downloads.setToolTip(tr("tip_downloads"))
         self.btn_settings.setToolTip(tr("tip_settings"))
+        self.btn_menu.setToolTip(tr("tip_menu_surf"))
         self.new_tab_btn.setToolTip(tr("tip_new_tab"))
         self.zoom_btn.setToolTip(tr("act_zoom_reset"))
+
+        self.act_reader.setToolTip(tr("tip_reader"))
+        self.act_star.setToolTip(tr("tip_bookmark"))
+
+        # Заголовок окна
+        self.setWindowTitle(tr("private_window_title") if self.is_private else tr("app_title"))
+        if hasattr(self, "lbl_private"):
+            self.lbl_private.setText(f" {tr('private_badge')} ")
 
         # Панель поиска
         self.find_label.setText(tr("find_label"))
@@ -623,6 +834,8 @@ class MainWindow(QMainWindow):
     def _setup_shortcuts(self) -> None:
         # Навигация по вкладкам
         QShortcut(QKeySequence("Ctrl+T"), self, lambda: self.add_new_tab())
+        QShortcut(QKeySequence("Ctrl+Shift+P"), self, self._open_private_window)
+        QShortcut(QKeySequence("Ctrl+N"), self, lambda: self._open_new_window())
         QShortcut(QKeySequence("Ctrl+W"), self, lambda: self.close_tab(self.tab_bar.currentIndex()))
         QShortcut(QKeySequence("Ctrl+Shift+T"), self, self._reopen_closed_tab)
         QShortcut(QKeySequence("Ctrl+Tab"), self, self._next_tab)
@@ -683,12 +896,11 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("F11"), self, self._toggle_fullscreen)
 
     def _setup_downloads(self) -> None:
-        profile = QWebEngineProfile.defaultProfile()
         try:
-            profile.downloadRequested.disconnect()
+            self.profile.downloadRequested.disconnect()
         except Exception:
             pass
-        profile.downloadRequested.connect(self._handle_download_requested)
+        self.profile.downloadRequested.connect(self._handle_download_requested)
 
     def _apply_theme(self) -> None:
         theme_name = self.db.get_setting("theme", "dark")
@@ -706,29 +918,41 @@ class MainWindow(QMainWindow):
 
         # Обновляем тему таббара
         if hasattr(self, "tab_bar") and isinstance(self.tab_bar, ClosableTabBar):
-            self.tab_bar.set_theme_mode(is_dark)
+            vol_icon = self._get_icon("volume-2")
+            vol_x_icon = self._get_icon("volume-x")
+            self.tab_bar.set_theme_mode(is_dark, vol_icon, vol_x_icon)
 
-        # Обновляем все тулбарные иконки в соответствии с темой (чёрные для светлой, белые для тёмной)
+        # Обновляем все тулбарные иконки в соответствии с темой
         if hasattr(self, "btn_back"):
             self.btn_back.setIcon(self._get_icon("back"))
             self.btn_forward.setIcon(self._get_icon("forward"))
             self.btn_reload.setIcon(self._get_icon("reload"))
             self.btn_home.setIcon(self._get_icon("home"))
-            self.btn_bookmark.setIcon(self._get_icon("star"))
-            self.btn_reader.setIcon(self._get_icon("reader"))
             self.btn_downloads.setIcon(self._get_icon("downloads"))
             self.btn_settings.setIcon(self._get_icon("settings"))
+            self.btn_menu.setIcon(self._get_icon("menu_burger"))
             self.new_tab_btn.setIcon(self._get_icon("plus"))
 
         if hasattr(self, "btn_close_find"):
             self.btn_close_find.setIcon(self._get_icon("close"))
 
+        if hasattr(self, "act_reader"):
+            self.act_reader.setIcon(self._get_icon("reader"))
+
+        # Обновляем значки безопасности и закладок в строке адреса
+        tab = self.current_tab()
+        current_url = tab.current_url if tab else ""
+        self._update_bookmark_icon(current_url)
+        self._update_security_and_shield_icons(current_url)
+
         # Обновляем тему всех открытых вкладок и режима чтения
         if hasattr(self, "tab_stack"):
             for i in range(self.tab_stack.count()):
-                tab = self.tab_stack.widget(i)
-                if tab and hasattr(tab, "set_theme_mode"):
-                    tab.set_theme_mode(is_dark)
+                t = self.tab_stack.widget(i)
+                if t and hasattr(t, "set_theme_mode"):
+                    t.set_theme_mode(is_dark)
+
+        self._apply_dwm_titlebar()
 
     def _apply_menu_visibility(self) -> None:
         auto_hide = self.db.get_setting("menu_bar_auto_hide", "1") == "1"
@@ -752,14 +976,18 @@ class MainWindow(QMainWindow):
     # --- Управление вкладками ---
 
     def add_new_tab(self, url: str = "") -> BrowserTab:
-        tab = BrowserTab(self.db, self)
+        tab = BrowserTab(self.db, self, profile=self.profile)
         idx = self.tab_stack.addWidget(tab)
         self.tab_bar.addTab(tr("new_tab"))
+        self.tab_bar.setTabIcon(idx, self._get_icon("globe"))
         self.tab_bar.setCurrentIndex(idx)
 
         tab.title_changed.connect(lambda title, t=tab: self._update_tab_title(t, title))
         tab.url_changed.connect(lambda u, t=tab: self._update_tab_url(t, u))
+        tab.icon_changed.connect(lambda icon, t=tab: self._on_tab_icon_changed(t, icon))
+        tab.audio_state_changed.connect(lambda aud, mut, t=tab: self._on_tab_audio_state_changed(t, aud, mut))
         tab.load_progress.connect(self._update_progress)
+        tab.open_new_tab.connect(lambda u: self.add_new_tab(u))
         tab.web_view.page().linkHovered.connect(self._on_link_hovered)
 
         if url:
@@ -823,6 +1051,7 @@ class MainWindow(QMainWindow):
                 url = tab.current_url
                 self.address_bar.setText("" if url.startswith("surf://newtab") else url)
                 self._update_bookmark_icon(url)
+                self._update_security_and_shield_icons(url)
                 tab.web_view.setZoomFactor(self.zoom_factor)
 
     def _on_tab_moved(self, from_idx: int, to_idx: int) -> None:
@@ -844,6 +1073,22 @@ class MainWindow(QMainWindow):
         if tab == self.current_tab():
             self.address_bar.setText("" if url.startswith("surf://newtab") else url)
             self._update_bookmark_icon(url)
+            self._update_security_and_shield_icons(url)
+
+    def _on_tab_icon_changed(self, tab: BrowserTab, icon: QIcon) -> None:
+        idx = self.tab_stack.indexOf(tab)
+        if idx >= 0:
+            self.tab_bar.setTabIcon(idx, icon if not icon.isNull() else self._get_icon("globe"))
+
+    def _on_tab_audio_state_changed(self, tab: BrowserTab, audible: bool, muted: bool) -> None:
+        idx = self.tab_stack.indexOf(tab)
+        if idx >= 0:
+            self.tab_bar.set_tab_audio(idx, audible, muted)
+
+    def _toggle_tab_audio_mute(self, index: int) -> None:
+        tab = self.tab_stack.widget(index)
+        if tab and isinstance(tab, BrowserTab):
+            tab.toggle_audio_mute()
 
     def _update_progress(self, progress: int) -> None:
         if progress < 100:
@@ -881,7 +1126,7 @@ class MainWindow(QMainWindow):
                 if i != tab_idx:
                     self.close_tab(i)
 
-    # --- Навигация ---
+    # --- Навигация и адресная строка ---
 
     def _navigate_from_address_bar(self) -> None:
         text = self.address_bar.text().strip()
@@ -925,6 +1170,81 @@ class MainWindow(QMainWindow):
     def _on_link_hovered(self, url: str) -> None:
         self.status_bar.showMessage(url, 4000)
 
+    # --- Безопасность и защита от отслеживания ---
+
+    def _update_security_and_shield_icons(self, url: str) -> None:
+        if not hasattr(self, "act_ssl") or not hasattr(self, "act_shield"):
+            return
+
+        if url.startswith("https://"):
+            self.act_ssl.setIcon(self._get_icon("lock"))
+            self.act_ssl.setToolTip(tr("tip_ssl_secure"))
+        elif url.startswith("http://"):
+            self.act_ssl.setIcon(self._get_icon("lock"))
+            self.act_ssl.setToolTip(tr("tip_ssl_insecure"))
+        else:
+            self.act_ssl.setIcon(self._get_icon("globe"))
+            self.act_ssl.setToolTip(tr("app_title"))
+
+        blocked_count = self.tracking_interceptor.blocked_count if self.tracking_interceptor else 0
+        self.act_shield.setIcon(self._get_icon("shield"))
+        self.act_shield.setToolTip(
+            f"{tr('tip_shield_protection')}\n{tr('shield_blocked_text', count=blocked_count)}"
+        )
+
+    def _on_blocked_count_changed(self, count: int) -> None:
+        tab = self.current_tab()
+        current_url = tab.current_url if tab else ""
+        self._update_security_and_shield_icons(current_url)
+
+    def _show_security_info(self) -> None:
+        tab = self.current_tab()
+        url = tab.current_url if tab else ""
+        if not url or url.startswith("surf://"):
+            return
+        host = QUrl(url).host() or url
+        if url.startswith("https://"):
+            msg = tr("ssl_secure_msg", host=host)
+            icon = QMessageBox.Icon.Information
+        else:
+            msg = tr("ssl_insecure_msg", host=host)
+            icon = QMessageBox.Icon.Warning
+
+        QMessageBox(icon, tr("ssl_secure_title"), msg, QMessageBox.StandardButton.Ok, self).exec()
+
+    def _show_tracking_protection_dialog(self) -> None:
+        if not self.tracking_interceptor:
+            return
+
+        cnt = self.tracking_interceptor.blocked_count
+        status_str = tr("shield_blocked_text", count=cnt)
+        state_btn = tr("shield_toggle_disable") if self.tracking_interceptor.is_enabled else tr("shield_toggle_enable")
+
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle(tr("shield_title"))
+        msg_box.setText(f"<h3>{tr('shield_title')}</h3><p>{status_str}</p>")
+        btn_toggle = msg_box.addButton(state_btn, QMessageBox.ButtonRole.ActionRole)
+        btn_reset = msg_box.addButton(tr("btn_clear_list"), QMessageBox.ButtonRole.ResetRole)
+        msg_box.addButton(QMessageBox.StandardButton.Close)
+        msg_box.exec()
+
+        if msg_box.clickedButton() == btn_toggle:
+            self.tracking_interceptor.is_enabled = not self.tracking_interceptor.is_enabled
+        elif msg_box.clickedButton() == btn_reset:
+            self.tracking_interceptor.reset_count()
+
+        tab = self.current_tab()
+        self._update_security_and_shield_icons(tab.current_url if tab else "")
+
+    def _open_private_window(self) -> None:
+        """Открывает новое приватное окно surf (Off-The-Record)."""
+        win = MainWindow(is_private=True)
+        win.show()
+
+    def _open_new_window(self) -> None:
+        win = MainWindow(is_private=False)
+        win.show()
+
     # --- Закладки ---
 
     def _toggle_bookmark(self) -> None:
@@ -950,10 +1270,12 @@ class MainWindow(QMainWindow):
                 self.status_bar.showMessage(tr("status_bookmark_added"), 2500)
 
     def _update_bookmark_icon(self, url: str) -> None:
+        if not hasattr(self, "act_star"):
+            return
         if url and self.db.is_bookmarked(url):
-            self.btn_bookmark.setIcon(self._get_icon("star_filled"))
+            self.act_star.setIcon(self._get_icon("star_filled"))
         else:
-            self.btn_bookmark.setIcon(self._get_icon("star"))
+            self.act_star.setIcon(self._get_icon("star"))
 
     # --- Режим чтения и исходный код ---
 
@@ -1124,7 +1446,6 @@ class MainWindow(QMainWindow):
                 tab.web_view.page().download(QUrl(url.strip()))
 
     def _handle_download_requested(self, download: QWebEngineDownloadRequest) -> None:
-        # Сохраняем ссылку, чтобы объект не уничтожился сборщиком мусора Python
         self._active_downloads.append(download)
 
         raw_folder = self.db.get_setting(
@@ -1184,7 +1505,13 @@ class MainWindow(QMainWindow):
         self.completer_model.setStringList(urls)
 
     def closeEvent(self, event) -> None:
-        if self.db.get_setting("privacy_clear_on_exit", "0") == "1":
+        if self in MainWindow._open_windows:
+            MainWindow._open_windows.remove(self)
+
+        if self.is_private:
+            self.profile.clearHttpCache()
+            self.profile.cookieStore().deleteAllCookies()
+        elif self.db.get_setting("privacy_clear_on_exit", "0") == "1":
             profile = QWebEngineProfile.defaultProfile()
             profile.clearHttpCache()
             profile.cookieStore().deleteAllCookies()

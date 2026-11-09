@@ -2,15 +2,22 @@ import html
 import urllib.parse
 from urllib.parse import urlparse
 
-from PyQt6.QtCore import QEvent, Qt, QUrl, pyqtSignal
+from PyQt6.QtCore import QEvent, QPoint, Qt, QUrl, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
-from PyQt6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile, QWebEngineSettings
+from PyQt6.QtWebEngineCore import (
+    QWebEngineContextMenuRequest,
+    QWebEnginePage,
+    QWebEngineProfile,
+    QWebEngineSettings,
+)
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWidgets import (
+    QApplication,
     QFileDialog,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMenu,
     QMessageBox,
     QPushButton,
     QStackedWidget,
@@ -123,10 +130,12 @@ class BrowserTab(QWidget):
     icon_changed = pyqtSignal(QIcon)
     load_progress = pyqtSignal(int)
     open_new_tab = pyqtSignal(str)
+    audio_state_changed = pyqtSignal(bool, bool)
 
-    def __init__(self, db: Database, parent=None):
+    def __init__(self, db: Database, parent=None, profile: QWebEngineProfile | None = None):
         super().__init__(parent)
         self.db = db
+        self.profile = profile or QWebEngineProfile.defaultProfile()
         self.current_title = tr("new_tab")
         self.current_url = ""
         self._init_ui()
@@ -141,13 +150,23 @@ class BrowserTab(QWidget):
 
         # 0: Веб-страница (QWebEngineView)
         self.web_view = QWebEngineView()
-        self.browser_page = BrowserPage(QWebEngineProfile.defaultProfile(), self.web_view)
+        self.browser_page = BrowserPage(self.profile, self.web_view)
         self.web_view.setPage(self.browser_page)
+
+        # Устранение белой вспышки (White Flash)
+        self._apply_background_color()
+
         self.web_view.titleChanged.connect(self._on_title_changed)
         self.web_view.urlChanged.connect(self._on_url_changed)
         self.web_view.iconChanged.connect(self._on_icon_changed)
         self.web_view.loadProgress.connect(self.load_progress.emit)
         self.web_view.loadFinished.connect(self._on_load_finished)
+
+        # Контекстное меню и отслеживание аудио
+        self.web_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.web_view.customContextMenuRequested.connect(self._show_web_context_menu)
+        self.browser_page.recentlyAudibleChanged.connect(self._on_audio_state_changed)
+        self.browser_page.audioMutedChanged.connect(self._on_audio_state_changed)
 
         # 1: Стартовая панель быстрого поиска
         self.speed_dial = SpeedDialWidget(self.db)
@@ -164,6 +183,85 @@ class BrowserTab(QWidget):
 
         layout.addWidget(self.stack)
         self.show_speed_dial()
+
+    def _apply_background_color(self) -> None:
+        is_dark = self.db.get_setting("theme", "dark") == "dark"
+        col = QColor("#1c1b22" if is_dark else "#f2f2f7")
+        self.web_view.page().setBackgroundColor(col)
+        self.web_view.setStyleSheet(f"background-color: {col.name()};")
+
+    def _on_audio_state_changed(self) -> None:
+        self.audio_state_changed.emit(
+            self.browser_page.recentlyAudible(),
+            self.browser_page.isAudioMuted(),
+        )
+
+    def toggle_audio_mute(self) -> None:
+        muted = self.browser_page.isAudioMuted()
+        self.browser_page.setAudioMuted(not muted)
+
+    def _show_web_context_menu(self, pos: QPoint) -> None:
+        req = self.web_view.lastContextMenuRequest()
+        menu = QMenu(self)
+
+        # 1. Если клик по ссылке
+        if req and req.linkUrl().isValid() and req.linkUrl().toString():
+            link_url = req.linkUrl().toString()
+            act_tab = menu.addAction(tr("ctx_open_link_tab"))
+            act_tab.triggered.connect(lambda: self.open_new_tab.emit(link_url))
+
+            act_copy_link = menu.addAction(tr("ctx_copy_link"))
+            act_copy_link.triggered.connect(lambda: QApplication.clipboard().setText(link_url))
+            menu.addSeparator()
+
+        # 2. Если клик по изображению
+        if req and req.mediaType() == QWebEngineContextMenuRequest.MediaType.MediaTypeImage and req.mediaUrl().isValid():
+            img_url = req.mediaUrl().toString()
+            act_img_tab = menu.addAction(tr("ctx_open_image_tab"))
+            act_img_tab.triggered.connect(lambda: self.open_new_tab.emit(img_url))
+
+            act_copy_img = menu.addAction(tr("ctx_copy_image_url"))
+            act_copy_img.triggered.connect(lambda: QApplication.clipboard().setText(img_url))
+            menu.addSeparator()
+
+        # 3. Если выделен текст
+        if req and req.selectedText():
+            sel_text = req.selectedText().strip()
+            act_copy = menu.addAction(tr("ctx_copy"))
+            act_copy.triggered.connect(lambda: QApplication.clipboard().setText(sel_text))
+
+            act_search = menu.addAction(tr("ctx_search_web", text=sel_text[:20]))
+            act_search.triggered.connect(lambda: self._search_selected_text(sel_text))
+            menu.addSeparator()
+
+        # 4. Навигация и общие действия
+        act_back = menu.addAction(tr("tip_back"))
+        act_back.setEnabled(self.web_view.history().canGoBack())
+        act_back.triggered.connect(self.web_view.back)
+
+        act_fwd = menu.addAction(tr("tip_forward"))
+        act_fwd.setEnabled(self.web_view.history().canGoForward())
+        act_fwd.triggered.connect(self.web_view.forward)
+
+        act_reload = menu.addAction(tr("tip_reload"))
+        act_reload.triggered.connect(self.web_view.reload)
+
+        menu.addSeparator()
+        act_save = menu.addAction(tr("act_save_page"))
+        act_save.triggered.connect(self._save_page_pdf)
+
+        act_reader = menu.addAction(tr("act_reader"))
+        act_reader.triggered.connect(self.toggle_reader_mode)
+
+        act_shot = menu.addAction(tr("act_screenshot"))
+        act_shot.triggered.connect(self.capture_screenshot)
+
+        menu.exec(self.web_view.mapToGlobal(pos))
+
+    def _search_selected_text(self, text: str) -> None:
+        engine = self.db.get_setting("search_engine", "https://www.google.com/search?q=")
+        url = format_search_url(engine, text)
+        self.open_new_tab.emit(url)
 
     def load_url(self, url: str) -> None:
         url = url.strip()
@@ -272,7 +370,7 @@ class BrowserTab(QWidget):
         if self.stack.currentIndex() == 0 and title:
             self.current_title = title
             self.title_changed.emit(title)
-            if self.current_url:
+            if self.current_url and not self.profile.isOffTheRecord():
                 self.db.add_history_entry(self.current_url, title)
 
     def _on_url_changed(self, qurl: QUrl) -> None:
@@ -286,5 +384,5 @@ class BrowserTab(QWidget):
             self.icon_changed.emit(icon)
 
     def _on_load_finished(self, ok: bool) -> None:
-        if ok and self.current_url and not self.current_url.startswith("surf://"):
+        if ok and self.current_url and not self.current_url.startswith("surf://") and not self.profile.isOffTheRecord():
             self.db.add_history_entry(self.current_url, self.current_title)
