@@ -54,18 +54,20 @@ QTabBar::tab:hover:!selected {
     color: #fbfbfe;
 }
 
-/* Кнопка закрытия вкладки (крестик с комфортным отступом от скруглённого края) */
-QTabBar::close-button {
+/* Кнопка закрытия вкладки (высококонтрастный крестик с аккуратным hover-эффектом) */
+#tabCloseBtn, QTabBar::close-button {
+    background-color: transparent;
+    border: none;
     border-radius: 4px;
     padding: 2px;
 }
 
-QTabBar::close-button:hover {
-    background-color: rgba(255, 255, 255, 0.2);
+#tabCloseBtn:hover, QTabBar::close-button:hover {
+    background-color: rgba(255, 255, 255, 0.22);
 }
 
-QTabBar::close-button:pressed {
-    background-color: rgba(255, 255, 255, 0.3);
+#tabCloseBtn:pressed, QTabBar::close-button:pressed {
+    background-color: rgba(255, 255, 255, 0.35);
 }
 
 /* Кнопки прокрутки вкладок (при >50-200 вкладках) */

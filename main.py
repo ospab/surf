@@ -55,21 +55,62 @@ class ZoomWheelFilter(QObject):
 
 
 class ClosableTabBar(QTabBar):
-    """Панель вкладок с аккуратным отступом кнопки закрытия от скруглённого края."""
+    """Панель вкладок с контрастной кнопкой закрытия и правильными отступами."""
 
-    def tabLayoutChange(self):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setTabsClosable(False)
+        self._is_dark = True
+        icon_dir = os.path.join(os.path.dirname(__file__), "resources", "icons")
+        self._close_icon_dark = QIcon(os.path.join(icon_dir, "close_dark.svg"))
+        self._close_icon_light = QIcon(os.path.join(icon_dir, "close_light.svg"))
+
+    def set_theme_mode(self, is_dark: bool) -> None:
+        self._is_dark = is_dark
+        icon = self._close_icon_dark if is_dark else self._close_icon_light
+        for i in range(self.count()):
+            btn = self.tabButton(i, QTabBar.ButtonPosition.RightSide)
+            if btn and isinstance(btn, QToolButton):
+                btn.setIcon(icon)
+
+    def retranslate_close_buttons(self) -> None:
+        tip = tr("act_close_tab")
+        for i in range(self.count()):
+            btn = self.tabButton(i, QTabBar.ButtonPosition.RightSide)
+            if btn and isinstance(btn, QToolButton):
+                btn.setToolTip(tip)
+
+    def tabInserted(self, index: int) -> None:
+        super().tabInserted(index)
+        btn = QToolButton(self)
+        btn.setObjectName("tabCloseBtn")
+        btn.setIcon(self._close_icon_dark if self._is_dark else self._close_icon_light)
+        btn.setIconSize(QSize(12, 12))
+        btn.setFixedSize(18, 18)
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.setToolTip(tr("act_close_tab"))
+        btn.clicked.connect(lambda _, b=btn: self._on_close_clicked(b))
+        self.setTabButton(index, QTabBar.ButtonPosition.RightSide, btn)
+
+    def _on_close_clicked(self, btn: QToolButton) -> None:
+        for i in range(self.count()):
+            if self.tabButton(i, QTabBar.ButtonPosition.RightSide) == btn:
+                self.tabCloseRequested.emit(i)
+                break
+
+    def tabLayoutChange(self) -> None:
         super().tabLayoutChange()
         self._adjust_close_buttons()
 
-    def resizeEvent(self, event):
+    def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
         self._adjust_close_buttons()
 
-    def paintEvent(self, event):
+    def paintEvent(self, event) -> None:
         self._adjust_close_buttons()
         super().paintEvent(event)
 
-    def _adjust_close_buttons(self):
+    def _adjust_close_buttons(self) -> None:
         for i in range(self.count()):
             btn = self.tabButton(i, QTabBar.ButtonPosition.RightSide)
             if btn:
@@ -214,7 +255,6 @@ class MainWindow(QMainWindow):
         # Панель вкладок со сжатием и прокруткой при 50-200 вкладках
         self.tab_bar = ClosableTabBar()
         self.tab_bar.setDocumentMode(True)
-        self.tab_bar.setTabsClosable(True)
         self.tab_bar.setMovable(True)
         self.tab_bar.setExpanding(False)
         self.tab_bar.setUsesScrollButtons(True)
@@ -523,6 +563,7 @@ class MainWindow(QMainWindow):
                 tab.retranslate_ui()
                 if tab.stack.currentIndex() == 1 or not tab.current_url or tab.current_url.startswith("surf://newtab"):
                     self.tab_bar.setTabText(i, tr("new_tab"))
+        self.tab_bar.retranslate_close_buttons()
 
     def _setup_shortcuts(self) -> None:
         # Навигация по вкладкам
@@ -606,6 +647,9 @@ class MainWindow(QMainWindow):
             # Динамически внедряем выбранный пользователем акцентный цвет
             qss = qss.replace("__ACCENT__", accent)
             self.setStyleSheet(qss)
+
+        if hasattr(self, "tab_bar") and isinstance(self.tab_bar, ClosableTabBar):
+            self.tab_bar.set_theme_mode(theme_name == "dark")
 
     def _apply_menu_visibility(self) -> None:
         auto_hide = self.db.get_setting("menu_bar_auto_hide", "1") == "1"
