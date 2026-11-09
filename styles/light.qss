@@ -1,7 +1,7 @@
-/* surf - Светлая тема со скруглённым интерфейсом и динамическим акцентом */
+/* surf - Высококонтрастная светлая тема со скруглённым интерфейсом */
 
 QMainWindow, QDialog {
-    background-color: #f2f2f6;
+    background-color: #f2f2f7;
     color: #15141a;
 }
 
@@ -13,11 +13,11 @@ QWidget {
 
 /* Верхняя полоса вкладок */
 #tabBarContainer {
-    background-color: #f2f2f6;
+    background-color: #e5e5ea;
     padding-top: 4px;
     padding-left: 4px;
     padding-right: 4px;
-    border-bottom: 1px solid #e2e2e8;
+    border-bottom: 1px solid #d1d1d6;
 }
 
 QTabBar {
@@ -27,8 +27,8 @@ QTabBar {
 }
 
 QTabBar::tab {
-    background-color: #e4e4eb;
-    color: #5b5b66;
+    background-color: #dedee4;
+    color: #2c2c34;
     padding-top: 5px;
     padding-bottom: 5px;
     padding-left: 12px;
@@ -38,20 +38,24 @@ QTabBar::tab {
     border-top-right-radius: 8px;
     min-width: 75px;
     max-width: 210px;
-    height: 20px;
-    border-bottom: 2px solid transparent;
+    height: 22px;
+    border: 1px solid #d1d1d6;
+    border-bottom: none;
 }
 
 QTabBar::tab:selected {
     background-color: #ffffff;
-    color: #15141a;
-    font-weight: 600;
-    border-bottom: 2px solid __ACCENT__;
+    color: #000000;
+    font-weight: 700;
+    border-top: 1.5px solid #c7c7cc;
+    border-left: 1.5px solid #c7c7cc;
+    border-right: 1.5px solid #c7c7cc;
+    border-bottom: 2.5px solid __ACCENT__;
 }
 
 QTabBar::tab:hover:!selected {
     background-color: #eaeaf0;
-    color: #15141a;
+    color: #000000;
 }
 
 /* Кнопка закрытия вкладки (высококонтрастный крестик с аккуратным hover-эффектом) */
@@ -72,8 +76,8 @@ QTabBar::tab:hover:!selected {
 
 /* Кнопки прокрутки вкладок */
 QTabBar QToolButton {
-    background-color: #e4e4eb;
-    border: 1px solid #d0d0d8;
+    background-color: #dedee4;
+    border: 1px solid #c7c7cc;
     border-radius: 4px;
     padding: 2px;
     margin: 2px;
@@ -88,8 +92,8 @@ QTabBar QToolButton:hover {
 
 /* Кнопка "+" добавления вкладки */
 #newTabBtn {
-    background-color: transparent;
-    border: 1px solid transparent;
+    background-color: #dedee4;
+    border: 1px solid #c7c7cc;
     border-radius: 6px;
     padding: 3px;
     min-width: 26px;
@@ -99,17 +103,21 @@ QTabBar QToolButton:hover {
 }
 
 #newTabBtn:hover {
-    background-color: #e4e4eb;
+    background-color: #ffffff;
     border-color: __ACCENT__;
+}
+
+#newTabBtn:pressed {
+    background-color: #d1d1d6;
 }
 
 /* Панель навигации */
 #navToolbar {
     background-color: #ffffff;
-    border-bottom: 1px solid #e2e2e8;
+    border-bottom: 1px solid #d1d1d6;
     padding: 4px 8px;
-    min-height: 36px;
-    max-height: 36px;
+    min-height: 38px;
+    max-height: 38px;
 }
 
 #navToolbar QToolButton {
@@ -118,64 +126,67 @@ QTabBar QToolButton:hover {
     border: 1px solid transparent;
     border-radius: 6px;
     padding: 4px;
-    min-width: 26px;
-    max-width: 26px;
-    min-height: 26px;
-    max-height: 26px;
+    min-width: 28px;
+    max-width: 28px;
+    min-height: 28px;
+    max-height: 28px;
 }
 
 #navToolbar QToolButton:hover {
-    background-color: #f0f0f4;
+    background-color: #e5e5ea;
 }
 
 #navToolbar QToolButton:pressed {
-    background-color: #e0e0e6;
+    background-color: #d1d1d6;
 }
 
 /* Адресная строка */
 QLineEdit#addressBar {
-    background-color: #f2f2f6;
+    background-color: #f2f2f7;
     color: #15141a;
-    border: 1px solid #d0d0d8;
+    border: 1.5px solid #c7c7cc;
     border-radius: 14px;
     padding: 5px 14px;
     font-size: 13px;
     selection-background-color: __ACCENT__;
+    selection-color: #ffffff;
 }
 
 QLineEdit#addressBar:focus {
-    border: 1.5px solid __ACCENT__;
+    border: 2px solid __ACCENT__;
     background-color: #ffffff;
 }
 
 /* Меню */
 QMenuBar {
-    background-color: #f2f2f6;
+    background-color: #e5e5ea;
     color: #15141a;
-    border-bottom: 1px solid #e2e2e8;
+    border-bottom: 1px solid #d1d1d6;
     padding: 2px 6px;
 }
 
 QMenuBar::item {
     padding: 4px 8px;
     border-radius: 5px;
+    color: #15141a;
 }
 
 QMenuBar::item:selected {
-    background-color: #e4e4eb;
+    background-color: #d1d1d6;
     color: #000000;
 }
 
 QMenu {
     background-color: #ffffff;
     color: #15141a;
-    border: 1px solid #d0d0d8;
+    border: 1px solid #c7c7cc;
     border-radius: 8px;
     padding: 4px 0;
 }
 
 QMenu::item {
-    padding: 6px 22px;
+    padding: 6px 24px;
+    color: #15141a;
 }
 
 QMenu::item:selected {
@@ -184,23 +195,153 @@ QMenu::item:selected {
     border-radius: 4px;
 }
 
+QMenu::separator {
+    height: 1px;
+    background-color: #e5e5ea;
+    margin: 4px 8px;
+}
+
+/* Строка состояния */
+QStatusBar {
+    background-color: #e5e5ea;
+    color: #15141a;
+    border-top: 1px solid #d1d1d6;
+}
+
+QStatusBar QLabel {
+    color: #15141a;
+}
+
+#zoomBtn {
+    background-color: #dedee4;
+    color: #15141a;
+    border: 1px solid #c7c7cc;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-weight: 600;
+}
+
+#zoomBtn:hover {
+    background-color: #ffffff;
+    color: #000000;
+    border-color: __ACCENT__;
+}
+
+/* Панель поиска */
+#findBar {
+    background-color: #ffffff;
+    border-top: 1px solid #d1d1d6;
+    padding: 4px 12px;
+}
+
+#findBar QLabel {
+    color: #15141a;
+    font-weight: 600;
+}
+
+#findBar QLineEdit {
+    background-color: #f2f2f7;
+    color: #15141a;
+    border: 1.5px solid #c7c7cc;
+    border-radius: 4px;
+    padding: 4px 8px;
+}
+
+#findBar QLineEdit:focus {
+    border: 1.5px solid __ACCENT__;
+    background-color: #ffffff;
+}
+
+#findBar QPushButton {
+    background-color: #f2f2f7;
+    color: #15141a;
+    border: 1px solid #c7c7cc;
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-weight: 500;
+}
+
+#findBar QPushButton:hover {
+    background-color: #ffffff;
+    border-color: __ACCENT__;
+}
+
+/* Стартовая страница */
+#speedDialWidget {
+    background-color: #f2f2f7;
+}
+
+#speedDialLogo {
+    font-size: 52px;
+    font-weight: 800;
+    color: #15141a;
+    letter-spacing: 2px;
+}
+
+#speedDialSubtitle {
+    font-size: 14px;
+    color: #48484a;
+    margin-bottom: 12px;
+}
+
+#speedDialSearch {
+    background-color: #ffffff;
+    border: 1.5px solid #c7c7cc;
+    border-radius: 22px;
+    font-size: 14px;
+    padding: 10px 20px;
+    color: #15141a;
+    selection-background-color: __ACCENT__;
+    selection-color: #ffffff;
+}
+
+#speedDialSearch:focus {
+    border: 2px solid __ACCENT__;
+    background-color: #ffffff;
+}
+
+/* Режим чтения */
+#readerToolbar {
+    background-color: #e5e5ea;
+    border-bottom: 1px solid #d1d1d6;
+}
+
+#readerTitleLabel {
+    font-weight: bold;
+    color: #15141a;
+}
+
+#readerBrowser {
+    background-color: #ffffff;
+    border: none;
+}
+
+#readerExitBtn {
+    background-color: __ACCENT__;
+    color: #ffffff;
+    font-weight: bold;
+    border: none;
+    border-radius: 4px;
+    padding: 5px 14px;
+}
+
 /* Таблицы */
 QTableWidget {
     background-color: #ffffff;
-    alternate-background-color: #f9f9fb;
+    alternate-background-color: #f8f8fb;
     color: #15141a;
-    border: 1px solid #d0d0d8;
+    border: 1px solid #c7c7cc;
     border-radius: 8px;
-    gridline-color: #e0e0e6;
+    gridline-color: #e5e5ea;
     selection-background-color: __ACCENT__;
     selection-color: #ffffff;
 }
 
 QHeaderView::section {
-    background-color: #f2f2f6;
-    color: #5b5b66;
+    background-color: #e5e5ea;
+    color: #15141a;
     padding: 6px;
-    border: 1px solid #e2e2e8;
+    border: 1px solid #d1d1d6;
     font-weight: bold;
 }
 
@@ -215,42 +356,14 @@ QProgressBar::chunk {
     background-color: __ACCENT__;
 }
 
-#zoomBtn {
-    background-color: transparent;
-    color: #5b5b66;
-    border: 1px solid transparent;
-    border-radius: 4px;
-    padding: 2px 8px;
-    font-weight: 600;
-}
-
-#zoomBtn:hover {
-    background-color: #e4e4eb;
-    color: #15141a;
-    border-color: __ACCENT__;
-}
-
-/* Стартовая страница */
-#speedDialSearch {
-    background-color: #ffffff;
-    border: 1px solid #d0d0d8;
-    border-radius: 22px;
-    font-size: 14px;
-    padding: 10px 20px;
-    color: #15141a;
-    selection-background-color: __ACCENT__;
-}
-
-#speedDialSearch:focus {
-    border: 1.5px solid __ACCENT__;
-}
-
+/* Диалог настроек и формы */
 QGroupBox {
-    border: 1px solid #d0d0d8;
+    border: 1.5px solid #c7c7cc;
     border-radius: 8px;
     margin-top: 12px;
     padding-top: 14px;
     font-weight: bold;
+    color: #15141a;
 }
 
 QGroupBox::title {
@@ -258,37 +371,88 @@ QGroupBox::title {
     subcontrol-position: top left;
     padding: 0 6px;
     color: __ACCENT__;
+    font-weight: bold;
+}
+
+QLabel {
+    color: #15141a;
 }
 
 QComboBox, QSpinBox {
     background-color: #ffffff;
     color: #15141a;
-    border: 1px solid #d0d0d8;
+    border: 1.5px solid #c7c7cc;
     border-radius: 6px;
-    padding: 4px 10px;
+    padding: 5px 10px;
 }
 
 QComboBox:focus, QSpinBox:focus {
-    border-color: __ACCENT__;
+    border: 1.5px solid __ACCENT__;
+}
+
+QComboBox QAbstractItemView {
+    background-color: #ffffff;
+    color: #15141a;
+    selection-background-color: __ACCENT__;
+    selection-color: #ffffff;
+    border: 1px solid #c7c7cc;
+}
+
+QLineEdit {
+    background-color: #ffffff;
+    color: #15141a;
+    border: 1.5px solid #c7c7cc;
+    border-radius: 6px;
+    padding: 5px 10px;
+}
+
+QLineEdit:focus {
+    border: 1.5px solid __ACCENT__;
 }
 
 QPushButton {
     background-color: #ffffff;
-    border: 1px solid #d0d0d8;
+    color: #15141a;
+    border: 1px solid #c7c7cc;
     border-radius: 6px;
-    padding: 5px 12px;
+    padding: 6px 14px;
+    font-weight: 500;
 }
 
 QPushButton:hover {
-    background-color: #f2f2f6;
+    background-color: #e5e5ea;
     border-color: __ACCENT__;
 }
 
-#readerExitBtn {
-    background-color: __ACCENT__;
-    color: #ffffff;
+QPushButton:pressed {
+    background-color: #d1d1d6;
+}
+
+QCheckBox {
+    color: #15141a;
+    spacing: 8px;
+}
+
+QTabWidget::pane {
+    border: 1px solid #c7c7cc;
+    border-radius: 6px;
+    background-color: #ffffff;
+}
+
+QTabWidget QTabBar::tab {
+    background-color: #dedee4;
+    color: #2c2c34;
+    border: 1px solid #d1d1d6;
+    border-bottom: none;
+    padding: 6px 16px;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    margin-right: 2px;
+}
+
+QTabWidget QTabBar::tab:selected {
+    background-color: #ffffff;
+    color: #15141a;
     font-weight: bold;
-    border: none;
-    border-radius: 4px;
-    padding: 5px 14px;
+    border-bottom: 2px solid __ACCENT__;
 }

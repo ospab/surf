@@ -59,6 +59,7 @@ class SpeedDialWidget(QWidget):
     def __init__(self, db: Database, parent=None):
         super().__init__(parent)
         self.db = db
+        self.setObjectName("speedDialWidget")
         self._init_ui()
 
     def _init_ui(self) -> None:
@@ -77,13 +78,12 @@ class SpeedDialWidget(QWidget):
 
         logo_label = QLabel("surf")
         logo_label.setObjectName("speedDialLogo")
-        logo_label.setStyleSheet("font-size: 46px; font-weight: 800; color: #fbfbfe; letter-spacing: 2px;")
         logo_layout.addWidget(logo_label)
         box_layout.addLayout(logo_layout)
 
         self.subtitle_label = QLabel(tr("app_subtitle"))
+        self.subtitle_label.setObjectName("speedDialSubtitle")
         self.subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.subtitle_label.setStyleSheet("font-size: 13px; color: #8f8f9d; margin-bottom: 10px;")
         box_layout.addWidget(self.subtitle_label)
 
         # Поле поиска со скругленными краями (pill-shape)
@@ -211,6 +211,10 @@ class BrowserTab(QWidget):
         if self.stack.currentIndex() == 1:
             self.current_title = tr("new_tab")
             self.title_changed.emit(self.current_title)
+
+    def set_theme_mode(self, is_dark: bool) -> None:
+        if hasattr(self, "reader_view"):
+            self.reader_view.set_theme_mode(is_dark)
 
     def toggle_reader_mode(self) -> None:
         if self.stack.currentIndex() == 2:

@@ -253,6 +253,23 @@ QStatusBar {
 }
 
 /* Стартовая страница */
+#speedDialWidget {
+    background-color: #1c1b22;
+}
+
+#speedDialLogo {
+    font-size: 52px;
+    font-weight: 800;
+    color: #fbfbfe;
+    letter-spacing: 2px;
+}
+
+#speedDialSubtitle {
+    font-size: 14px;
+    color: #9d9da8;
+    margin-bottom: 12px;
+}
+
 #speedDialSearch {
     background-color: #24242d;
     border: 1px solid #353542;

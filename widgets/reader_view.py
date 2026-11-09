@@ -20,6 +20,9 @@ class ReaderViewWidget(QWidget):
         super().__init__(parent)
         self._current_url = ""
         self._font_size = 17
+        self._is_dark = True
+        self._last_mode = ""
+        self._last_data = {}
         self._init_ui()
 
     def _init_ui(self) -> None:
@@ -34,7 +37,7 @@ class ReaderViewWidget(QWidget):
         tb_layout.setContentsMargins(16, 8, 16, 8)
 
         self.title_label = QLabel("Режим комфортного чтения")
-        self.title_label.setStyleSheet("font-weight: bold; color: #8f8f9d;")
+        self.title_label.setObjectName("readerTitleLabel")
 
         self.zoom_out_btn = QPushButton("A-")
         self.zoom_out_btn.setFixedSize(32, 28)
@@ -57,6 +60,7 @@ class ReaderViewWidget(QWidget):
 
         # Сам QTextBrowser (Тема QT 4)
         self.browser = QTextBrowser()
+        self.browser.setObjectName("readerBrowser")
         self.browser.setOpenExternalLinks(False)
         self.browser.setOpenLinks(False)
         self.browser.anchorClicked.connect(lambda qurl: self.open_link.emit(qurl.toString()))
@@ -65,17 +69,38 @@ class ReaderViewWidget(QWidget):
         layout.addWidget(self.toolbar)
         layout.addWidget(self.browser)
 
+    def set_theme_mode(self, is_dark: bool) -> None:
+        self._is_dark = is_dark
+        if self._last_mode == "article" and self._last_data:
+            self.set_article(self._last_data["title"], self._last_data["content"], self._last_data["url"])
+        elif self._last_mode == "source" and self._last_data:
+            self.set_source_code(self._last_data["title"], self._last_data["raw_html"], self._last_data["url"])
+        elif self._last_mode == "help":
+            self.set_help_content()
+
     def set_article(self, title: str, content_html: str, source_url: str) -> None:
+        self._last_mode = "article"
+        self._last_data = {"title": title, "content": content_html, "url": source_url}
         self._current_url = source_url
         self.title_label.setText(f"Чтение: {title[:60]}..." if len(title) > 60 else f"Чтение: {title}")
+
+        bg = "#1e1e24" if self._is_dark else "#ffffff"
+        fg = "#fbfbfe" if self._is_dark else "#15141a"
+        h1_color = "#ffffff" if self._is_dark else "#15141a"
+        link_color = "#4ba0ff" if self._is_dark else "#0060df"
+        source_color = "#63a9ff" if self._is_dark else "#0060df"
+        hr_color = "#42414d" if self._is_dark else "#dcdce8"
+        code_bg = "#1c1b22" if self._is_dark else "#f0f0f5"
+        code_fg = "#50fa7b" if self._is_dark else "#0055aa"
+        quote_color = "#cfcfd8" if self._is_dark else "#5b5b66"
 
         styled_html = f"""
         <html>
         <head>
             <style>
                 body {{
-                    background-color: #2b2a33;
-                    color: #fbfbfe;
+                    background-color: {bg};
+                    color: {fg};
                     font-family: Georgia, 'Times New Roman', serif;
                     font-size: {self._font_size}px;
                     line-height: 1.65;
@@ -85,12 +110,12 @@ class ReaderViewWidget(QWidget):
                 }}
                 h1 {{
                     font-size: 1.8em;
-                    color: #ffffff;
+                    color: {h1_color};
                     margin-bottom: 0.3em;
                     line-height: 1.25;
                 }}
                 .source-link {{
-                    color: #00ddff;
+                    color: {source_color};
                     font-size: 0.85em;
                     text-decoration: none;
                     margin-bottom: 2em;
@@ -100,7 +125,7 @@ class ReaderViewWidget(QWidget):
                     margin: 1.1em 0;
                 }}
                 a {{
-                    color: #80ebff;
+                    color: {link_color};
                     text-decoration: underline;
                 }}
                 img {{
@@ -109,8 +134,8 @@ class ReaderViewWidget(QWidget):
                     border-radius: 6px;
                 }}
                 pre, code {{
-                    background: #1c1b22;
-                    color: #50fa7b;
+                    background: {code_bg};
+                    color: {code_fg};
                     font-family: Consolas, monospace;
                     font-size: 0.9em;
                     padding: 2px 5px;
@@ -121,10 +146,10 @@ class ReaderViewWidget(QWidget):
                     overflow-x: auto;
                 }}
                 blockquote {{
-                    border-left: 3px solid #00ddff;
+                    border-left: 3px solid {link_color};
                     padding-left: 14px;
                     margin-left: 0;
-                    color: #cfcfd8;
+                    color: {quote_color};
                     font-style: italic;
                 }}
             </style>
@@ -132,7 +157,7 @@ class ReaderViewWidget(QWidget):
         <body>
             <h1>{html.escape(title)}</h1>
             <a class="source-link" href="{source_url}">Источник: {source_url}</a>
-            <hr style="border: 0; border-top: 1px solid #42414d; margin: 15px 0 25px 0;" />
+            <hr style="border: 0; border-top: 1px solid {hr_color}; margin: 15px 0 25px 0;" />
             {content_html}
         </body>
         </html>
@@ -140,17 +165,23 @@ class ReaderViewWidget(QWidget):
         self.browser.setHtml(styled_html)
 
     def set_source_code(self, title: str, raw_html: str, source_url: str) -> None:
+        self._last_mode = "source"
+        self._last_data = {"title": title, "raw_html": raw_html, "url": source_url}
         self._current_url = source_url
         self.title_label.setText(f"Исходный код: {title[:50]}")
         escaped = html.escape(raw_html)
+
+        bg = "#1c1b22" if self._is_dark else "#ffffff"
+        fg = "#f8f8f2" if self._is_dark else "#15141a"
+        url_color = "#8f8f9d" if self._is_dark else "#5b5b66"
 
         code_view_html = f"""
         <html>
         <head>
             <style>
                 body {{
-                    background-color: #1c1b22;
-                    color: #f8f8f2;
+                    background-color: {bg};
+                    color: {fg};
                     font-family: 'Consolas', 'Courier New', monospace;
                     font-size: {self._font_size - 3}px;
                     line-height: 1.45;
@@ -163,7 +194,7 @@ class ReaderViewWidget(QWidget):
             </style>
         </head>
         <body>
-            <div style="color: #8f8f9d; margin-bottom: 15px;">URL: {source_url}</div>
+            <div style="color: {url_color}; margin-bottom: 15px;">URL: {source_url}</div>
             <pre>{escaped}</pre>
         </body>
         </html>
@@ -171,14 +202,24 @@ class ReaderViewWidget(QWidget):
         self.browser.setHtml(code_view_html)
 
     def set_help_content(self) -> None:
+        self._last_mode = "help"
         self.title_label.setText("Справка surf")
+
+        bg = "#1e1e24" if self._is_dark else "#ffffff"
+        fg = "#fbfbfe" if self._is_dark else "#15141a"
+        h_color = "#ffffff" if self._is_dark else "#15141a"
+        border_color = "#42414d" if self._is_dark else "#d0d0d8"
+        th_bg = "#2b2a33" if self._is_dark else "#eaeaf0"
+        code_bg = "#2b2a33" if self._is_dark else "#f0f0f5"
+        code_color = "#00ddff" if self._is_dark else "#0055aa"
+
         help_html = f"""
         <html>
         <head>
             <style>
                 body {{
-                    background-color: #2b2a33;
-                    color: #fbfbfe;
+                    background-color: {bg};
+                    color: {fg};
                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                     font-size: {self._font_size - 1}px;
                     line-height: 1.6;
@@ -186,8 +227,8 @@ class ReaderViewWidget(QWidget):
                     margin: 0 auto;
                     padding: 30px 20px;
                 }}
-                h1, h2 {{ color: #ffffff; }}
-                h1 {{ font-size: 2em; border-bottom: 1px solid #42414d; padding-bottom: 10px; }}
+                h1, h2 {{ color: {h_color}; }}
+                h1 {{ font-size: 2em; border-bottom: 1px solid {border_color}; padding-bottom: 10px; }}
                 h2 {{ font-size: 1.3em; margin-top: 25px; }}
                 table {{
                     width: 100%;
@@ -195,16 +236,17 @@ class ReaderViewWidget(QWidget):
                     margin: 15px 0;
                 }}
                 th, td {{
-                    border: 1px solid #42414d;
+                    border: 1px solid {border_color};
                     padding: 8px 12px;
                     text-align: left;
                 }}
                 th {{
-                    background-color: #1c1b22;
+                    background-color: {th_bg};
+                    color: {h_color};
                 }}
                 code {{
-                    background-color: #1c1b22;
-                    color: #00ddff;
+                    background-color: {code_bg};
+                    color: {code_color};
                     padding: 2px 6px;
                     border-radius: 4px;
                     font-family: Consolas, monospace;

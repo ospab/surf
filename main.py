@@ -1,9 +1,10 @@
 import os
 import sys
 
-from PyQt6.QtCore import QEvent, QObject, QPoint, QSize, QStringListModel, Qt, QUrl
-from PyQt6.QtGui import QAction, QColor, QFont, QIcon, QKeySequence, QShortcut
+from PyQt6.QtCore import QByteArray, QEvent, QObject, QPoint, QSize, QStringListModel, Qt, QUrl
+from PyQt6.QtGui import QAction, QColor, QFont, QIcon, QKeySequence, QPainter, QPixmap, QShortcut
 from PyQt6.QtNetwork import QNetworkProxy
+from PyQt6.QtSvg import QSvgRenderer
 from PyQt6.QtWebEngineCore import (
     QWebEngineDownloadRequest,
     QWebEnginePage,
@@ -154,8 +155,45 @@ class MainWindow(QMainWindow):
         self.add_new_tab()
 
     def _get_icon(self, name: str) -> QIcon:
+        is_dark = self.db.get_setting("theme", "dark") == "dark"
+        return self._render_themed_icon(name, is_dark)
+
+    def _render_themed_icon(self, name: str, is_dark: bool) -> QIcon:
         path = os.path.join(os.path.dirname(__file__), "resources", "icons", f"{name}.svg")
-        return QIcon(path)
+        if not os.path.exists(path):
+            return QIcon()
+
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                svg_text = f.read()
+        except Exception:
+            return QIcon(path)
+
+        stroke_color = "#fbfbfe" if is_dark else "#15141a"
+        if not is_dark:
+            svg_text = svg_text.replace("#cfcfd8", stroke_color)
+            svg_text = svg_text.replace("#ffffff", stroke_color)
+            svg_text = svg_text.replace('stroke="white"', f'stroke="{stroke_color}"')
+            if name == "star_filled":
+                accent = self.db.get_setting("accent_color", "#e5a50a")
+                svg_text = svg_text.replace('fill="#f5c518"', f'fill="{accent}"')
+        else:
+            svg_text = svg_text.replace("#15141a", stroke_color)
+            svg_text = svg_text.replace("#2b2a33", stroke_color)
+            if name == "star_filled":
+                accent = self.db.get_setting("accent_color", "#f5c518")
+                svg_text = svg_text.replace('fill="#e5a50a"', f'fill="{accent}"')
+
+        renderer = QSvgRenderer(QByteArray(svg_text.encode("utf-8")))
+        icon = QIcon()
+        for sz in (16, 20, 24, 32, 48):
+            pix = QPixmap(sz, sz)
+            pix.fill(Qt.GlobalColor.transparent)
+            painter = QPainter(pix)
+            renderer.render(painter)
+            painter.end()
+            icon.addPixmap(pix)
+        return icon
 
     def _setup_network_and_profile(self) -> None:
         profile = QWebEngineProfile.defaultProfile()
@@ -483,17 +521,17 @@ class MainWindow(QMainWindow):
         self.btn_find_prev = QPushButton()
         self.btn_find_prev.clicked.connect(self._find_prev)
 
-        btn_close_find = QPushButton()
-        btn_close_find.setIcon(self._get_icon("close"))
-        btn_close_find.setFixedSize(24, 24)
-        btn_close_find.clicked.connect(self._hide_find_bar)
+        self.btn_close_find = QPushButton()
+        self.btn_close_find.setIcon(self._get_icon("close"))
+        self.btn_close_find.setFixedSize(24, 24)
+        self.btn_close_find.clicked.connect(self._hide_find_bar)
 
         layout.addWidget(self.find_label)
         layout.addWidget(self.find_input)
         layout.addWidget(self.btn_find_next)
         layout.addWidget(self.btn_find_prev)
         layout.addStretch()
-        layout.addWidget(btn_close_find)
+        layout.addWidget(self.btn_close_find)
 
         self.find_bar.setVisible(False)
         self.main_layout.addWidget(self.find_bar)
@@ -637,6 +675,7 @@ class MainWindow(QMainWindow):
 
     def _apply_theme(self) -> None:
         theme_name = self.db.get_setting("theme", "dark")
+        is_dark = theme_name == "dark"
         accent = self.db.get_setting("accent_color", "#0060df")
         style_file = f"{theme_name}.qss"
         style_path = os.path.join(os.path.dirname(__file__), "styles", style_file)
@@ -648,8 +687,31 @@ class MainWindow(QMainWindow):
             qss = qss.replace("__ACCENT__", accent)
             self.setStyleSheet(qss)
 
+        # Обновляем тему таббара
         if hasattr(self, "tab_bar") and isinstance(self.tab_bar, ClosableTabBar):
-            self.tab_bar.set_theme_mode(theme_name == "dark")
+            self.tab_bar.set_theme_mode(is_dark)
+
+        # Обновляем все тулбарные иконки в соответствии с темой (чёрные для светлой, белые для тёмной)
+        if hasattr(self, "btn_back"):
+            self.btn_back.setIcon(self._get_icon("back"))
+            self.btn_forward.setIcon(self._get_icon("forward"))
+            self.btn_reload.setIcon(self._get_icon("reload"))
+            self.btn_home.setIcon(self._get_icon("home"))
+            self.btn_bookmark.setIcon(self._get_icon("star"))
+            self.btn_reader.setIcon(self._get_icon("reader"))
+            self.btn_downloads.setIcon(self._get_icon("downloads"))
+            self.btn_settings.setIcon(self._get_icon("settings"))
+            self.new_tab_btn.setIcon(self._get_icon("plus"))
+
+        if hasattr(self, "btn_close_find"):
+            self.btn_close_find.setIcon(self._get_icon("close"))
+
+        # Обновляем тему всех открытых вкладок и режима чтения
+        if hasattr(self, "tab_stack"):
+            for i in range(self.tab_stack.count()):
+                tab = self.tab_stack.widget(i)
+                if tab and hasattr(tab, "set_theme_mode"):
+                    tab.set_theme_mode(is_dark)
 
     def _apply_menu_visibility(self) -> None:
         auto_hide = self.db.get_setting("menu_bar_auto_hide", "1") == "1"
