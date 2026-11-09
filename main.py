@@ -241,7 +241,11 @@ class MainWindow(QMainWindow):
         if app:
             app.installEventFilter(self.zoom_filter)
 
-        self.add_new_tab()
+        restored = 0
+        if not self.is_private and self.db.get_setting("restore_session_on_startup", "1") == "1":
+            restored = self.restore_previous_session()
+        if restored == 0:
+            self.add_new_tab()
 
     def showEvent(self, event) -> None:
         super().showEvent(event)
@@ -635,6 +639,10 @@ class MainWindow(QMainWindow):
         self.act_history.setShortcut(QKeySequence("Ctrl+H"))
         self.act_history.triggered.connect(self._open_history_dialog)
 
+        self.act_restore_session = self.history_menu.addAction("")
+        self.act_restore_session.setShortcut(QKeySequence("Ctrl+Shift+T"))
+        self.act_restore_session.triggered.connect(self.restore_previous_session)
+
         self.act_clear_hist = self.history_menu.addAction("")
         self.act_clear_hist.triggered.connect(self._quick_clear_history)
 
@@ -706,6 +714,10 @@ class MainWindow(QMainWindow):
         act_hist = menu.addAction(tr("menu_history"))
         act_hist.setShortcut(QKeySequence("Ctrl+H"))
         act_hist.triggered.connect(self._open_history_dialog)
+
+        act_rest = menu.addAction(tr("act_restore_session"))
+        act_rest.setShortcut(QKeySequence("Ctrl+Shift+T"))
+        act_rest.triggered.connect(self.restore_previous_session)
 
         act_dl = menu.addAction(tr("act_downloads"))
         act_dl.setShortcut(QKeySequence("Ctrl+J"))
@@ -802,6 +814,8 @@ class MainWindow(QMainWindow):
 
         self.history_menu.setTitle(tr("menu_history"))
         self.act_history.setText(tr("act_show_history"))
+        if hasattr(self, "act_restore_session"):
+            self.act_restore_session.setText(tr("act_restore_session"))
         self.act_clear_hist.setText(tr("act_clear_history"))
 
         self.bm_menu.setTitle(tr("menu_bookmarks"))
@@ -1040,10 +1054,67 @@ class MainWindow(QMainWindow):
             if current:
                 current.show_speed_dial()
 
+    def _save_current_session(self) -> None:
+        """Сохраняет список открытых вкладок текущего окна для восстановления."""
+        if self.is_private:
+            return
+        tabs = []
+        for i in range(self.tab_bar.count()):
+            tab = self.tab_stack.widget(i)
+            if tab and isinstance(tab, BrowserTab):
+                url = tab.current_url
+                if url and not url.startswith("data:"):
+                    tabs.append({
+                        "url": url,
+                        "title": tab.current_title,
+                        "tab_index": i,
+                        "is_active": (i == self.tab_bar.currentIndex()),
+                    })
+        if tabs:
+            self.db.save_session_tabs(tabs)
+
+    def restore_previous_session(self) -> int:
+        """Восстанавливает вкладки сохранённой сессии."""
+        if self.is_private:
+            return 0
+        saved_tabs = self.db.get_saved_session_tabs()
+        if not saved_tabs:
+            self.status_bar.showMessage(tr("status_no_session"), 3000)
+            return 0
+
+        # Если текущая единственная вкладка пустая/speed dial, закроем её после восстановления
+        cur_tab = self.current_tab()
+        initial_is_blank = (
+            self.tab_bar.count() == 1
+            and cur_tab is not None
+            and (not cur_tab.current_url or cur_tab.current_url.startswith("surf://newtab") or cur_tab.current_url == "about:blank")
+        )
+
+        active_idx = 0
+        restored = 0
+        for item in saved_tabs:
+            url = item.get("url")
+            if url:
+                tab = self.add_new_tab(url)
+                if item.get("is_active"):
+                    active_idx = self.tab_stack.indexOf(tab)
+                restored += 1
+
+        if initial_is_blank and self.tab_bar.count() > 1:
+            self.close_tab(0)
+
+        if 0 <= active_idx < self.tab_bar.count():
+            self.tab_bar.setCurrentIndex(active_idx)
+
+        self.status_bar.showMessage(tr("status_session_restored", count=restored), 4000)
+        return restored
+
     def _reopen_closed_tab(self) -> None:
         if self._recently_closed_urls:
             url = self._recently_closed_urls.pop()
             self.add_new_tab(url)
+        else:
+            self.restore_previous_session()
 
     def _next_tab(self) -> None:
         count = self.tab_bar.count()
@@ -1576,6 +1647,9 @@ class MainWindow(QMainWindow):
         if self in MainWindow._open_windows:
             MainWindow._open_windows.remove(self)
 
+        if not self.is_private and self.db.get_setting("privacy_clear_on_exit", "0") != "1":
+            self._save_current_session()
+
         if self.is_private:
             self.profile.clearHttpCache()
             self.profile.cookieStore().deleteAllCookies()
@@ -1584,6 +1658,7 @@ class MainWindow(QMainWindow):
             profile.clearHttpCache()
             profile.cookieStore().deleteAllCookies()
             self.db.clear_history("all")
+            self.db.clear_saved_session()
         super().closeEvent(event)
 
 

@@ -2,7 +2,7 @@ import os
 from PyQt6 import uic
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QColorDialog, QDialog, QFileDialog
+from PyQt6.QtWidgets import QCheckBox, QColorDialog, QDialog, QFileDialog
 
 try:
     from surf.database import Database
@@ -77,6 +77,12 @@ class SettingsDialog(QDialog):
         set_language(lang)
         self.langCombo.setCurrentIndex(0 if lang == "ru" else 1)
         self._retranslate_ui()
+
+        if not hasattr(self, "restoreSessionCheck"):
+            self.restoreSessionCheck = QCheckBox(tr("pref_restore_session"))
+            if self.homeGroup.layout():
+                self.homeGroup.layout().addWidget(self.restoreSessionCheck)
+        self.restoreSessionCheck.setChecked(self.db.get_setting("restore_session_on_startup", "1") == "1")
 
         self.downloadPathEdit.setText(
             self.db.get_setting("download_folder", os.path.expanduser("~/Downloads"))
@@ -218,6 +224,8 @@ class SettingsDialog(QDialog):
 
         self.downloadGroup.setTitle(tr("group_downloads"))
         self.browseDownloadBtn.setText(tr("btn_browse"))
+        if hasattr(self, "restoreSessionCheck"):
+            self.restoreSessionCheck.setText(tr("pref_restore_session"))
 
         self.uaGroup.setTitle(tr("group_user_agent"))
         self.uaCombo.setItemText(0, tr("ua_surf"))
@@ -267,6 +275,8 @@ class SettingsDialog(QDialog):
         self.db.set_setting("search_engine", engine_url)
         self.db.set_setting("menu_bar_auto_hide", "1" if self.menuBarCombo.currentIndex() == 0 else "0")
         self.db.set_setting("download_folder", self.downloadPathEdit.text())
+        if hasattr(self, "restoreSessionCheck"):
+            self.db.set_setting("restore_session_on_startup", "1" if self.restoreSessionCheck.isChecked() else "0")
 
         # Приватность и User-Agent
         ua_idx = self.uaCombo.currentIndex()
