@@ -1,0 +1,223 @@
+/* surf - Светлая тема со скруглённым интерфейсом */
+
+QMainWindow, QDialog {
+    background-color: #f2f2f6;
+    color: #15141a;
+}
+
+QWidget {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 13px;
+    color: #15141a;
+}
+
+/* Верхняя полоса вкладок */
+#tabBarContainer {
+    background-color: #f2f2f6;
+    padding-top: 4px;
+    padding-left: 4px;
+    padding-right: 4px;
+    border-bottom: 1px solid #e2e2e8;
+}
+
+QTabBar {
+    background-color: transparent;
+    border: none;
+    qproperty-drawBase: 0;
+}
+
+QTabBar::tab {
+    background-color: #e4e4eb;
+    color: #5b5b66;
+    padding: 6px 12px;
+    margin-right: 3px;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    min-width: 65px;
+    max-width: 200px;
+    height: 20px;
+}
+
+QTabBar::tab:selected {
+    background-color: #ffffff;
+    color: #15141a;
+    font-weight: 600;
+}
+
+QTabBar::tab:hover:!selected {
+    background-color: #eaeaf0;
+    color: #15141a;
+}
+
+/* Кнопки прокрутки вкладок */
+QTabBar QToolButton {
+    background-color: #e4e4eb;
+    border: 1px solid #d0d0d8;
+    border-radius: 4px;
+    padding: 2px;
+    margin: 2px;
+    min-width: 16px;
+    max-width: 16px;
+}
+
+QTabBar QToolButton:hover {
+    background-color: #ffffff;
+}
+
+/* Кнопка "+" добавления вкладки */
+#newTabBtn {
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 3px;
+    min-width: 26px;
+    max-width: 26px;
+    min-height: 24px;
+    max-height: 24px;
+}
+
+#newTabBtn:hover {
+    background-color: #e4e4eb;
+}
+
+/* Панель навигации */
+#navToolbar {
+    background-color: #ffffff;
+    border-bottom: 1px solid #e2e2e8;
+    padding: 4px 8px;
+    min-height: 36px;
+    max-height: 36px;
+}
+
+#navToolbar QToolButton {
+    background-color: transparent;
+    color: #15141a;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 4px;
+    min-width: 26px;
+    max-width: 26px;
+    min-height: 26px;
+    max-height: 26px;
+}
+
+#navToolbar QToolButton:hover {
+    background-color: #f0f0f4;
+}
+
+#navToolbar QToolButton:pressed {
+    background-color: #e0e0e6;
+}
+
+/* Адресная строка */
+QLineEdit#addressBar {
+    background-color: #f2f2f6;
+    color: #15141a;
+    border: 1px solid #d0d0d8;
+    border-radius: 14px;
+    padding: 5px 14px;
+    font-size: 13px;
+    selection-background-color: #0060df;
+}
+
+QLineEdit#addressBar:focus {
+    border: 1px solid #0060df;
+    background-color: #ffffff;
+}
+
+/* Меню */
+QMenuBar {
+    background-color: #f2f2f6;
+    color: #15141a;
+    border-bottom: 1px solid #e2e2e8;
+    padding: 2px 6px;
+}
+
+QMenuBar::item {
+    padding: 4px 8px;
+    border-radius: 5px;
+}
+
+QMenuBar::item:selected {
+    background-color: #e4e4eb;
+    color: #000000;
+}
+
+QMenu {
+    background-color: #ffffff;
+    color: #15141a;
+    border: 1px solid #d0d0d8;
+    border-radius: 8px;
+    padding: 4px 0;
+}
+
+QMenu::item {
+    padding: 6px 22px;
+}
+
+QMenu::item:selected {
+    background-color: #0060df;
+    color: #ffffff;
+    border-radius: 4px;
+}
+
+/* Таблицы */
+QTableWidget {
+    background-color: #ffffff;
+    alternate-background-color: #f9f9fb;
+    color: #15141a;
+    border: 1px solid #d0d0d8;
+    border-radius: 8px;
+    gridline-color: #e0e0e6;
+    selection-background-color: #0060df;
+    selection-color: #ffffff;
+}
+
+QHeaderView::section {
+    background-color: #f2f2f6;
+    color: #5b5b66;
+    padding: 6px;
+    border: 1px solid #e2e2e8;
+    font-weight: bold;
+}
+
+/* Стартовая страница */
+#speedDialSearch {
+    background-color: #ffffff;
+    border: 1px solid #d0d0d8;
+    border-radius: 22px;
+    font-size: 14px;
+    padding: 10px 20px;
+    color: #15141a;
+}
+
+#speedDialSearch:focus {
+    border-color: #0060df;
+}
+
+QGroupBox {
+    border: 1px solid #d0d0d8;
+    border-radius: 8px;
+    margin-top: 12px;
+    padding-top: 14px;
+    font-weight: bold;
+}
+
+QComboBox, QSpinBox {
+    background-color: #ffffff;
+    color: #15141a;
+    border: 1px solid #d0d0d8;
+    border-radius: 6px;
+    padding: 4px 10px;
+}
+
+QPushButton {
+    background-color: #ffffff;
+    border: 1px solid #d0d0d8;
+    border-radius: 6px;
+    padding: 5px 12px;
+}
+
+QPushButton:hover {
+    background-color: #f2f2f6;
+}

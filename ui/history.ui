@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>HistoryDialog</class>
+ <widget class="QDialog" name="HistoryDialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>750</width>
+    <height>500</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Журнал и закладки</string>
+  </property>
+  <layout class="QVBoxLayout" name="dialogLayout">
+   <item>
+    <widget class="QTabWidget" name="tabs">
+     <property name="currentIndex">
+      <number>0</number>
+     </property>
+     <widget class="QWidget" name="historyTab">
+      <attribute name="title">
+       <string>История</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="historyLayout">
+       <item>
+        <layout class="QHBoxLayout" name="historyControlsLayout">
+         <item>
+          <widget class="QLineEdit" name="historySearchEdit">
+           <property name="placeholderText">
+            <string>Поиск в истории...</string>
+           </property>
+           <property name="clearButtonEnabled">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QComboBox" name="periodCombo">
+           <item>
+            <property name="text">
+             <string>За всё время</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>За сегодня</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>За вчера</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>За последнюю неделю</string>
+            </property>
+           </item>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="exportHistoryCsvBtn">
+           <property name="text">
+            <string>Экспорт в CSV...</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QTableWidget" name="historyTable"/>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="historyActionsLayout">
+         <item>
+          <widget class="QPushButton" name="deleteHistoryBtn">
+           <property name="text">
+            <string>Удалить выбранное</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="clearAllHistoryBtn">
+           <property name="text">
+            <string>Очистить историю...</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="horizontalSpacer1">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QPushButton" name="openHistoryUrlBtn">
+           <property name="text">
+            <string>Открыть в новой вкладке</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="bookmarksTab">
+      <attribute name="title">
+       <string>Закладки</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="bookmarksLayout">
+       <item>
+        <layout class="QHBoxLayout" name="bookmarksControlsLayout">
+         <item>
+          <widget class="QLineEdit" name="bookmarksSearchEdit">
+           <property name="placeholderText">
+            <string>Поиск по закладкам...</string>
+           </property>
+           <property name="clearButtonEnabled">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="importBookmarksCsvBtn">
+           <property name="text">
+            <string>Импорт CSV...</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="exportBookmarksCsvBtn">
+           <property name="text">
+            <string>Экспорт CSV...</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QTableWidget" name="bookmarksTable"/>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="bookmarksActionsLayout">
+         <item>
+          <widget class="QPushButton" name="deleteBookmarkBtn">
+           <property name="text">
+            <string>Удалить закладку</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="horizontalSpacer2">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QPushButton" name="openBookmarkUrlBtn">
+           <property name="text">
+            <string>Открыть в новой вкладке</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="statsTab">
+      <attribute name="title">
+       <string>Статистика сайтов</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="statsLayout">
+       <item>
+        <widget class="QLabel" name="statsInfoLabel">
+         <property name="text">
+          <string>Топ самых посещаемых доменов по данным истории:</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QTableWidget" name="statsTable"/>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="bottomLayout">
+     <item>
+      <spacer name="spacerBottom">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QPushButton" name="closeBtn">
+       <property name="text">
+        <string>Закрыть</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

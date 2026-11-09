@@ -1,0 +1,416 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>SettingsDialog</class>
+ <widget class="QDialog" name="SettingsDialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>540</width>
+    <height>440</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Настройки surf</string>
+  </property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <item>
+    <widget class="QTabWidget" name="settingsTabs">
+     <property name="currentIndex">
+      <number>0</number>
+     </property>
+     <widget class="QWidget" name="generalTab">
+      <attribute name="title">
+       <string>Основные</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="generalLayout">
+       <item>
+        <widget class="QGroupBox" name="homeGroup">
+         <property name="title">
+          <string>Навигация и поиск</string>
+         </property>
+         <layout class="QFormLayout" name="homeForm">
+          <item row="0" column="0">
+           <widget class="QLabel" name="homeLabel">
+            <property name="text">
+             <string>Домашняя страница:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QLineEdit" name="homeEdit">
+            <property name="placeholderText">
+             <string>https://ya.ru</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="searchLabel">
+            <property name="text">
+             <string>Поисковая система:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QComboBox" name="searchCombo">
+            <item>
+             <property name="text">
+              <string>Яндекс</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Google</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>DuckDuckGo</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="menuLabel">
+            <property name="text">
+             <string>Строка меню (Alt):</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QComboBox" name="menuBarCombo">
+            <item>
+             <property name="text">
+              <string>Скрывать (по нажатию Alt)</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Всегда показывать</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="downloadGroup">
+         <property name="title">
+          <string>Загрузки</string>
+         </property>
+         <layout class="QHBoxLayout" name="dlLayout">
+          <item>
+           <widget class="QLineEdit" name="downloadPathEdit">
+            <property name="readOnly">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="browseDownloadBtn">
+            <property name="text">
+             <string>Обзор...</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <spacer name="generalSpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="privacyTab">
+      <attribute name="title">
+       <string>Приватность и заголовок</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="privacyLayout">
+       <item>
+        <widget class="QGroupBox" name="uaGroup">
+         <property name="title">
+          <string>User-Agent (идентификация браузера)</string>
+         </property>
+         <layout class="QVBoxLayout" name="uaLayout">
+          <item>
+           <widget class="QComboBox" name="uaCombo">
+            <item>
+             <property name="text">
+              <string>Современный десктопный браузер (рекомендуется)</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Google Chrome</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>QtWebEngine (по умолчанию)</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Пользовательский...</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLineEdit" name="uaEdit"/>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="historyPrivacyGroup">
+         <property name="title">
+          <string>Журнал и отслеживание</string>
+         </property>
+         <layout class="QVBoxLayout" name="hpLayout">
+          <item>
+           <widget class="QCheckBox" name="saveHistoryCheck">
+            <property name="text">
+             <string>Вести журнал посещенных страниц</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="clearExitCheck">
+            <property name="text">
+             <string>Очищать кэш и историю при выходе из браузера</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="dntCheck">
+            <property name="text">
+             <string>Отправлять веб-сайтам сигнал «Не отслеживать» (Do Not Track)</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <spacer name="privacySpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="proxyTab">
+      <attribute name="title">
+       <string>Прокси-сервер</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="proxyLayout">
+       <item>
+        <widget class="QGroupBox" name="proxyGroup">
+         <property name="title">
+          <string>Конфигурация сети</string>
+         </property>
+         <layout class="QFormLayout" name="proxyForm">
+          <item row="0" column="0">
+           <widget class="QLabel" name="proxyTypeLabel">
+            <property name="text">
+             <string>Тип прокси:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QComboBox" name="proxyTypeCombo">
+            <item>
+             <property name="text">
+              <string>Без прокси (прямое соединение)</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Системные настройки Windows</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>HTTP прокси</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>SOCKS5 прокси</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="proxyHostLabel">
+            <property name="text">
+             <string>Хост / IP:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QLineEdit" name="proxyHostEdit">
+            <property name="placeholderText">
+             <string>127.0.0.1 или proxy.example.com</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="proxyPortLabel">
+            <property name="text">
+             <string>Порт:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QSpinBox" name="proxyPortSpin">
+            <property name="minimum">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <number>65535</number>
+            </property>
+            <property name="value">
+             <number>8080</number>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0">
+           <widget class="QLabel" name="proxyUserLabel">
+            <property name="text">
+             <string>Логин (опционально):</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1">
+           <widget class="QLineEdit" name="proxyUserEdit"/>
+          </item>
+          <item row="4" column="0">
+           <widget class="QLabel" name="proxyPassLabel">
+            <property name="text">
+             <string>Пароль (опционально):</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="1">
+           <widget class="QLineEdit" name="proxyPassEdit">
+            <property name="echoMode">
+             <enum>QLineEdit::Password</enum>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <spacer name="proxySpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="appearanceTab">
+      <attribute name="title">
+       <string>Оформление</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="appearanceLayout">
+       <item>
+        <widget class="QGroupBox" name="appearanceGroup">
+         <property name="title">
+          <string>Стиль интерфейса</string>
+         </property>
+         <layout class="QFormLayout" name="appForm">
+          <item row="0" column="0">
+           <widget class="QLabel" name="themeLabel">
+            <property name="text">
+             <string>Цветовая схема:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QComboBox" name="themeCombo">
+            <item>
+             <property name="text">
+              <string>Тёмная (surf Dark)</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Светлая (surf Light)</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="colorLabel">
+            <property name="text">
+             <string>Акцентный цвет кнопок:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QPushButton" name="colorBtn">
+            <property name="text">
+             <string>Выбрать акцент...</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <spacer name="appSpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+   <item>
+    <widget class="QDialogButtonBox" name="buttonBox">
+     <property name="standardButtons">
+      <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
