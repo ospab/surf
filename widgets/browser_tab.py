@@ -1,7 +1,7 @@
 import html
 from urllib.parse import urlparse
 
-from PyQt6.QtCore import Qt, QUrl, pyqtSignal
+from PyQt6.QtCore import QEvent, Qt, QUrl, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
 from PyQt6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile, QWebEngineSettings
 from PyQt6.QtWebEngineWidgets import QWebEngineView
@@ -79,6 +79,10 @@ class SpeedDialWidget(QWidget):
 
         main_layout.addWidget(center_box)
 
+    def retranslate_ui(self) -> None:
+        self.subtitle_label.setText(tr("app_subtitle"))
+        self.search_input.setPlaceholderText(tr("search_placeholder"))
+
     def _handle_search(self) -> None:
         query = self.search_input.text().strip()
         if not query:
@@ -101,7 +105,7 @@ class BrowserTab(QWidget):
     def __init__(self, db: Database, parent=None):
         super().__init__(parent)
         self.db = db
-        self.current_title = "Новая вкладка"
+        self.current_title = tr("new_tab")
         self.current_url = ""
         self._init_ui()
 
@@ -110,7 +114,7 @@ class BrowserTab(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # Тема QT 5: Стопка клеток (QStackedWidget)
+        # Стопка клеток (QStackedWidget)
         self.stack = QStackedWidget()
 
         # 0: Веб-страница (QWebEngineView)
@@ -159,12 +163,14 @@ class BrowserTab(QWidget):
                 engine = self.db.get_setting("search_engine", "https://yandex.ru/search/?text=")
                 url = f"{engine}{url}"
 
+        self.current_url = url
         self.stack.setCurrentIndex(0)
         self.web_view.load(QUrl(url))
+        self.url_changed.emit(url)
 
     def show_speed_dial(self) -> None:
         self.stack.setCurrentIndex(1)
-        self.current_title = "Новая вкладка"
+        self.current_title = tr("new_tab")
         self.current_url = "surf://newtab"
         self.title_changed.emit(self.current_title)
         self.url_changed.emit("")
@@ -178,10 +184,16 @@ class BrowserTab(QWidget):
     def show_help(self) -> None:
         self.reader_view.set_help_content()
         self.stack.setCurrentIndex(2)
-        self.current_title = "Справка surf"
+        self.current_title = tr("act_help")
         self.current_url = "surf://help"
         self.title_changed.emit(self.current_title)
         self.url_changed.emit(self.current_url)
+
+    def retranslate_ui(self) -> None:
+        self.speed_dial.retranslate_ui()
+        if self.stack.currentIndex() == 1:
+            self.current_title = tr("new_tab")
+            self.title_changed.emit(self.current_title)
 
     def toggle_reader_mode(self) -> None:
         if self.stack.currentIndex() == 2:
@@ -222,13 +234,13 @@ class BrowserTab(QWidget):
         pixmap = self.web_view.grab()
         file_path, _ = QFileDialog.getSaveFileName(
             self,
-            "Сохранить скриншот страницы",
+            tr("save_screenshot_dialog"),
             "screenshot.png",
-            "Изображения PNG (*.png);;Изображения JPEG (*.jpg *.jpeg)",
+            "PNG (*.png);;JPEG (*.jpg *.jpeg)",
         )
         if file_path:
             pixmap.save(file_path)
-            QMessageBox.information(self, "Скриншот сохранен", f"Снимок страницы сохранен:\n{file_path}")
+            QMessageBox.information(self, tr("screenshot_saved_title"), tr("screenshot_saved_msg", path=file_path))
 
     def _on_title_changed(self, title: str) -> None:
         if self.stack.currentIndex() == 0 and title:

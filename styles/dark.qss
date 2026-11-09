@@ -29,12 +29,15 @@ QTabBar {
 QTabBar::tab {
     background-color: #24242d;
     color: #a4a4b2;
-    padding: 6px 14px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    padding-left: 12px;
+    padding-right: 28px;
     margin-right: 3px;
     border-top-left-radius: 8px;
     border-top-right-radius: 8px;
-    min-width: 65px;
-    max-width: 200px;
+    min-width: 75px;
+    max-width: 210px;
     height: 20px;
     border-bottom: 2px solid transparent;
 }
@@ -49,6 +52,20 @@ QTabBar::tab:selected {
 QTabBar::tab:hover:!selected {
     background-color: #2c2c38;
     color: #fbfbfe;
+}
+
+/* Кнопка закрытия вкладки (крестик с комфортным отступом от скруглённого края) */
+QTabBar::close-button {
+    border-radius: 4px;
+    padding: 2px;
+}
+
+QTabBar::close-button:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+QTabBar::close-button:pressed {
+    background-color: rgba(255, 255, 255, 0.3);
 }
 
 /* Кнопки прокрутки вкладок (при >50-200 вкладках) */
@@ -209,6 +226,21 @@ QStatusBar {
     color: #8f8f9d;
     border-top: 1px solid #282832;
     padding: 2px 10px;
+}
+
+#zoomBtn {
+    background-color: transparent;
+    color: #a4a4b2;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-weight: 600;
+}
+
+#zoomBtn:hover {
+    background-color: #2c2c38;
+    color: #fbfbfe;
+    border-color: __ACCENT__;
 }
 
 /* Панель поиска */

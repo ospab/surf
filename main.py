@@ -1,7 +1,7 @@
 import os
 import sys
 
-from PyQt6.QtCore import QPoint, QSize, QStringListModel, Qt, QUrl
+from PyQt6.QtCore import QEvent, QObject, QPoint, QSize, QStringListModel, Qt, QUrl
 from PyQt6.QtGui import QAction, QColor, QFont, QIcon, QKeySequence, QShortcut
 from PyQt6.QtNetwork import QNetworkProxy
 from PyQt6.QtWebEngineCore import (
@@ -38,6 +38,49 @@ from surf.widgets.history_dialog import HistoryDialog
 from surf.widgets.settings_dialog import SettingsDialog
 
 
+class ZoomWheelFilter(QObject):
+    def __init__(self, main_window):
+        super().__init__(main_window)
+        self.main_window = main_window
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Type.Wheel and (event.modifiers() & Qt.KeyboardModifier.ControlModifier):
+            delta = event.angleDelta().y()
+            if delta > 0:
+                self.main_window._zoom_in()
+            elif delta < 0:
+                self.main_window._zoom_out()
+            return True
+        return False
+
+
+class ClosableTabBar(QTabBar):
+    """Панель вкладок с аккуратным отступом кнопки закрытия от скруглённого края."""
+
+    def tabLayoutChange(self):
+        super().tabLayoutChange()
+        self._adjust_close_buttons()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._adjust_close_buttons()
+
+    def paintEvent(self, event):
+        self._adjust_close_buttons()
+        super().paintEvent(event)
+
+    def _adjust_close_buttons(self):
+        for i in range(self.count()):
+            btn = self.tabButton(i, QTabBar.ButtonPosition.RightSide)
+            if btn:
+                r = self.tabRect(i)
+                # Отступ 8px от правого края вкладки, чтобы не налезать на скругление
+                target_x = r.right() - btn.width() - 8
+                target_y = r.top() + (r.height() - btn.height()) // 2
+                if btn.x() != target_x or btn.y() != target_y:
+                    btn.move(target_x, target_y)
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -47,8 +90,9 @@ class MainWindow(QMainWindow):
         self.db = Database()
         self.zoom_factor = 1.0
         self._active_downloads: list[QWebEngineDownloadRequest] = []
+        self._recently_closed_urls: list[str] = []
 
-        # Язык интерфейса
+        # Инициализация языка интерфейса
         user_lang = self.db.get_setting("language", "ru")
         set_language(user_lang)
 
@@ -60,6 +104,12 @@ class MainWindow(QMainWindow):
         self._apply_menu_visibility()
         self._retranslate_ui()
 
+        # Глобальный фильтр колесика мыши с зажатым Ctrl для масштабирования
+        self.zoom_filter = ZoomWheelFilter(self)
+        app = QApplication.instance()
+        if app:
+            app.installEventFilter(self.zoom_filter)
+
         self.add_new_tab()
 
     def _get_icon(self, name: str) -> QIcon:
@@ -69,7 +119,7 @@ class MainWindow(QMainWindow):
     def _setup_network_and_profile(self) -> None:
         profile = QWebEngineProfile.defaultProfile()
 
-        # Собственный фирменный User-Agent surf с полной совместимостью с веб-стандартами
+        # Фирменный User-Agent surf с полной веб-совместимостью
         ua_type = self.db.get_setting("user_agent_type", "surf")
         if ua_type == "surf" and "Surf/1.0" not in self.db.get_setting("custom_user_agent", ""):
             self.db.set_setting(
@@ -143,11 +193,16 @@ class MainWindow(QMainWindow):
 
         self._build_find_bar()
 
-        # 5. Строка состояния
+        # 5. Строка состояния с интерактивным масштабом
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
-        self.zoom_label = QLabel("100%")
-        self.status_bar.addPermanentWidget(self.zoom_label)
+
+        self.zoom_btn = QToolButton()
+        self.zoom_btn.setObjectName("zoomBtn")
+        self.zoom_btn.setText("100%")
+        self.zoom_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.zoom_btn.clicked.connect(self._zoom_reset)
+        self.status_bar.addPermanentWidget(self.zoom_btn)
 
     def _build_tab_strip(self) -> None:
         self.tab_container = QWidget()
@@ -157,7 +212,7 @@ class MainWindow(QMainWindow):
         layout.setSpacing(4)
 
         # Панель вкладок со сжатием и прокруткой при 50-200 вкладках
-        self.tab_bar = QTabBar()
+        self.tab_bar = ClosableTabBar()
         self.tab_bar.setDocumentMode(True)
         self.tab_bar.setTabsClosable(True)
         self.tab_bar.setMovable(True)
@@ -311,13 +366,13 @@ class MainWindow(QMainWindow):
         self.act_source.setShortcut(QKeySequence("Ctrl+U"))
         self.act_source.triggered.connect(self._show_page_source)
 
-        self.view_menu.addSeparator()
+        view_menu_sep = self.view_menu.addSeparator()
         self.act_zoom_in = self.view_menu.addAction("")
-        self.act_zoom_in.setShortcut(QKeySequence("Ctrl+="))
+        self.act_zoom_in.setShortcuts([QKeySequence("Ctrl++"), QKeySequence("Ctrl+="), QKeySequence("Ctrl+Shift+=")])
         self.act_zoom_in.triggered.connect(self._zoom_in)
 
         self.act_zoom_out = self.view_menu.addAction("")
-        self.act_zoom_out.setShortcut(QKeySequence("Ctrl+-"))
+        self.act_zoom_out.setShortcuts([QKeySequence("Ctrl+-"), QKeySequence("Ctrl+_")])
         self.act_zoom_out.triggered.connect(self._zoom_out)
 
         self.act_zoom_reset = self.view_menu.addAction("")
@@ -453,6 +508,7 @@ class MainWindow(QMainWindow):
         self.btn_downloads.setToolTip(tr("tip_downloads"))
         self.btn_settings.setToolTip(tr("tip_settings"))
         self.new_tab_btn.setToolTip(tr("tip_new_tab"))
+        self.zoom_btn.setToolTip(tr("act_zoom_reset"))
 
         # Панель поиска
         self.find_label.setText(tr("find_label"))
@@ -460,22 +516,75 @@ class MainWindow(QMainWindow):
         self.btn_find_next.setText(tr("find_next"))
         self.btn_find_prev.setText(tr("find_prev"))
 
-        # Обновление заголовков вкладок без названия
+        # Обновление всех открытых страниц и заголовков вкладок
         for i in range(self.tab_bar.count()):
-            text = self.tab_bar.tabText(i)
-            if text in ("Новая вкладка", "New Tab"):
-                self.tab_bar.setTabText(i, tr("new_tab"))
+            tab = self.tab_stack.widget(i)
+            if tab and isinstance(tab, BrowserTab):
+                tab.retranslate_ui()
+                if tab.stack.currentIndex() == 1 or not tab.current_url or tab.current_url.startswith("surf://newtab"):
+                    self.tab_bar.setTabText(i, tr("new_tab"))
 
     def _setup_shortcuts(self) -> None:
+        # Навигация по вкладкам
+        QShortcut(QKeySequence("Ctrl+T"), self, lambda: self.add_new_tab())
+        QShortcut(QKeySequence("Ctrl+W"), self, lambda: self.close_tab(self.tab_bar.currentIndex()))
+        QShortcut(QKeySequence("Ctrl+Shift+T"), self, self._reopen_closed_tab)
+        QShortcut(QKeySequence("Ctrl+Tab"), self, self._next_tab)
+        QShortcut(QKeySequence("Ctrl+Shift+Tab"), self, self._prev_tab)
+
+        # Переход к вкладкам 1-9
+        for num in range(1, 9):
+            QShortcut(QKeySequence(f"Ctrl+{num}"), self, lambda n=num: self._switch_to_tab(n - 1))
+        QShortcut(QKeySequence("Ctrl+9"), self, lambda: self._switch_to_tab(self.tab_bar.count() - 1))
+
+        # Адресная строка и фокус
         QShortcut(QKeySequence("Ctrl+L"), self, self._focus_address_bar)
         QShortcut(QKeySequence("Alt+D"), self, self._focus_address_bar)
+        QShortcut(QKeySequence("F6"), self, self._focus_address_bar)
+
+        # Обновление
         QShortcut(QKeySequence("F5"), self, self._reload_current)
         QShortcut(QKeySequence("Ctrl+R"), self, self._reload_current)
+        QShortcut(QKeySequence("Ctrl+Shift+R"), self, self._hard_reload_current)
+        QShortcut(QKeySequence("Ctrl+F5"), self, self._hard_reload_current)
+
+        # Переходы
         QShortcut(QKeySequence("Alt+Left"), self, self._go_back)
         QShortcut(QKeySequence("Alt+Right"), self, self._go_forward)
         QShortcut(QKeySequence("Alt+Home"), self, self._go_home)
+
+        # Диалоги и инструменты
+        QShortcut(QKeySequence("Ctrl+H"), self, self._open_history_dialog)
+        QShortcut(QKeySequence("Ctrl+J"), self, self._open_downloads_dialog)
+        QShortcut(QKeySequence("Ctrl+D"), self, self._toggle_bookmark)
+        QShortcut(QKeySequence("Ctrl+Shift+O"), self, self._open_history_dialog)
+        QShortcut(QKeySequence("Ctrl+Shift+B"), self, self._open_history_dialog)
+        QShortcut(QKeySequence("Ctrl+P"), self, self._save_page)
+        QShortcut(QKeySequence("Ctrl+S"), self, self._save_page)
+        QShortcut(QKeySequence("Ctrl+O"), self, self._open_local_file)
+        QShortcut(QKeySequence("Ctrl+Shift+S"), self, self._capture_screenshot)
+        QShortcut(QKeySequence("Ctrl+U"), self, self._show_page_source)
+        QShortcut(QKeySequence("Ctrl+Alt+R"), self, self._toggle_reader_mode)
+
+        # Поиск
+        QShortcut(QKeySequence("Ctrl+F"), self, self._show_find_bar)
+        QShortcut(QKeySequence("F3"), self, self._find_next)
+        QShortcut(QKeySequence("Shift+F3"), self, self._find_prev)
+        QShortcut(QKeySequence("Ctrl+G"), self, self._find_next)
+        QShortcut(QKeySequence("Ctrl+Shift+G"), self, self._find_prev)
+
+        # Масштаб
+        QShortcut(QKeySequence("Ctrl+="), self, self._zoom_in)
+        QShortcut(QKeySequence("Ctrl++"), self, self._zoom_in)
+        QShortcut(QKeySequence("Ctrl+Shift+="), self, self._zoom_in)
+        QShortcut(QKeySequence("Ctrl+-"), self, self._zoom_out)
+        QShortcut(QKeySequence("Ctrl+_"), self, self._zoom_out)
+        QShortcut(QKeySequence("Ctrl+0"), self, self._zoom_reset)
+
+        # Системные
         QShortcut(QKeySequence("Escape"), self, self._handle_escape)
         QShortcut(QKeySequence("F10"), self, self._toggle_menu_visibility)
+        QShortcut(QKeySequence("F11"), self, self._toggle_fullscreen)
 
     def _setup_downloads(self) -> None:
         profile = QWebEngineProfile.defaultProfile()
@@ -540,6 +649,12 @@ class MainWindow(QMainWindow):
 
     def close_tab(self, index: int) -> None:
         if self.tab_bar.count() > 1:
+            tab = self.tab_stack.widget(index)
+            if tab and isinstance(tab, BrowserTab):
+                url = tab.current_url
+                if url and not url.startswith("surf://newtab") and url != "about:blank":
+                    self._recently_closed_urls.append(url)
+
             self.tab_bar.removeTab(index)
             widget = self.tab_stack.widget(index)
             if widget:
@@ -549,6 +664,27 @@ class MainWindow(QMainWindow):
             current = self.current_tab()
             if current:
                 current.show_speed_dial()
+
+    def _reopen_closed_tab(self) -> None:
+        if self._recently_closed_urls:
+            url = self._recently_closed_urls.pop()
+            self.add_new_tab(url)
+
+    def _next_tab(self) -> None:
+        count = self.tab_bar.count()
+        if count > 1:
+            next_idx = (self.tab_bar.currentIndex() + 1) % count
+            self.tab_bar.setCurrentIndex(next_idx)
+
+    def _prev_tab(self) -> None:
+        count = self.tab_bar.count()
+        if count > 1:
+            prev_idx = (self.tab_bar.currentIndex() - 1 + count) % count
+            self.tab_bar.setCurrentIndex(prev_idx)
+
+    def _switch_to_tab(self, index: int) -> None:
+        if 0 <= index < self.tab_bar.count():
+            self.tab_bar.setCurrentIndex(index)
 
     def current_tab(self) -> BrowserTab | None:
         widget = self.tab_stack.currentWidget()
@@ -648,6 +784,11 @@ class MainWindow(QMainWindow):
             else:
                 tab.web_view.reload()
 
+    def _hard_reload_current(self) -> None:
+        tab = self.current_tab()
+        if tab:
+            tab.web_view.triggerPageAction(QWebEnginePage.WebAction.ReloadAndBypassCache)
+
     def _go_home(self) -> None:
         tab = self.current_tab()
         if tab:
@@ -734,16 +875,16 @@ class MainWindow(QMainWindow):
         elif self.main_menubar.isVisible() and self.db.get_setting("menu_bar_auto_hide", "1") == "1":
             self.main_menubar.setVisible(False)
 
-    # --- Масштаб ---
+    # --- Масштабирование ---
 
     def _zoom_in(self) -> None:
         if self.zoom_factor < 3.0:
-            self.zoom_factor += 0.1
+            self.zoom_factor = round(self.zoom_factor + 0.1, 2)
             self._apply_zoom()
 
     def _zoom_out(self) -> None:
-        if self.zoom_factor > 0.4:
-            self.zoom_factor -= 0.1
+        if self.zoom_factor > 0.3:
+            self.zoom_factor = round(self.zoom_factor - 0.1, 2)
             self._apply_zoom()
 
     def _zoom_reset(self) -> None:
@@ -754,7 +895,8 @@ class MainWindow(QMainWindow):
         tab = self.current_tab()
         if tab:
             tab.web_view.setZoomFactor(self.zoom_factor)
-        self.zoom_label.setText(f"{int(self.zoom_factor * 100)}%")
+        pct = int(round(self.zoom_factor * 100))
+        self.zoom_btn.setText(f"{pct}%")
 
     def _toggle_fullscreen(self) -> None:
         if self.isFullScreen():
