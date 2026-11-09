@@ -849,6 +849,9 @@ def render_gpu_page(is_dark: bool, accent: str = "#0060df") -> str:
                     <tr><td><b>WebGL 1.0 & WebGL 2.0</b></td><td><span class="badge badge-success">Поддерживается</span></td></tr>
                     <tr><td><b>WebAssembly (WASM)</b></td><td><span class="badge badge-success">Поддерживается</span></td></tr>
                     <tr><td><b>WebRTC & PeerConnection</b></td><td><span class="badge badge-success">Поддерживается</span></td></tr>
+                    <tr><td><b>WebXR & Gamepad API</b></td><td><span class="badge badge-success">Поддерживается</span></td></tr>
+                    <tr><td><b>WebUSB & WebHID API</b></td><td><span class="badge badge-success">Поддерживается</span></td></tr>
+                    <tr><td><b>{"Захват экрана (Screen Capture)" if is_ru else "Screen Capture API"}</b></td><td><span class="badge badge-success">{"Включено" if is_ru else "Enabled"}</span></td></tr>
                     <tr><td><b>{"Сглаживание шрифтов" if is_ru else "Font Antialiasing"}</b></td><td>DirectWrite / FreeType</td></tr>
                 </table>
             </div>

@@ -16,7 +16,10 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWebEngineCore import (
     QWebEngineContextMenuRequest,
+    QWebEngineDesktopMediaRequest,
+    QWebEngineFileSystemAccessRequest,
     QWebEnginePage,
+    QWebEnginePermission,
     QWebEngineProfile,
     QWebEngineSettings,
 )
@@ -42,6 +45,12 @@ try:
     from surf.database import Database
     from surf.i18n import tr
     from surf.widgets.reader_view import ReaderViewWidget
+    from surf.widgets.permission_dialogs import (
+        DesktopMediaDialog,
+        FileSystemAccessDialog,
+        PermissionPromptBar,
+        normalize_origin,
+    )
     from surf.utils.favicon_service import (
         FaviconService,
         create_circular_favicon_badge,
@@ -52,6 +61,12 @@ except ModuleNotFoundError:
     from database import Database
     from i18n import tr
     from widgets.reader_view import ReaderViewWidget
+    from widgets.permission_dialogs import (
+        DesktopMediaDialog,
+        FileSystemAccessDialog,
+        PermissionPromptBar,
+        normalize_origin,
+    )
     from utils.favicon_service import (
         FaviconService,
         create_circular_favicon_badge,
@@ -77,9 +92,16 @@ def format_search_url(engine_template: str, query: str) -> str:
 
 
 class BrowserPage(QWebEnginePage):
-    def __init__(self, profile, parent=None, main_window=None):
+    def __init__(self, profile, parent=None, main_window=None, tab=None):
         super().__init__(profile, parent)
         self.main_window = main_window
+        self.tab = tab
+
+        # Подключение обработчиков системных запросов разрешений и девайсов
+        self.permissionRequested.connect(self._on_permission_requested)
+        self.featurePermissionRequested.connect(self._on_feature_permission_requested)
+        self.desktopMediaRequested.connect(self._on_desktop_media_requested)
+        self.fileSystemAccessRequested.connect(self._on_file_system_access_requested)
 
     def _get_main_window(self):
         if self.main_window:
@@ -107,6 +129,89 @@ class BrowserPage(QWebEnginePage):
                 win.add_new_tab(url.toString())
                 return False
         return super().acceptNavigationRequest(url, nav_type, is_main_frame)
+
+    def _permission_type_key(self, perm_type) -> str:
+        s = str(perm_type).lower()
+        if "audio" in s and "video" in s:
+            return "media"
+        elif "audio" in s:
+            return "audio"
+        elif "video" in s:
+            return "video"
+        elif "desktop" in s or "screen" in s:
+            return "screen"
+        elif "geolocation" in s or "location" in s:
+            return "geolocation"
+        elif "notification" in s:
+            return "notifications"
+        elif "clipboard" in s:
+            return "clipboard"
+        elif "font" in s:
+            return "fonts"
+        elif "mouselock" in s:
+            return "mouselock"
+        return "device"
+
+    def _on_permission_requested(self, permission: QWebEnginePermission) -> None:
+        origin_url = permission.origin()
+        origin_str = normalize_origin(origin_url)
+        feat_key = self._permission_type_key(permission.permissionType())
+
+        db = self.tab.db if self.tab and hasattr(self.tab, "db") else None
+        if db:
+            saved = db.get_site_permission(origin_str, feat_key)
+            if saved == "allow":
+                permission.grant()
+                return
+            elif saved == "deny":
+                permission.deny()
+                return
+
+        if self.tab and hasattr(self.tab, "request_permission"):
+            self.tab.request_permission(origin_str, feat_key, permission=permission)
+        else:
+            permission.grant()
+
+    def _on_feature_permission_requested(self, security_origin: QUrl, feature: QWebEnginePage.Feature) -> None:
+        origin_str = normalize_origin(security_origin)
+        feat_key = self._permission_type_key(feature)
+
+        db = self.tab.db if self.tab and hasattr(self.tab, "db") else None
+        if db:
+            saved = db.get_site_permission(origin_str, feat_key)
+            if saved == "allow":
+                self.setFeaturePermission(security_origin, feature, QWebEnginePage.PermissionPolicy.PermissionGrantedByUser)
+                return
+            elif saved == "deny":
+                self.setFeaturePermission(security_origin, feature, QWebEnginePage.PermissionPolicy.PermissionDeniedByUser)
+                return
+
+        if self.tab and hasattr(self.tab, "request_permission"):
+            self.tab.request_permission(origin_str, feat_key, origin_url=security_origin, feature=feature)
+        else:
+            self.setFeaturePermission(security_origin, feature, QWebEnginePage.PermissionPolicy.PermissionGrantedByUser)
+
+    def _on_desktop_media_requested(self, request: QWebEngineDesktopMediaRequest) -> None:
+        is_dark = True
+        accent = "#0060df"
+        if self.tab and hasattr(self.tab, "db"):
+            is_dark = self.tab.db.get_setting("theme", "dark") == "dark"
+            accent = self.tab.db.get_setting("accent_color", "#0060df")
+
+        parent_win = self._get_main_window()
+        dlg = DesktopMediaDialog(request, is_dark=is_dark, accent=accent, parent=parent_win)
+        dlg.exec()
+
+    def _on_file_system_access_requested(self, request: QWebEngineFileSystemAccessRequest) -> None:
+        is_dark = True
+        accent = "#0060df"
+        if self.tab and hasattr(self.tab, "db"):
+            is_dark = self.tab.db.get_setting("theme", "dark") == "dark"
+            accent = self.tab.db.get_setting("accent_color", "#0060df")
+
+        parent_win = self._get_main_window()
+        dlg = FileSystemAccessDialog(request, is_dark=is_dark, accent=accent, parent=parent_win)
+        dlg.exec()
 
 
 def generate_tile_badge(title: str, url: str, is_add_btn: bool = False, is_dark: bool = True) -> QPixmap:
@@ -565,16 +670,22 @@ class BrowserTab(QWidget):
         self._init_ui()
 
     def _init_ui(self) -> None:
+        self._pending_perm_requests = {}
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
+
+        # Плашка запроса системных разрешений на устройства
+        self.permission_bar = PermissionPromptBar(self)
+        layout.addWidget(self.permission_bar)
 
         # Стопка клеток (QStackedWidget)
         self.stack = QStackedWidget()
 
         # 0: Веб-страница (QWebEngineView)
         self.web_view = QWebEngineView()
-        self.browser_page = BrowserPage(self.profile, self.web_view, main_window=self.main_window)
+        self.browser_page = BrowserPage(self.profile, self.web_view, main_window=self.main_window, tab=self)
         self.web_view.setPage(self.browser_page)
 
         # Устранение белой вспышки (White Flash)
@@ -611,9 +722,12 @@ class BrowserTab(QWidget):
 
     def _apply_background_color(self) -> None:
         is_dark = self.db.get_setting("theme", "dark") == "dark"
+        accent = self.db.get_setting("accent_color", "#0060df")
         col = QColor("#1c1b22" if is_dark else "#f2f2f7")
         self.web_view.page().setBackgroundColor(col)
         self.web_view.setStyleSheet(f"background-color: {col.name()};")
+        if hasattr(self, "permission_bar"):
+            self.permission_bar.update_theme(is_dark, accent)
 
     def _on_audio_state_changed(self) -> None:
         self.audio_state_changed.emit(
@@ -802,6 +916,11 @@ class BrowserTab(QWidget):
         if not url_str or url_str == "about:blank":
             return
 
+        if hasattr(self, "permission_bar") and self.permission_bar.isVisible():
+            new_origin = normalize_origin(qurl)
+            if self.permission_bar._current_origin != new_origin:
+                self.permission_bar.close_prompt()
+
         if url_str.startswith("surf://newtab"):
             self.show_speed_dial()
             return
@@ -809,6 +928,99 @@ class BrowserTab(QWidget):
         self.current_url = url_str
         self.stack.setCurrentIndex(0)
         self.url_changed.emit(url_str)
+
+    def request_permission(
+        self,
+        origin_str: str,
+        feat_key: str,
+        permission: QWebEnginePermission = None,
+        origin_url: QUrl = None,
+        feature: QWebEnginePage.Feature = None,
+    ) -> None:
+        """Обрабатывает и координирует системные запросы разрешений на устройства."""
+        req_key = f"{origin_str}:{feat_key}"
+        if req_key not in self._pending_perm_requests:
+            self._pending_perm_requests[req_key] = []
+
+        item = {"permission": permission, "origin_url": origin_url, "feature": feature}
+        self._pending_perm_requests[req_key].append(item)
+
+        # Если плашка для этого запроса уже показана, просто аккумулируем запрос
+        if hasattr(self, "permission_bar") and self.permission_bar.isVisible():
+            if self.permission_bar._current_origin == origin_str and self.permission_bar._current_feature_key == feat_key:
+                return
+
+        def on_allow(remember: bool):
+            items = self._pending_perm_requests.pop(req_key, [])
+            for req in items:
+                if req["permission"]:
+                    try:
+                        req["permission"].grant()
+                    except Exception:
+                        pass
+                if req["origin_url"] and req["feature"] is not None:
+                    try:
+                        self.browser_page.setFeaturePermission(
+                            req["origin_url"],
+                            req["feature"],
+                            QWebEnginePage.PermissionPolicy.PermissionGrantedByUser,
+                        )
+                    except Exception:
+                        pass
+            if remember and self.db:
+                self.db.set_site_permission(origin_str, feat_key, "allow")
+
+        def on_deny(remember: bool):
+            items = self._pending_perm_requests.pop(req_key, [])
+            for req in items:
+                if req["permission"]:
+                    try:
+                        req["permission"].deny()
+                    except Exception:
+                        pass
+                if req["origin_url"] and req["feature"] is not None:
+                    try:
+                        self.browser_page.setFeaturePermission(
+                            req["origin_url"],
+                            req["feature"],
+                            QWebEnginePage.PermissionPolicy.PermissionDeniedByUser,
+                        )
+                    except Exception:
+                        pass
+            if remember and self.db:
+                self.db.set_site_permission(origin_str, feat_key, "deny")
+
+        def on_dismiss():
+            items = self._pending_perm_requests.pop(req_key, [])
+            for req in items:
+                if req["permission"]:
+                    try:
+                        req["permission"].deny()
+                    except Exception:
+                        pass
+                if req["origin_url"] and req["feature"] is not None:
+                    try:
+                        self.browser_page.setFeaturePermission(
+                            req["origin_url"],
+                            req["feature"],
+                            QWebEnginePage.PermissionPolicy.PermissionDeniedByUser,
+                        )
+                    except Exception:
+                        pass
+
+        if hasattr(self, "permission_bar"):
+            is_dark = self.db.get_setting("theme", "dark") == "dark"
+            accent = self.db.get_setting("accent_color", "#0060df")
+            self.permission_bar.update_theme(is_dark, accent)
+            self.permission_bar.show_prompt(
+                origin_str=origin_str,
+                feature_type=feat_key,
+                on_allow=on_allow,
+                on_deny=on_deny,
+                on_dismiss=on_dismiss,
+            )
+        else:
+            on_allow(False)
 
     def _on_icon_changed(self, icon: QIcon) -> None:
         self.icon_changed.emit(icon)

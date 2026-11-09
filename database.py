@@ -152,6 +152,19 @@ class Database:
                 """
             )
 
+            # Системные разрешения сайтов на девайсы и API (микрофон, камера, геолокация и т.д.)
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS site_permissions (
+                    origin TEXT NOT NULL,
+                    feature TEXT NOT NULL,
+                    decision TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (origin, feature)
+                )
+                """
+            )
+
             conn.commit()
 
     # --- История ---
@@ -510,4 +523,63 @@ class Database:
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM session_tabs")
+            conn.commit()
+
+    # --- Разрешения сайтов на системные устройства (Permissions) ---
+
+    def get_site_permission(self, origin: str, feature: str) -> str | None:
+        """Возвращает сохранённое решение ('allow' или 'deny') для источника и фичи/устройства."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT decision FROM site_permissions WHERE origin = ? AND feature = ?",
+                (origin, feature),
+            )
+            row = cursor.fetchone()
+            return row["decision"] if row else None
+
+    def set_site_permission(self, origin: str, feature: str, decision: str) -> None:
+        """Сохраняет решение ('allow' или 'deny') для источника."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO site_permissions (origin, feature, decision, created_at)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(origin, feature) DO UPDATE SET
+                    decision = excluded.decision,
+                    created_at = CURRENT_TIMESTAMP
+                """,
+                (origin, feature, decision),
+            )
+            conn.commit()
+
+    def delete_site_permission(self, origin: str, feature: str) -> bool:
+        """Удаляет сохранённое разрешение."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "DELETE FROM site_permissions WHERE origin = ? AND feature = ?",
+                (origin, feature),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def get_all_site_permissions(self) -> list[dict]:
+        """Возвращает список всех сохранённых разрешений сайтов."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT origin, feature, decision, created_at FROM site_permissions ORDER BY origin ASC, feature ASC"
+            )
+            return [dict(r) for r in cursor.fetchall()]
+
+    def clear_site_permissions(self, origin: str = None) -> None:
+        """Очищает разрешения сайтов (все или для конкретного origin)."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            if origin:
+                cursor.execute("DELETE FROM site_permissions WHERE origin = ?", (origin,))
+            else:
+                cursor.execute("DELETE FROM site_permissions")
             conn.commit()

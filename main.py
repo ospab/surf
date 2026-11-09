@@ -19,6 +19,7 @@ from PyQt6.QtWebEngineCore import (
     QWebEnginePage,
     QWebEngineProfile,
     QWebEngineScript,
+    QWebEngineSettings,
 )
 from PyQt6.QtWidgets import (
     QApplication,
@@ -61,6 +62,28 @@ except ModuleNotFoundError:
     from widgets.download_manager import DownloadManagerDialog
     from widgets.history_dialog import HistoryDialog
     from widgets.settings_dialog import SettingsDialog
+
+def setup_chromium_environment() -> None:
+    """Настраивает флаги Chromium для поддержки WebUSB, WebXR, WebRTC, устройств и ускорения."""
+    flags = [
+        "--enable-features=WebXR,WebXRGamepadSupport,WebUSB,WebBluetooth,WebHID,WebSerial,EnumerateDevices,UserMediaScreenCapturing",
+        "--enable-experimental-web-platform-features",
+        "--enable-gpu-rasterization",
+        "--enable-zero-copy",
+        "--enable-webgl-developer-extensions",
+        "--enable-webgl-draft-extensions",
+        "--enable-usermedia-screen-capturing",
+        "--autoplay-policy=no-user-gesture-required",
+    ]
+    existing = os.environ.get("QTWEBENGINE_CHROMIUM_FLAGS", "")
+    flags_str = " ".join(flags)
+    if existing:
+        os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = f"{existing} {flags_str}".strip()
+    else:
+        os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = flags_str
+
+
+setup_chromium_environment()
 
 try:
     register_surf_scheme()
@@ -509,6 +532,27 @@ class MainWindow(QMainWindow):
             self.tracking_interceptor.blocked_count_changed.connect(self._on_blocked_count_changed)
         else:
             self.tracking_interceptor = None
+
+        # Конфигурация WebEngineSettings: аппаратное ускорение, WebGL, WebRTC, захват экрана
+        web_settings = self.profile.settings()
+        web_settings.setAttribute(QWebEngineSettings.WebAttribute.Accelerated2dCanvasEnabled, True)
+        web_settings.setAttribute(QWebEngineSettings.WebAttribute.WebGLEnabled, True)
+        web_settings.setAttribute(QWebEngineSettings.WebAttribute.ScreenCaptureEnabled, True)
+        web_settings.setAttribute(QWebEngineSettings.WebAttribute.PlaybackRequiresUserGesture, False)
+        web_settings.setAttribute(QWebEngineSettings.WebAttribute.FullScreenSupportEnabled, True)
+        web_settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptCanAccessClipboard, True)
+        web_settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptCanPaste, True)
+        web_settings.setAttribute(QWebEngineSettings.WebAttribute.LocalStorageEnabled, True)
+        web_settings.setAttribute(QWebEngineSettings.WebAttribute.WebRTCPublicInterfacesOnly, False)
+        web_settings.setAttribute(QWebEngineSettings.WebAttribute.PluginsEnabled, True)
+        web_settings.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True)
+        web_settings.setAttribute(QWebEngineSettings.WebAttribute.DnsPrefetchEnabled, True)
+
+        # Политика хранения разрешений на устройства и системные API
+        if not self.is_private:
+            self.profile.setPersistentPermissionsPolicy(QWebEngineProfile.PersistentPermissionsPolicy.StoreOnDisk)
+        else:
+            self.profile.setPersistentPermissionsPolicy(QWebEngineProfile.PersistentPermissionsPolicy.StoreInMemory)
 
         # Обработчик служебных внутренних страниц surf://
         self.scheme_handler = SurfSchemeHandler(self.db, self.profile, interceptor=self.tracking_interceptor)
