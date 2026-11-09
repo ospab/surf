@@ -268,15 +268,11 @@ class BrowserTab(QWidget):
         if not url:
             return
 
-        if url.startswith("surf://help"):
-            self.show_help()
-            return
-
         if url.startswith("surf://newtab") or url == "about:blank":
             self.show_speed_dial()
             return
 
-        if not (url.startswith("http://") or url.startswith("https://") or url.startswith("file://")):
+        if not (url.startswith("http://") or url.startswith("https://") or url.startswith("file://") or url.startswith("surf://")):
             if "." in url and " " not in url:
                 url = f"https://{url}"
             else:

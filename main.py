@@ -44,6 +44,7 @@ try:
     from surf.database import Database
     from surf.i18n import get_language, set_language, tr
     from surf.utils.adblock import TrackingProtectionInterceptor
+    from surf.utils.internal_pages import SurfSchemeHandler, register_surf_scheme
     from surf.widgets.browser_tab import BrowserTab
     from surf.widgets.certificate_dialog import CertificateDialog, fetch_certificate_details
     from surf.widgets.download_manager import DownloadManagerDialog
@@ -53,11 +54,17 @@ except ModuleNotFoundError:
     from database import Database
     from i18n import get_language, set_language, tr
     from utils.adblock import TrackingProtectionInterceptor
+    from utils.internal_pages import SurfSchemeHandler, register_surf_scheme
     from widgets.browser_tab import BrowserTab
     from widgets.certificate_dialog import CertificateDialog, fetch_certificate_details
     from widgets.download_manager import DownloadManagerDialog
     from widgets.history_dialog import HistoryDialog
     from widgets.settings_dialog import SettingsDialog
+
+try:
+    register_surf_scheme()
+except Exception:
+    pass
 
 
 class ZoomWheelFilter(QObject):
@@ -342,6 +349,10 @@ class MainWindow(QMainWindow):
             self.tracking_interceptor.blocked_count_changed.connect(self._on_blocked_count_changed)
         else:
             self.tracking_interceptor = None
+
+        # Обработчик служебных внутренних страниц surf://
+        self.scheme_handler = SurfSchemeHandler(self.db, self.profile)
+        self.profile.installUrlSchemeHandler(b"surf", self.scheme_handler)
 
         self._apply_network_proxy()
 
@@ -656,6 +667,9 @@ class MainWindow(QMainWindow):
         self.act_help.setShortcut(QKeySequence("F1"))
         self.act_help.triggered.connect(self._open_help)
 
+        self.act_pages = self.help_menu.addAction("")
+        self.act_pages.triggered.connect(lambda: self.add_new_tab("surf://pages"))
+
         self.act_about = self.help_menu.addAction("")
         self.act_about.triggered.connect(self._show_about)
 
@@ -801,6 +815,8 @@ class MainWindow(QMainWindow):
 
         self.help_menu.setTitle(tr("menu_help"))
         self.act_help.setText(tr("act_help"))
+        if hasattr(self, "act_pages"):
+            self.act_pages.setText("surf://pages (" + ("Все страницы" if get_language() == "ru" else "All Pages") + ")")
         self.act_about.setText(tr("act_about"))
 
         # Тулбар
@@ -1207,7 +1223,7 @@ class MainWindow(QMainWindow):
             return
 
         is_new_tab = not url or url.startswith("surf://newtab") or url == "about:blank"
-        is_help = url.startswith("surf://help")
+        is_internal = url.startswith("surf://")
 
         if is_new_tab:
             # На новой вкладке / главной странице скрываем специфичные веб-значки
@@ -1218,10 +1234,10 @@ class MainWindow(QMainWindow):
             self.act_star.setVisible(False)
             return
 
-        if is_help:
-            # На внутренней странице справки
+        if is_internal:
+            # На внутренних страницах surf:// (about, history, settings, help, pages и др.)
             self.act_ssl.setIcon(self._get_icon("globe"))
-            self.act_ssl.setToolTip(tr("act_help"))
+            self.act_ssl.setToolTip(f"surf 1.0 — {url}")
             self.act_shield.setVisible(False)
             self.act_reader.setVisible(False)
             self.act_star.setVisible(False)
@@ -1480,11 +1496,7 @@ class MainWindow(QMainWindow):
         self.add_new_tab("surf://help")
 
     def _show_about(self) -> None:
-        QMessageBox.about(
-            self,
-            tr("about_title"),
-            tr("about_text"),
-        )
+        self.add_new_tab("surf://about")
 
     # --- Загрузка файлов ---
 
@@ -1576,6 +1588,11 @@ class MainWindow(QMainWindow):
 
 
 def main():
+    try:
+        register_surf_scheme()
+    except Exception:
+        pass
+
     app = QApplication(sys.argv)
     app.setApplicationName("surf")
     app.setOrganizationName("surf-browser")
