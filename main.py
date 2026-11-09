@@ -45,6 +45,7 @@ try:
     from surf.i18n import get_language, set_language, tr
     from surf.utils.adblock import TrackingProtectionInterceptor
     from surf.widgets.browser_tab import BrowserTab
+    from surf.widgets.certificate_dialog import CertificateDialog, fetch_certificate_details
     from surf.widgets.download_manager import DownloadManagerDialog
     from surf.widgets.history_dialog import HistoryDialog
     from surf.widgets.settings_dialog import SettingsDialog
@@ -53,6 +54,7 @@ except ModuleNotFoundError:
     from i18n import get_language, set_language, tr
     from utils.adblock import TrackingProtectionInterceptor
     from widgets.browser_tab import BrowserTab
+    from widgets.certificate_dialog import CertificateDialog, fetch_certificate_details
     from widgets.download_manager import DownloadManagerDialog
     from widgets.history_dialog import HistoryDialog
     from widgets.settings_dialog import SettingsDialog
@@ -212,6 +214,7 @@ class MainWindow(QMainWindow):
         self.zoom_factor = 1.0
         self._active_downloads: list[QWebEngineDownloadRequest] = []
         self._recently_closed_urls: list[str] = []
+        self._cert_cache: dict[str, dict] = {}
 
         # Инициализация языка интерфейса
         user_lang = self.db.get_setting("language", "ru")
@@ -478,23 +481,26 @@ class MainWindow(QMainWindow):
         self.address_bar.setMinimumHeight(28)
         self.address_bar.returnPressed.connect(self._navigate_from_address_bar)
 
-        # Ведущие кнопки (слева): SSL замок и Защита от отслеживания (Shield)
-        self.act_ssl = self.address_bar.addAction(self._get_icon("lock"), QLineEdit.ActionPosition.LeadingPosition)
+        # Ведущая кнопка (слева): Замок SSL/TLS или иконка поиска
+        self.act_ssl = self.address_bar.addAction(self._get_icon("search"), QLineEdit.ActionPosition.LeadingPosition)
         self.act_ssl.setToolTip(tr("tip_ssl_secure"))
         self.act_ssl.triggered.connect(self._show_security_info)
 
-        self.act_shield = self.address_bar.addAction(self._get_icon("shield"), QLineEdit.ActionPosition.LeadingPosition)
-        self.act_shield.setToolTip(tr("tip_shield_protection"))
-        self.act_shield.triggered.connect(self._show_tracking_protection_dialog)
+        # Завершающие кнопки (справа, порядок появления слева-направо: Shield, Reader, Star):
+        # 1. Крайняя правая кнопка (Star)
+        self.act_star = self.address_bar.addAction(self._get_icon("star"), QLineEdit.ActionPosition.TrailingPosition)
+        self.act_star.setToolTip(tr("tip_bookmark"))
+        self.act_star.triggered.connect(self._toggle_bookmark)
 
-        # Завершающие кнопки (справа): Режим чтения и Закладка со звездой
+        # 2. Средняя кнопка (Reader)
         self.act_reader = self.address_bar.addAction(self._get_icon("reader"), QLineEdit.ActionPosition.TrailingPosition)
         self.act_reader.setToolTip(tr("tip_reader"))
         self.act_reader.triggered.connect(self._toggle_reader_mode)
 
-        self.act_star = self.address_bar.addAction(self._get_icon("star"), QLineEdit.ActionPosition.TrailingPosition)
-        self.act_star.setToolTip(tr("tip_bookmark"))
-        self.act_star.triggered.connect(self._toggle_bookmark)
+        # 3. Левая кнопка в правой группе (Shield - Enhanced Tracking Protection)
+        self.act_shield = self.address_bar.addAction(self._get_icon("shield"), QLineEdit.ActionPosition.TrailingPosition)
+        self.act_shield.setToolTip(tr("tip_shield_protection"))
+        self.act_shield.triggered.connect(self._show_tracking_protection_dialog)
 
         self.completer_model = QStringListModel()
         self.completer = QCompleter(self.completer_model, self)
@@ -989,6 +995,7 @@ class MainWindow(QMainWindow):
         tab.audio_state_changed.connect(lambda aud, mut, t=tab: self._on_tab_audio_state_changed(t, aud, mut))
         tab.load_progress.connect(self._update_progress)
         tab.open_new_tab.connect(lambda u: self.add_new_tab(u))
+        tab.web_view.loadFinished.connect(lambda ok, t=tab: self._on_tab_load_finished(t, ok))
         tab.web_view.page().linkHovered.connect(self._on_link_hovered)
 
         if url:
@@ -1173,9 +1180,57 @@ class MainWindow(QMainWindow):
 
     # --- Безопасность и защита от отслеживания ---
 
+    def _prefetch_certificate(self, url: str) -> None:
+        if not url.startswith("https://"):
+            return
+        host = QUrl(url).host()
+        if not host or host in self._cert_cache:
+            return
+
+        import threading
+
+        def worker():
+            try:
+                data = fetch_certificate_details(url, timeout=3.0)
+                self._cert_cache[host] = data
+            except Exception:
+                pass
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_tab_load_finished(self, tab: BrowserTab, ok: bool) -> None:
+        if ok and tab.current_url:
+            self._prefetch_certificate(tab.current_url)
+
     def _update_security_and_shield_icons(self, url: str) -> None:
         if not hasattr(self, "act_ssl") or not hasattr(self, "act_shield"):
             return
+
+        is_new_tab = not url or url.startswith("surf://newtab") or url == "about:blank"
+        is_help = url.startswith("surf://help")
+
+        if is_new_tab:
+            # На новой вкладке / главной странице скрываем специфичные веб-значки
+            self.act_ssl.setIcon(self._get_icon("search"))
+            self.act_ssl.setToolTip(tr("search_placeholder"))
+            self.act_shield.setVisible(False)
+            self.act_reader.setVisible(False)
+            self.act_star.setVisible(False)
+            return
+
+        if is_help:
+            # На внутренней странице справки
+            self.act_ssl.setIcon(self._get_icon("globe"))
+            self.act_ssl.setToolTip(tr("act_help"))
+            self.act_shield.setVisible(False)
+            self.act_reader.setVisible(False)
+            self.act_star.setVisible(False)
+            return
+
+        # На реальных веб-страницах показываем весь инструментарий
+        self.act_shield.setVisible(True)
+        self.act_reader.setVisible(True)
+        self.act_star.setVisible(True)
 
         if url.startswith("https://"):
             self.act_ssl.setIcon(self._get_icon("lock"))
@@ -1201,17 +1256,17 @@ class MainWindow(QMainWindow):
     def _show_security_info(self) -> None:
         tab = self.current_tab()
         url = tab.current_url if tab else ""
-        if not url or url.startswith("surf://"):
+        if not url or url.startswith("surf://newtab") or url == "about:blank":
             return
-        host = QUrl(url).host() or url
-        if url.startswith("https://"):
-            msg = tr("ssl_secure_msg", host=host)
-            icon = QMessageBox.Icon.Information
-        else:
-            msg = tr("ssl_insecure_msg", host=host)
-            icon = QMessageBox.Icon.Warning
 
-        QMessageBox(icon, tr("ssl_secure_title"), msg, QMessageBox.StandardButton.Ok, self).exec()
+        host = QUrl(url).host() or url
+        cert_data = self._cert_cache.get(host)
+        if not cert_data:
+            cert_data = fetch_certificate_details(url)
+            self._cert_cache[host] = cert_data
+
+        dlg = CertificateDialog(url, cert_data=cert_data, parent=self)
+        dlg.exec()
 
     def _show_tracking_protection_dialog(self) -> None:
         if not self.tracking_interceptor:
