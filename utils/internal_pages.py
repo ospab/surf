@@ -266,19 +266,19 @@ def get_base_css(is_dark: bool, accent: str = "#0060df") -> str:
 def render_pages_directory(is_dark: bool, accent: str = "#0060df") -> str:
     """Генерирует каталог всех внутренних страниц surf://pages."""
     is_ru = get_language() == "ru"
-    title = "Внутренние страницы surf" if is_ru else "surf Internal Pages Directory"
-    subtitle = "Полный каталог служебных адресов и панелей браузера" if is_ru else "Directory of internal surf:// browser addresses"
+    title = "Служебные страницы" if is_ru else "Internal Pages"
+    subtitle = "Список внутренних адресов surf://" if is_ru else "List of internal surf:// addresses"
 
     pages = [
-        ("surf://about", "ℹ️ surf://about", "О браузере surf, версии компонентов, User-Agent и среда" if is_ru else "About surf browser, component versions and User-Agent"),
-        ("surf://history", "🕒 surf://history", "Журнал посещенных страниц с поиском и статистикой" if is_ru else "Browsing history explorer with live search"),
-        ("surf://bookmarks", "⭐ surf://bookmarks", "Менеджер сохранённых закладок с прямыми ссылками" if is_ru else "Bookmarks manager with direct site links"),
-        ("surf://downloads", "⬇️ surf://downloads", "Журнал загрузок и сохранённых файлов" if is_ru else "Downloads manager and file records"),
-        ("surf://protection", "🛡️ surf://protection", "Панель защиты от отслеживания (ETP) и список трекеров" if is_ru else "Enhanced Tracking Protection panel and tracker list"),
-        ("surf://gpu", "⚡ surf://gpu", "Сведения о графическом ускорителе, QPA и системе" if is_ru else "Graphics acceleration, QPA platform and hardware info"),
-        ("surf://settings", "⚙️ surf://settings", "Конфигурация браузера, поисковые системы и прокси" if is_ru else "Browser settings overview, search engine and proxy"),
-        ("surf://help", "❓ surf://help", "Полный справочник горячих клавиш и руководства" if is_ru else "Keyboard shortcuts guide and documentation"),
-        ("surf://newtab", "🚀 surf://newtab", "Стартовая страница быстрого доступа (Speed Dial)" if is_ru else "New tab speed dial home page"),
+        ("surf://about", "surf://about", "Сведения о браузере и среде выполнения" if is_ru else "Browser and runtime environment details"),
+        ("surf://history", "surf://history", "Журнал посещений" if is_ru else "Browsing history"),
+        ("surf://bookmarks", "surf://bookmarks", "Сохранённые закладки" if is_ru else "Saved bookmarks"),
+        ("surf://downloads", "surf://downloads", "Журнал загрузок" if is_ru else "Download records"),
+        ("surf://protection", "surf://protection", "Защита от отслеживания" if is_ru else "Tracking protection"),
+        ("surf://gpu", "surf://gpu", "Сведения о графической подсистеме" if is_ru else "Graphics and GPU diagnostics"),
+        ("surf://settings", "surf://settings", "Параметры браузера" if is_ru else "Browser preferences"),
+        ("surf://help", "surf://help", "Горячие клавиши" if is_ru else "Keyboard shortcuts"),
+        ("surf://newtab", "surf://newtab", "Новая вкладка" if is_ru else "New tab"),
     ]
 
     cards_html = ""
@@ -378,14 +378,8 @@ def render_about_page(db: Database, is_dark: bool, accent: str = "#0060df") -> s
                 font-size: 15px;
                 line-height: 1.6;
                 color: var(--text);
-                margin-bottom: 10px;
-                font-weight: 500;
-            }}
-            .app-org {{
-                font-size: 13px;
-                color: var(--text-muted);
-                line-height: 1.5;
                 margin-bottom: 22px;
+                font-weight: 500;
             }}
             .app-links {{
                 display: flex;
@@ -448,10 +442,6 @@ def render_about_page(db: Database, is_dark: bool, accent: str = "#0060df") -> s
                     {"Быстрый, приватный и независимый веб-серфинг." if is_ru else "Fast, private, and independent web browsing experience."}
                 </div>
 
-                <div class="app-org">
-                    {"Разрабатывается организацией <b>ospab foundation</b> и сообществом открытого исходного кода." if is_ru else "Built and maintained by <b>ospab foundation</b> and the open-source community."}
-                </div>
-
                 <div class="app-links">
                     <a href="surf://pages">{"Каталог страниц" if is_ru else "Pages Directory"}</a>
                     <a href="surf://settings">{"Настройки" if is_ru else "Settings"}</a>
@@ -463,12 +453,11 @@ def render_about_page(db: Database, is_dark: bool, accent: str = "#0060df") -> s
                 <details class="specs-box" open>
                     <summary>{"Сведения о сборке и среде выполнения" if is_ru else "Build & Runtime Details"}</summary>
                     <table class="specs-table">
-                        <tr><td class="dim">{"Организация" if is_ru else "Organization"}</td><td><b>ospab foundation</b></td></tr>
                         <tr><td class="dim">{"Движок рендеринга" if is_ru else "Rendering Engine"}</td><td>SurfEngine (Chromium / QtWebEngine Core)</td></tr>
                         <tr><td class="dim">{"Среда выполнения" if is_ru else "Runtime"}</td><td>Python {platform.python_version()} • PyQt6 {PYQT_VERSION_STR} • Qt {QT_VERSION_STR}</td></tr>
                         <tr><td class="dim">{"Платформа" if is_ru else "Operating System"}</td><td>{platform.system()} {platform.release()} ({platform.architecture()[0]})</td></tr>
-                        <tr><td class="dim">{"Менеджер окон" if is_ru else "Window Manager"}</td><td>Windows DWM API (Desktop Window Manager)</td></tr>
-                        <tr><td class="dim">{"База данных" if is_ru else "Local Storage"}</td><td>SQLite3 (surf.db)</td></tr>
+                        <tr><td class="dim">{"Менеджер окон" if is_ru else "Window Manager"}</td><td>Windows DWM API</td></tr>
+                        <tr><td class="dim">{"База данных" if is_ru else "Local Storage"}</td><td>SQLite3</td></tr>
                         <tr><td class="dim">{"Идентификация" if is_ru else "User-Agent"}</td><td style="font-family: Consolas, monospace; font-size: 11px; word-break: break-all;">{html.escape(ua_str)}</td></tr>
                     </table>
                 </details>
@@ -480,10 +469,10 @@ def render_about_page(db: Database, is_dark: bool, accent: str = "#0060df") -> s
 
 
 def render_history_page(db: Database, is_dark: bool, accent: str = "#0060df") -> str:
-    """Генерирует интерактивную веб-страницу surf://history с живым поиском."""
+    """Генерирует веб-страницу surf://history с поиском."""
     is_ru = get_language() == "ru"
     title = "Журнал посещений" if is_ru else "Browsing History"
-    subtitle = "Полная хроника посещённых веб-страниц" if is_ru else "Chronological log of visited pages"
+    subtitle = "История переходов" if is_ru else "Chronological log of visited pages"
 
     records = db.get_history(limit=200)
 
@@ -527,16 +516,16 @@ def render_history_page(db: Database, is_dark: bool, accent: str = "#0060df") ->
         <div class="container">
             <div class="header">
                 <div class="header-left">
-                    <span class="logo-badge">surf://</span>
+                    <span class="logo-badge">surf://history</span>
                     <div>
                         <div class="header-title">{title}</div>
-                        <div class="header-subtitle">{subtitle} ({len(records)} {"записей" if is_ru else "entries"})</div>
+                        <div class="header-subtitle">{subtitle} ({len(records)})</div>
                     </div>
                 </div>
-                <a href="surf://pages" class="nav-link">← {"Каталог страниц" if is_ru else "Pages Directory"}</a>
+                <a href="surf://pages" class="nav-link">{"Каталог страниц" if is_ru else "Pages Directory"}</a>
             </div>
 
-            <input type="text" id="search" class="search-box" placeholder="{"Поиск в журнале истории..." if is_ru else "Search history records..."}" oninput="filterHistory()">
+            <input type="text" id="search" class="search-box" placeholder="{"Поиск в истории..." if is_ru else "Search history..."}" oninput="filterHistory()">
 
             <div class="card" style="padding: 0; overflow: hidden;">
                 <table>
@@ -563,7 +552,7 @@ def render_bookmarks_page(db: Database, is_dark: bool, accent: str = "#0060df") 
     """Генерирует веб-страницу закладок surf://bookmarks."""
     is_ru = get_language() == "ru"
     title = "Закладки" if is_ru else "Bookmarks"
-    subtitle = "Сохранённые закладки и избранные сайты" if is_ru else "Saved bookmarks and favorites"
+    subtitle = "Сохранённые закладки" if is_ru else "Saved bookmarks"
 
     bookmarks = db.get_bookmarks()
 
@@ -575,13 +564,13 @@ def render_bookmarks_page(db: Database, is_dark: bool, accent: str = "#0060df") 
             b_time = html.escape(str(b.get("created_at", "")))
             rows_html += f"""
             <tr class="bm-row">
-                <td><a href="{b_url}" class="site-link">★ {b_title}</a></td>
+                <td><a href="{b_url}" class="site-link">{b_title}</a></td>
                 <td style="color: var(--text-muted); font-size: 12px;">{b_url}</td>
                 <td width="160" style="color: var(--text-muted); font-size: 12px;">{b_time}</td>
             </tr>
             """
     else:
-        rows_html = f"""<tr><td colspan="3"><div class="empty-state">{"Список закладок пуст. Нажмите звезду (Ctrl+D) на любой веб-странице." if is_ru else "Bookmarks list is empty. Press Ctrl+D to bookmark any page."}</div></td></tr>"""
+        rows_html = f"""<tr><td colspan="3"><div class="empty-state">{"Список закладок пуст" if is_ru else "Bookmarks list is empty"}</div></td></tr>"""
 
     return f"""<!DOCTYPE html>
     <html>
@@ -605,13 +594,13 @@ def render_bookmarks_page(db: Database, is_dark: bool, accent: str = "#0060df") 
         <div class="container">
             <div class="header">
                 <div class="header-left">
-                    <span class="logo-badge">surf://</span>
+                    <span class="logo-badge">surf://bookmarks</span>
                     <div>
                         <div class="header-title">{title}</div>
-                        <div class="header-subtitle">{subtitle} ({len(bookmarks)} {"закладок" if is_ru else "bookmarks"})</div>
+                        <div class="header-subtitle">{subtitle} ({len(bookmarks)})</div>
                     </div>
                 </div>
-                <a href="surf://pages" class="nav-link">← {"Каталог страниц" if is_ru else "Pages Directory"}</a>
+                <a href="surf://pages" class="nav-link">{"Каталог страниц" if is_ru else "Pages Directory"}</a>
             </div>
 
             <input type="text" id="search" class="search-box" placeholder="{"Поиск в закладках..." if is_ru else "Search bookmarks..."}" oninput="filterBookmarks()">
@@ -620,7 +609,7 @@ def render_bookmarks_page(db: Database, is_dark: bool, accent: str = "#0060df") 
                 <table>
                     <thead>
                         <tr>
-                            <th>{"Название закладки" if is_ru else "Bookmark Name"}</th>
+                            <th>{"Название" if is_ru else "Title"}</th>
                             <th>URL</th>
                             <th>{"Дата добавления" if is_ru else "Date Added"}</th>
                         </tr>
@@ -640,7 +629,7 @@ def render_downloads_page(db: Database, is_dark: bool, accent: str = "#0060df") 
     """Генерирует веб-страницу загрузок surf://downloads."""
     is_ru = get_language() == "ru"
     title = "Загрузки" if is_ru else "Downloads"
-    subtitle = "Список скачанных и активных файлов" if is_ru else "Downloaded files history"
+    subtitle = "Список загруженных файлов" if is_ru else "Downloaded files history"
 
     downloads = db.get_downloads(limit=100)
 
@@ -663,7 +652,7 @@ def render_downloads_page(db: Database, is_dark: bool, accent: str = "#0060df") 
 
             rows_html += f"""
             <tr>
-                <td><b>📄 {d_name}</b><br><span style="font-size: 11px; color: var(--text-muted);">{d_path}</span></td>
+                <td><b>{d_name}</b><br><span style="font-size: 11px; color: var(--text-muted);">{d_path}</span></td>
                 <td width="100">{size_str}</td>
                 <td width="120"><span class="badge {badge_cls}">{d_status}</span></td>
                 <td width="150" style="color: var(--text-muted); font-size: 12px;">{d_time}</td>
@@ -684,13 +673,13 @@ def render_downloads_page(db: Database, is_dark: bool, accent: str = "#0060df") 
         <div class="container">
             <div class="header">
                 <div class="header-left">
-                    <span class="logo-badge">surf://</span>
+                    <span class="logo-badge">surf://downloads</span>
                     <div>
                         <div class="header-title">{title}</div>
-                        <div class="header-subtitle">{subtitle} ({len(downloads)} {"файлов" if is_ru else "files"})</div>
+                        <div class="header-subtitle">{subtitle} ({len(downloads)})</div>
                     </div>
                 </div>
-                <a href="surf://pages" class="nav-link">← {"Каталог страниц" if is_ru else "Pages Directory"}</a>
+                <a href="surf://pages" class="nav-link">{"Каталог страниц" if is_ru else "Pages Directory"}</a>
             </div>
 
             <div class="card" style="padding: 0; overflow: hidden;">
@@ -714,50 +703,55 @@ def render_downloads_page(db: Database, is_dark: bool, accent: str = "#0060df") 
     """
 
 
-def render_protection_page(is_dark: bool, accent: str = "#0060df") -> str:
+def render_protection_page(is_dark: bool, accent: str = "#0060df", interceptor=None) -> str:
     """Генерирует страницу защиты от отслеживания surf://protection."""
     is_ru = get_language() == "ru"
-    title = "Улучшенная защита от отслеживания (ETP)" if is_ru else "Enhanced Tracking Protection (ETP)"
-    subtitle = "Блокировка трекеров, рекламы и фингерпринтинга" if is_ru else "Block trackers, ads and fingerprinting"
+    title = "Защита от отслеживания" if is_ru else "Tracking Protection"
+    subtitle = "Сетевая фильтрация трекеров и телеметрии" if is_ru else "Network-level tracker and telemetry filtering"
 
-    domains = [
-        ("google-analytics.com", "Google Analytics", "Сбор телеметрии и аналитики активности"),
-        ("googletagmanager.com", "Google Tag Manager", "Контейнер динамических трекинговых тегов"),
-        ("doubleclick.net", "Google DoubleClick", "Сеть поведенческого таргетинга рекламы"),
-        ("googlesyndication.com", "Google AdSense", "Показ баннерной и видеорекламы"),
-        ("adservice.google.com", "Google Ads Service", "Рекламный сервис Google"),
-        ("an.yandex.ru", "Яндекс РСЯ", "Рекламная сеть Яндекса"),
-        ("mc.yandex.ru", "Яндекс Метрика", "Сбор статистики посещений и вебвизор"),
-        ("adfox.ru", "Яндекс ADFOX", "Управление баннерами и медийной рекламой"),
-        ("criteo.com", "Criteo", "Ретаргетинг и межсайтовое отслеживание пользователей"),
-        ("criteo.net", "Criteo Network", "Сеть сбора идентификаторов покупок"),
-        ("connect.facebook.net", "Facebook Pixel", "Отслеживание конверсий и межсайтовой активности"),
-        ("scorecardresearch.com", "ScoreCardResearch", "Маркетинговые опросы и измерение трафика"),
-        ("hotjar.com", "Hotjar", "Запись сессий кликов, движений мыши и экранов"),
-        ("clarity.ms", "Microsoft Clarity", "Поведенческая аналитика и тепловые карты"),
-        ("ads.twitter.com", "Twitter/X Ads", "Трекинг конверсий из социальной сети"),
-        ("moatads.com", "Oracle Moat", "Измерение видимости рекламы и атрибуция"),
-        ("outbrain.com", "Outbrain", "Рекомендательные виджеты рекламного контента"),
-        ("taboola.com", "Taboola", "Виджеты навязчивых спонсорских ссылок"),
-        ("rubiconproject.com", "Magnite/Rubicon", "Автоматизированная биржа рекламных аукционов"),
-        ("adsystem.com", "AdSystem", "Биржа рекламных мест"),
-        ("advertising.com", "AOL Advertising", "Сеть медийных баннеров"),
-        ("admob.com", "Google AdMob", "Мобильная реклама"),
-        ("openx.net", "OpenX", "Рекламный сервер и трекер"),
-        ("pubmatic.com", "PubMatic", "Система программатик-рекламы"),
-        ("adnxs.com", "Xandr/AppNexus", "Платформа продажи персональных профилей рекламодателям"),
+    blocked_count = interceptor.blocked_count if interceptor and hasattr(interceptor, "blocked_count") else 0
+    is_enabled = interceptor.is_enabled if interceptor and hasattr(interceptor, "is_enabled") else True
+
+    filter_rules = [
+        ("google-analytics.com", "Аналитика" if is_ru else "Analytics", "Сбор телеметрии"),
+        ("googletagmanager.com", "Аналитика" if is_ru else "Analytics", "Контейнер динамических тегов"),
+        ("doubleclick.net", "Реклама" if is_ru else "Advertising", "Рекламный трекинг"),
+        ("googlesyndication.com", "Реклама" if is_ru else "Advertising", "Рекламная сеть"),
+        ("adservice.google.com", "Реклама" if is_ru else "Advertising", "Рекламный сервис"),
+        ("an.yandex.ru", "Реклама" if is_ru else "Advertising", "Рекламная сеть Яндекса"),
+        ("mc.yandex.ru", "Аналитика" if is_ru else "Analytics", "Сбор метрик и вебвизор"),
+        ("adfox.ru", "Реклама" if is_ru else "Advertising", "Управление баннерами"),
+        ("criteo.com", "Трекер" if is_ru else "Tracker", "Ретаргетинг"),
+        ("criteo.net", "Трекер" if is_ru else "Tracker", "Идентификаторы пользователей"),
+        ("connect.facebook.net", "Соцсети" if is_ru else "Social", "Межсайтовое отслеживание"),
+        ("scorecardresearch.com", "Аналитика" if is_ru else "Analytics", "Измерение аудитории"),
+        ("hotjar.com", "Аналитика" if is_ru else "Analytics", "Запись активности"),
+        ("clarity.ms", "Аналитика" if is_ru else "Analytics", "Тепловые карты и сессии"),
+        ("ads.twitter.com", "Соцсети" if is_ru else "Social", "Трекинг конверсий"),
+        ("moatads.com", "Реклама" if is_ru else "Advertising", "Атрибуция рекламы"),
+        ("outbrain.com", "Реклама" if is_ru else "Advertising", "Рекламные виджеты"),
+        ("taboola.com", "Реклама" if is_ru else "Advertising", "Спонсорские блоки"),
+        ("rubiconproject.com", "Реклама" if is_ru else "Advertising", "Рекламная биржа"),
+        ("adsystem.com", "Реклама" if is_ru else "Advertising", "Рекламная сеть"),
+        ("advertising.com", "Реклама" if is_ru else "Advertising", "Медийная реклама"),
+        ("admob.com", "Реклама" if is_ru else "Advertising", "Мобильная реклама"),
+        ("trafficjunky.com", "Реклама" if is_ru else "Advertising", "Рекламная сеть"),
+        ("openx.net", "Реклама" if is_ru else "Advertising", "Рекламный сервер"),
+        ("pubmatic.com", "Реклама" if is_ru else "Advertising", "Программатик-платформа"),
+        ("adnxs.com", "Реклама" if is_ru else "Advertising", "Платформа монетизации"),
     ]
 
-    domains_html = ""
-    for dom, name, desc in domains:
-        domains_html += f"""
+    rules_html = ""
+    for dom, cat, purpose in filter_rules:
+        rules_html += f"""
         <tr>
-            <td><span class="badge badge-danger">🛡️ Блокируется</span></td>
-            <td><b>{name}</b></td>
             <td><code>{dom}</code></td>
-            <td style="color: var(--text-muted); font-size: 12px;">{desc}</td>
+            <td width="140"><span class="badge badge-info">{cat}</span></td>
+            <td style="color: var(--text-muted); font-size: 12px;">{purpose}</td>
         </tr>
         """
+
+    status_badge = '<span class="badge badge-success">Включена</span>' if is_enabled else '<span class="badge badge-danger">Отключена</span>'
 
     return f"""<!DOCTYPE html>
     <html>
@@ -771,34 +765,36 @@ def render_protection_page(is_dark: bool, accent: str = "#0060df") -> str:
         <div class="container">
             <div class="header">
                 <div class="header-left">
-                    <span class="logo-badge" style="background: var(--success);">🛡️ ETP Active</span>
+                    <span class="logo-badge">surf://protection</span>
                     <div>
                         <div class="header-title">{title}</div>
                         <div class="header-subtitle">{subtitle}</div>
                     </div>
                 </div>
-                <a href="surf://pages" class="nav-link">← {"Каталог страниц" if is_ru else "Pages Directory"}</a>
+                <a href="surf://pages" class="nav-link">{"Каталог страниц" if is_ru else "Pages Directory"}</a>
             </div>
 
             <div class="card">
-                <div class="card-title">🔒 {"Как работает встроенная защита" if is_ru else "How built-in protection works"}</div>
-                <p style="font-size: 13px; color: var(--text-muted); line-height: 1.8;">
-                    {"Браузер surf использует сетевой перехватчик URL-запросов (QWebEngineUrlRequestInterceptor), блокируя сторонние сценарии отслеживания до того, как они передадут данные на внешние серверы. Это ускоряет загрузку сайтов, экономит оперативную память и снижает расход трафика." if is_ru else "surf browser uses native QWebEngineUrlRequestInterceptor to intercept and block tracking requests before they transmit your personal data to third parties. This speeds up page load times and protects your privacy."}
-                </p>
+                <div class="card-title">{"Параметры защиты" if is_ru else "Protection Parameters"}</div>
+                <table>
+                    <tr><td width="240"><b>{"Состояние защиты" if is_ru else "Protection Status"}</b></td><td>{status_badge}</td></tr>
+                    <tr><td><b>{"Заблокировано в текущей сессии" if is_ru else "Blocked in Current Session"}</b></td><td><span class="badge badge-info">{blocked_count}</span></td></tr>
+                    <tr><td><b>{"Механизм перехвата" if is_ru else "Interception Mechanism"}</b></td><td><code>QWebEngineUrlRequestInterceptor</code></td></tr>
+                    <tr><td><b>{"Активных правил" if is_ru else "Active Rules"}</b></td><td>{len(filter_rules)}</td></tr>
+                </table>
             </div>
 
             <div class="card" style="padding: 0; overflow: hidden;">
                 <table>
                     <thead>
                         <tr>
-                            <th>{"Статус" if is_ru else "Status"}</th>
-                            <th>{"Сервис" if is_ru else "Service"}</th>
-                            <th>{"Домен" if is_ru else "Domain"}</th>
+                            <th>{"Доменный шаблон" if is_ru else "Domain Pattern"}</th>
+                            <th>{"Категория" if is_ru else "Category"}</th>
                             <th>{"Назначение" if is_ru else "Purpose"}</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {domains_html}
+                        {rules_html}
                     </tbody>
                 </table>
             </div>
@@ -811,8 +807,8 @@ def render_protection_page(is_dark: bool, accent: str = "#0060df") -> str:
 def render_gpu_page(is_dark: bool, accent: str = "#0060df") -> str:
     """Генерирует страницу графической и системной информации surf://gpu."""
     is_ru = get_language() == "ru"
-    title = "Графика и аппаратное ускорение" if is_ru else "Graphics & Hardware Acceleration"
-    subtitle = "Диагностика графического стека и платформы рендеринга" if is_ru else "Graphics stack and platform diagnostics"
+    title = "Графическая подсистема" if is_ru else "Graphics Subsystem"
+    subtitle = "Параметры видеоподсистемы и среды отрисовки" if is_ru else "Graphics stack and display diagnostics"
 
     app = QGuiApplication.instance()
     primary_screen = app.primaryScreen() if app else None
@@ -833,17 +829,17 @@ def render_gpu_page(is_dark: bool, accent: str = "#0060df") -> str:
         <div class="container">
             <div class="header">
                 <div class="header-left">
-                    <span class="logo-badge">GPU Info</span>
+                    <span class="logo-badge">surf://gpu</span>
                     <div>
                         <div class="header-title">{title}</div>
                         <div class="header-subtitle">{subtitle}</div>
                     </div>
                 </div>
-                <a href="surf://pages" class="nav-link">← {"Каталог страниц" if is_ru else "Pages Directory"}</a>
+                <a href="surf://pages" class="nav-link">{"Каталог страниц" if is_ru else "Pages Directory"}</a>
             </div>
 
             <div class="card">
-                <div class="card-title">🖥️ {"Параметры графической подсистемы" if is_ru else "Graphics Subsystem Parameters"}</div>
+                <div class="card-title">{"Параметры графической подсистемы" if is_ru else "Graphics Subsystem Parameters"}</div>
                 <table>
                     <tr><td width="240"><b>{"Платформа QPA" if is_ru else "QPA Platform"}</b></td><td><code>{plat_str}</code></td></tr>
                     <tr><td><b>{"Разрешение экрана" if is_ru else "Screen Resolution"}</b></td><td>{res_str} px</td></tr>
@@ -853,7 +849,7 @@ def render_gpu_page(is_dark: bool, accent: str = "#0060df") -> str:
                     <tr><td><b>WebGL 1.0 & WebGL 2.0</b></td><td><span class="badge badge-success">Поддерживается</span></td></tr>
                     <tr><td><b>WebAssembly (WASM)</b></td><td><span class="badge badge-success">Поддерживается</span></td></tr>
                     <tr><td><b>WebRTC & PeerConnection</b></td><td><span class="badge badge-success">Поддерживается</span></td></tr>
-                    <tr><td><b>{"Сглаживание и субпиксельный рендеринг" if is_ru else "Subpixel Antialiasing"}</b></td><td>DirectWrite / FreeType</td></tr>
+                    <tr><td><b>{"Сглаживание шрифтов" if is_ru else "Font Antialiasing"}</b></td><td>DirectWrite / FreeType</td></tr>
                 </table>
             </div>
         </div>
@@ -865,41 +861,41 @@ def render_gpu_page(is_dark: bool, accent: str = "#0060df") -> str:
 def render_help_page(is_dark: bool, accent: str = "#0060df") -> str:
     """Генерирует справочник горячих клавиш surf://help."""
     is_ru = get_language() == "ru"
-    title = "Справка и горячие клавиши" if is_ru else "Help & Keyboard Shortcuts"
-    subtitle = "Полное руководство по управлению браузером surf" if is_ru else "Complete guide to surf browser shortcuts"
+    title = "Горячие клавиши" if is_ru else "Keyboard Shortcuts"
+    subtitle = "Сочетания клавиш браузера" if is_ru else "Key combinations reference"
 
     shortcuts = [
-        ("Вкладки", "Новая вкладка", "Ctrl+T"),
-        ("Вкладки", "Новое приватное окно", "Ctrl+Shift+P"),
-        ("Вкладки", "Новое обычное окно", "Ctrl+N"),
-        ("Вкладки", "Закрыть текущую вкладку", "Ctrl+W"),
-        ("Вкладки", "Восстановить закрытую вкладку", "Ctrl+Shift+T"),
-        ("Вкладки", "Следующая вкладка", "Ctrl+Tab"),
-        ("Вкладки", "Предыдущая вкладка", "Ctrl+Shift+Tab"),
-        ("Вкладки", "Перейти на вкладку 1..9", "Ctrl+1..Ctrl+9"),
-        ("Адресная строка", "Фокус на строку адреса", "Ctrl+L / Alt+D / F6"),
-        ("Навигация", "Назад", "Alt+Left"),
-        ("Навигация", "Вперед", "Alt+Right"),
-        ("Навигация", "Обновить страницу", "F5 / Ctrl+R"),
-        ("Навигация", "Жесткая перезагрузка с очисткой кэша", "Ctrl+Shift+R / Ctrl+F5"),
-        ("Навигация", "Домашняя страница", "Alt+Home"),
-        ("Поиск", "Найти на текущей странице", "Ctrl+F"),
-        ("Поиск", "Следующее совпадение", "F3 / Ctrl+G"),
-        ("Поиск", "Предыдущее совпадение", "Shift+F3 / Ctrl+Shift+G"),
-        ("Масштаб", "Увеличить масштаб", "Ctrl++ / Ctrl+="),
-        ("Масштаб", "Уменьшить масштаб", "Ctrl+-"),
-        ("Масштаб", "Сбросить масштаб (100%)", "Ctrl+0"),
-        ("Масштаб", "Полноэкранный режим", "F11"),
-        ("Инструменты", "Добавить в закладки / Удалить", "Ctrl+D"),
-        ("Инструменты", "Управление закладками и историей", "Ctrl+Shift+O / Ctrl+H"),
-        ("Инструменты", "Менеджер загрузок", "Ctrl+J"),
-        ("Инструменты", "Режим комфортного чтения (Reader)", "Ctrl+Alt+R"),
-        ("Инструменты", "Сохранить страницу в PDF", "Ctrl+S / Ctrl+P"),
-        ("Инструменты", "Снимок веб-страницы (скриншот)", "Ctrl+Shift+S"),
-        ("Инструменты", "Исходный код страницы", "Ctrl+U"),
-        ("Инструменты", "Настройки браузера", "Ctrl+,"),
-        ("Инструменты", "Справка surf", "F1"),
-        ("Инструменты", "Закрыть браузер", "Ctrl+Q"),
+        ("Вкладки" if is_ru else "Tabs", "Новая вкладка" if is_ru else "New tab", "Ctrl+T"),
+        ("Вкладки" if is_ru else "Tabs", "Новое приватное окно" if is_ru else "New private window", "Ctrl+Shift+P"),
+        ("Вкладки" if is_ru else "Tabs", "Новое окно" if is_ru else "New window", "Ctrl+N"),
+        ("Вкладки" if is_ru else "Tabs", "Закрыть текущую вкладку" if is_ru else "Close tab", "Ctrl+W"),
+        ("Вкладки" if is_ru else "Tabs", "Восстановить закрытую вкладку" if is_ru else "Reopen closed tab", "Ctrl+Shift+T"),
+        ("Вкладки" if is_ru else "Tabs", "Следующая вкладка" if is_ru else "Next tab", "Ctrl+Tab"),
+        ("Вкладки" if is_ru else "Tabs", "Предыдущая вкладка" if is_ru else "Previous tab", "Ctrl+Shift+Tab"),
+        ("Вкладки" if is_ru else "Tabs", "Перейти на вкладку 1..9" if is_ru else "Go to tab 1..9", "Ctrl+1..Ctrl+9"),
+        ("Адресная строка" if is_ru else "Address Bar", "Фокус на строку адреса" if is_ru else "Focus address bar", "Ctrl+L / Alt+D / F6"),
+        ("Навигация" if is_ru else "Navigation", "Назад" if is_ru else "Back", "Alt+Left"),
+        ("Навигация" if is_ru else "Navigation", "Вперед" if is_ru else "Forward", "Alt+Right"),
+        ("Навигация" if is_ru else "Navigation", "Обновить страницу" if is_ru else "Reload", "F5 / Ctrl+R"),
+        ("Навигация" if is_ru else "Navigation", "Перезагрузка без кэша" if is_ru else "Hard reload", "Ctrl+Shift+R / Ctrl+F5"),
+        ("Навигация" if is_ru else "Navigation", "Домашняя страница" if is_ru else "Home", "Alt+Home"),
+        ("Поиск" if is_ru else "Search", "Найти на странице" if is_ru else "Find in page", "Ctrl+F"),
+        ("Поиск" if is_ru else "Search", "Следующее совпадение" if is_ru else "Find next", "F3 / Ctrl+G"),
+        ("Поиск" if is_ru else "Search", "Предыдущее совпадение" if is_ru else "Find previous", "Shift+F3 / Ctrl+Shift+G"),
+        ("Масштаб" if is_ru else "Zoom", "Увеличить масштаб" if is_ru else "Zoom in", "Ctrl++ / Ctrl+="),
+        ("Масштаб" if is_ru else "Zoom", "Уменьшить масштаб" if is_ru else "Zoom out", "Ctrl+-"),
+        ("Масштаб" if is_ru else "Zoom", "Сбросить масштаб" if is_ru else "Reset zoom", "Ctrl+0"),
+        ("Масштаб" if is_ru else "Zoom", "Полноэкранный режим" if is_ru else "Fullscreen", "F11"),
+        ("Инструменты" if is_ru else "Tools", "Добавить закладку" if is_ru else "Bookmark page", "Ctrl+D"),
+        ("Инструменты" if is_ru else "Tools", "Закладки и история" if is_ru else "Bookmarks & History", "Ctrl+Shift+O / Ctrl+H"),
+        ("Инструменты" if is_ru else "Tools", "Загрузки" if is_ru else "Downloads", "Ctrl+J"),
+        ("Инструменты" if is_ru else "Tools", "Режим чтения" if is_ru else "Reader view", "Ctrl+Alt+R"),
+        ("Инструменты" if is_ru else "Tools", "Печать / Экспорт в PDF" if is_ru else "Print / PDF", "Ctrl+P"),
+        ("Инструменты" if is_ru else "Tools", "Снимок страницы" if is_ru else "Screenshot", "Ctrl+Shift+S"),
+        ("Инструменты" if is_ru else "Tools", "Исходный код страницы" if is_ru else "View source", "Ctrl+U"),
+        ("Инструменты" if is_ru else "Tools", "Настройки" if is_ru else "Settings", "Ctrl+,"),
+        ("Инструменты" if is_ru else "Tools", "Справка" if is_ru else "Help", "F1"),
+        ("Инструменты" if is_ru else "Tools", "Закрыть браузер" if is_ru else "Quit", "Ctrl+Q"),
     ]
 
     rows_html = ""
@@ -931,7 +927,7 @@ def render_help_page(is_dark: bool, accent: str = "#0060df") -> str:
                         <div class="header-subtitle">{subtitle}</div>
                     </div>
                 </div>
-                <a href="surf://pages" class="nav-link">← {"Каталог страниц" if is_ru else "Pages Directory"}</a>
+                <a href="surf://pages" class="nav-link">{"Каталог страниц" if is_ru else "Pages Directory"}</a>
             </div>
 
             <div class="card" style="padding: 0; overflow: hidden;">
@@ -940,7 +936,7 @@ def render_help_page(is_dark: bool, accent: str = "#0060df") -> str:
                         <tr>
                             <th>{"Категория" if is_ru else "Category"}</th>
                             <th>{"Действие" if is_ru else "Action"}</th>
-                            <th>{"Горячие клавиши" if is_ru else "Key combination"}</th>
+                            <th>{"Сочетание клавиш" if is_ru else "Keys"}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -957,8 +953,8 @@ def render_help_page(is_dark: bool, accent: str = "#0060df") -> str:
 def render_settings_page(db: Database, is_dark: bool, accent: str = "#0060df") -> str:
     """Генерирует веб-страницу параметров surf://settings."""
     is_ru = get_language() == "ru"
-    title = "Настройки браузера" if is_ru else "Browser Settings"
-    subtitle = "Текущая конфигурация профиля и окружения" if is_ru else "Profile and environment configuration"
+    title = "Параметры браузера" if is_ru else "Browser Settings"
+    subtitle = "Текущая конфигурация" if is_ru else "Current configuration"
 
     homepage = db.get_setting("homepage", "https://ya.ru")
     search_eng = db.get_setting("search_engine", "https://www.google.com/search?q=")
@@ -986,11 +982,11 @@ def render_settings_page(db: Database, is_dark: bool, accent: str = "#0060df") -
                         <div class="header-subtitle">{subtitle}</div>
                     </div>
                 </div>
-                <a href="surf://pages" class="nav-link">← {"Каталог страниц" if is_ru else "Pages Directory"}</a>
+                <a href="surf://pages" class="nav-link">{"Каталог страниц" if is_ru else "Pages Directory"}</a>
             </div>
 
             <div class="card">
-                <div class="card-title">⚙️ {"Основные параметры" if is_ru else "General Settings"}</div>
+                <div class="card-title">{"Основные параметры" if is_ru else "General Settings"}</div>
                 <table>
                     <tr><td width="240"><b>{"Домашняя страница" if is_ru else "Homepage"}</b></td><td><code>{html.escape(homepage)}</code></td></tr>
                     <tr><td><b>{"Поисковая система" if is_ru else "Search Engine"}</b></td><td><code>{html.escape(search_eng)}</code></td></tr>
@@ -1003,9 +999,9 @@ def render_settings_page(db: Database, is_dark: bool, accent: str = "#0060df") -
             </div>
 
             <div class="card">
-                <div class="card-title">💡 {"Изменение параметров" if is_ru else "Change Parameters"}</div>
+                <div class="card-title">{"Изменение параметров" if is_ru else "Change Settings"}</div>
                 <p style="font-size: 13px; color: var(--text-muted); line-height: 1.8;">
-                    {"Для изменения темы, добавления кастомных поисковиков или настройки прокси нажмите сочетание клавиш" if is_ru else "To configure options, themes, or custom search engines press"} <kbd>Ctrl+,</kbd> {"или выберите пункт «Настройки» в меню приложения." if is_ru else "or open Settings dialog."}
+                    {"Для изменения параметров используйте диалоговое окно настроек:" if is_ru else "To configure browser options open Settings dialog:"} <kbd>Ctrl+,</kbd>
                 </p>
             </div>
         </div>
@@ -1017,9 +1013,10 @@ def render_settings_page(db: Database, is_dark: bool, accent: str = "#0060df") -
 class SurfSchemeHandler(QWebEngineUrlSchemeHandler):
     """Обработчик кастомной схемы surf:// для прямого рендеринга служебных страниц."""
 
-    def __init__(self, db: Database, parent=None):
+    def __init__(self, db: Database, parent=None, interceptor=None):
         super().__init__(parent)
         self.db = db
+        self.interceptor = interceptor
         self._buffers: dict = {}
 
     def requestStarted(self, job) -> None:
@@ -1038,7 +1035,7 @@ class SurfSchemeHandler(QWebEngineUrlSchemeHandler):
         elif host == "downloads":
             html_content = render_downloads_page(self.db, is_dark, accent)
         elif host == "protection":
-            html_content = render_protection_page(is_dark, accent)
+            html_content = render_protection_page(is_dark, accent, self.interceptor)
         elif host == "gpu":
             html_content = render_gpu_page(is_dark, accent)
         elif host == "help":

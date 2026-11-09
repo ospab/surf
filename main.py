@@ -511,7 +511,7 @@ class MainWindow(QMainWindow):
             self.tracking_interceptor = None
 
         # Обработчик служебных внутренних страниц surf://
-        self.scheme_handler = SurfSchemeHandler(self.db, self.profile)
+        self.scheme_handler = SurfSchemeHandler(self.db, self.profile, interceptor=self.tracking_interceptor)
         self.profile.installUrlSchemeHandler(b"surf", self.scheme_handler)
 
         self._apply_network_proxy()
