@@ -117,12 +117,12 @@ QTabBar QToolButton:hover {
 #navToolbar {
     background-color: #ffffff;
     border-bottom: 1px solid #d1d1d6;
-    padding: 4px 8px;
+    padding: 3px 8px;
     min-height: 38px;
     max-height: 38px;
 }
 
-#navToolbar QToolButton {
+#navToolbar > QToolButton {
     background-color: transparent;
     color: #15141a;
     border: 1px solid transparent;
@@ -134,11 +134,11 @@ QTabBar QToolButton:hover {
     max-height: 28px;
 }
 
-#navToolbar QToolButton:hover {
+#navToolbar > QToolButton:hover {
     background-color: #e5e5ea;
 }
 
-#navToolbar QToolButton:pressed {
+#navToolbar > QToolButton:pressed {
     background-color: #d1d1d6;
 }
 
@@ -148,7 +148,8 @@ QLineEdit#addressBar {
     color: #15141a;
     border: 1.5px solid #c7c7cc;
     border-radius: 14px;
-    padding: 5px 14px;
+    padding: 0px 6px;
+    min-height: 28px;
     font-size: 13px;
     selection-background-color: __ACCENT__;
     selection-color: #ffffff;
@@ -157,6 +158,27 @@ QLineEdit#addressBar {
 QLineEdit#addressBar:focus {
     border: 2px solid __ACCENT__;
     background-color: #ffffff;
+}
+
+/* Значки действий внутри адресной строки (SSL, Shield, Reader, Bookmark) */
+QLineEdit QToolButton {
+    background-color: transparent;
+    border: none;
+    border-radius: 4px;
+    padding: 0px;
+    margin: 0px 1px;
+    min-width: 18px;
+    max-width: 18px;
+    min-height: 18px;
+    max-height: 18px;
+}
+
+QLineEdit QToolButton:hover {
+    background-color: rgba(0, 0, 0, 0.08);
+}
+
+QLineEdit QToolButton:pressed {
+    background-color: rgba(0, 0, 0, 0.15);
 }
 
 /* Меню */

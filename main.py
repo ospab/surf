@@ -475,6 +475,7 @@ class MainWindow(QMainWindow):
         # Скруглённая адресная строка AwesomeBar со встроенными экшенами (SSL, Shield, Reader, Star)
         self.address_bar = QLineEdit()
         self.address_bar.setObjectName("addressBar")
+        self.address_bar.setMinimumHeight(28)
         self.address_bar.returnPressed.connect(self._navigate_from_address_bar)
 
         # Ведущие кнопки (слева): SSL замок и Защита от отслеживания (Shield)
