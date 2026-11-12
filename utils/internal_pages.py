@@ -1182,12 +1182,13 @@ class SurfSchemeHandler(QWebEngineUrlSchemeHandler):
             # surf://pages, surf://surf, surf://urls или любой неизвестный host
             html_content = render_pages_directory(is_dark, accent)
 
+        # Qt читает ответ уже после выхода из функции. Родитель job держит буфер, пока жив запрос,
+        # а ссылка в _buffers дополнительно страхует его и убирается, когда job удаляется
         buf = QBuffer(job)
         buf.open(QIODevice.OpenModeFlag.WriteOnly)
         buf.write(html_content.encode("utf-8"))
         buf.close()
         buf.open(QIODevice.OpenModeFlag.ReadOnly)
-        # Буфер должен жить, пока Qt читает ответ, поэтому храним ссылку до удаления job
         self._buffers[job] = buf
         try:
             job.destroyed.connect(lambda: self._buffers.pop(job, None))
