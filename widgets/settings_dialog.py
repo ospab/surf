@@ -1,9 +1,11 @@
 import os
+
 from PyQt6 import uic
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QAbstractItemView,
+    QButtonGroup,
     QCheckBox,
     QColorDialog,
     QComboBox,
@@ -22,12 +24,14 @@ from PyQt6.QtWidgets import (
 )
 
 try:
+    from surf.constants import SURF_USER_AGENT
     from surf.database import Database
-    from surf.i18n import get_language, set_language, tr
+    from surf.i18n import set_language, tr
     from surf.utils.device_service import DeviceService
 except ModuleNotFoundError:
+    from constants import SURF_USER_AGENT
     from database import Database
-    from i18n import get_language, set_language, tr
+    from i18n import set_language, tr
     from utils.device_service import DeviceService
 
 SEARCH_ENGINES = {
@@ -38,9 +42,16 @@ SEARCH_ENGINES = {
 }
 
 USER_AGENTS = {
-    0: ("surf", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Surf/1.0"),
+    0: (
+        "surf",
+        SURF_USER_AGENT,
+    ),
     1: ("surf_pure", "Surf/1.0 (Windows NT 10.0; Win64; x64)"),
-    2: ("chrome", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"),
+    2: (
+        "chrome",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    ),
     3: ("firefox", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0"),
 }
 
@@ -50,6 +61,12 @@ PROXY_TYPES = {
     2: "http",
     3: "socks5",
 }
+
+# id радиокнопок темы в QButtonGroup -> значение настройки "theme"
+THEME_IDS = {0: "dark", 1: "light"}
+
+# Через сколько минут неактивности вкладка «засыпает» (см. MainWindow._sleep_inactive_tabs)
+TAB_SLEEP_MINUTES = 10
 
 
 class SettingsDialog(QDialog):
@@ -62,6 +79,11 @@ class SettingsDialog(QDialog):
         # Способ 1: динамическая загрузка .ui файла без предварительной компиляции
         ui_path = os.path.join(os.path.dirname(__file__), "..", "ui", "settings.ui")
         uic.loadUi(ui_path, self)
+
+        # Радиокнопки темы объединены в группу: выбрать можно только одну
+        self.themeGroup = QButtonGroup(self)
+        self.themeGroup.addButton(self.themeDarkRadio, 0)
+        self.themeGroup.addButton(self.themeLightRadio, 1)
 
         self._setup_devices_tab()
         self._load_current_settings()
@@ -95,12 +117,14 @@ class SettingsDialog(QDialog):
 
         self.siteDevTable = QTableWidget()
         self.siteDevTable.setColumnCount(4)
-        self.siteDevTable.setHorizontalHeaderLabels([
-            tr("col_site"),
-            tr("col_microphone"),
-            tr("col_camera"),
-            tr("col_action"),
-        ])
+        self.siteDevTable.setHorizontalHeaderLabels(
+            [
+                tr("col_site"),
+                tr("col_microphone"),
+                tr("col_camera"),
+                tr("col_action"),
+            ]
+        )
         self.siteDevTable.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.siteDevTable.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         self.siteDevTable.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
@@ -195,12 +219,7 @@ class SettingsDialog(QDialog):
         self._load_site_device_table()
 
     def _clear_all_site_devices(self) -> None:
-        with self.db._get_connection() as conn:
-            conn.cursor().execute("DELETE FROM site_device_preferences")
-            conn.commit()
-        self.db.delete_site_permission(feature="media")
-        self.db.delete_site_permission(feature="audio")
-        self.db.delete_site_permission(feature="video")
+        self.db.clear_site_device_preferences()
         self._load_site_device_table()
 
     def _load_current_settings(self) -> None:
@@ -240,16 +259,20 @@ class SettingsDialog(QDialog):
                 self.homeGroup.layout().addWidget(self.restoreSessionCheck)
         self.restoreSessionCheck.setChecked(self.db.get_setting("restore_session_on_startup", "1") == "1")
 
-        self.downloadPathEdit.setText(
-            self.db.get_setting("download_folder", os.path.expanduser("~/Downloads"))
-        )
+        if not hasattr(self, "tabSleepCheck"):
+            self.tabSleepCheck = QCheckBox(tr("chk_tab_sleep", minutes=TAB_SLEEP_MINUTES))
+            if self.homeGroup.layout():
+                self.homeGroup.layout().addWidget(self.tabSleepCheck)
+        self.tabSleepCheck.setChecked(self.db.get_setting("tab_sleep_enabled", "1") == "1")
+
+        self.downloadPathEdit.setText(self.db.get_setting("download_folder", os.path.expanduser("~/Downloads")))
 
         # Приватность и User-Agent
         ua_type = self.db.get_setting("user_agent_type", "surf")
         ua_string = self.db.get_setting("custom_user_agent", USER_AGENTS[0][1])
 
         found_idx = None
-        for idx, (code, val) in USER_AGENTS.items():
+        for idx, (code, _ua) in USER_AGENTS.items():
             if code == ua_type:
                 found_idx = idx
                 break
@@ -282,7 +305,8 @@ class SettingsDialog(QDialog):
 
         # Оформление
         theme = self.db.get_setting("theme", "dark")
-        self.themeCombo.setCurrentIndex(0 if theme == "dark" else 1)
+        (self.themeDarkRadio if theme == "dark" else self.themeLightRadio).setChecked(True)
+        self.forceDarkSitesCheck.setChecked(self.db.get_setting("force_dark_sites", "0") == "1")
 
         self.accent_color = self.db.get_setting("accent_color", "#0060df")
         self._update_color_button(self.accent_color)
@@ -411,8 +435,11 @@ class SettingsDialog(QDialog):
 
         self.appearanceGroup.setTitle(tr("group_style"))
         self.themeLabel.setText(tr("lbl_theme"))
-        self.themeCombo.setItemText(0, tr("theme_dark"))
-        self.themeCombo.setItemText(1, tr("theme_light"))
+        self.themeDarkRadio.setText(tr("theme_dark"))
+        self.themeLightRadio.setText(tr("theme_light"))
+        self.forceDarkSitesCheck.setText(tr("chk_force_dark"))
+        if hasattr(self, "tabSleepCheck"):
+            self.tabSleepCheck.setText(tr("chk_tab_sleep", minutes=TAB_SLEEP_MINUTES))
         self.colorLabel.setText(tr("lbl_accent"))
         self.colorBtn.setText(tr("btn_accent"))
 
@@ -423,12 +450,14 @@ class SettingsDialog(QDialog):
             self.lblDefaultMic.setText(tr("lbl_default_mic"))
             self.lblDefaultCam.setText(tr("lbl_default_camera"))
             self.siteDevGroup.setTitle(tr("group_site_devices"))
-            self.siteDevTable.setHorizontalHeaderLabels([
-                tr("col_site"),
-                tr("col_microphone"),
-                tr("col_camera"),
-                tr("col_action"),
-            ])
+            self.siteDevTable.setHorizontalHeaderLabels(
+                [
+                    tr("col_site"),
+                    tr("col_microphone"),
+                    tr("col_camera"),
+                    tr("col_action"),
+                ]
+            )
             self.clearAllDevBtn.setText(tr("btn_clear_all_devices"))
 
     def _save_settings(self) -> None:
@@ -451,6 +480,8 @@ class SettingsDialog(QDialog):
         self.db.set_setting("download_folder", self.downloadPathEdit.text())
         if hasattr(self, "restoreSessionCheck"):
             self.db.set_setting("restore_session_on_startup", "1" if self.restoreSessionCheck.isChecked() else "0")
+        if hasattr(self, "tabSleepCheck"):
+            self.db.set_setting("tab_sleep_enabled", "1" if self.tabSleepCheck.isChecked() else "0")
 
         # Приватность и User-Agent
         ua_idx = self.uaCombo.currentIndex()
@@ -481,7 +512,8 @@ class SettingsDialog(QDialog):
         set_language(new_lang)
 
         # Оформление
-        self.db.set_setting("theme", "dark" if self.themeCombo.currentIndex() == 0 else "light")
+        self.db.set_setting("theme", THEME_IDS.get(self.themeGroup.checkedId(), "dark"))
+        self.db.set_setting("force_dark_sites", "1" if self.forceDarkSitesCheck.isChecked() else "0")
         self.db.set_setting("accent_color", self.accent_color)
 
         # Устройства по умолчанию

@@ -58,6 +58,38 @@
              <string>За последнюю неделю</string>
             </property>
            </item>
+           <item>
+            <property name="text">
+             <string>Диапазон дат...</string>
+            </property>
+           </item>
+          </widget>
+         </item>
+         <item>
+          <widget class="QDateEdit" name="dateFromEdit">
+           <property name="calendarPopup">
+            <bool>true</bool>
+           </property>
+           <property name="displayFormat">
+            <string>dd.MM.yyyy</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="dateDashLabel">
+           <property name="text">
+            <string>—</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QDateEdit" name="dateToEdit">
+           <property name="calendarPopup">
+            <bool>true</bool>
+           </property>
+           <property name="displayFormat">
+            <string>dd.MM.yyyy</string>
+           </property>
           </widget>
          </item>
          <item>

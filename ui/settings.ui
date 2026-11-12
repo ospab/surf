@@ -405,18 +405,22 @@
            </widget>
           </item>
           <item row="0" column="1">
-           <widget class="QComboBox" name="themeCombo">
+           <layout class="QHBoxLayout" name="themeRadioLayout">
             <item>
-             <property name="text">
-              <string>Тёмная (surf Dark)</string>
-             </property>
+             <widget class="QRadioButton" name="themeDarkRadio">
+              <property name="text">
+               <string>Тёмная (surf Dark)</string>
+              </property>
+             </widget>
             </item>
             <item>
-             <property name="text">
-              <string>Светлая (surf Light)</string>
-             </property>
+             <widget class="QRadioButton" name="themeLightRadio">
+              <property name="text">
+               <string>Светлая (surf Light)</string>
+              </property>
+             </widget>
             </item>
-           </widget>
+           </layout>
           </item>
           <item row="1" column="0">
            <widget class="QLabel" name="colorLabel">
@@ -429,6 +433,13 @@
            <widget class="QPushButton" name="colorBtn">
             <property name="text">
              <string>Выбрать акцент...</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0" colspan="2">
+           <widget class="QCheckBox" name="forceDarkSitesCheck">
+            <property name="text">
+             <string>Тёмная тема для всех сайтов</string>
             </property>
            </widget>
           </item>

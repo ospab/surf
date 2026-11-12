@@ -34,6 +34,9 @@ def build_executable():
         "--noconsole",
         "--onedir",
         "--clean",
+        # Перезаписывать dist/surf без вопроса: иначе повторная сборка падает,
+        # если папка уже существует
+        "--noconfirm",
         *data_args,
         main_script,
     ]

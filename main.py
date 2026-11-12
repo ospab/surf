@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 
 # Поддержка прямого запуска 'python ./main.py' из папки проекта,
 # а также запуска как модуля 'python -m surf.main' из внешнего каталога
@@ -10,8 +11,8 @@ if CURRENT_DIR not in sys.path:
 if PARENT_DIR not in sys.path:
     sys.path.insert(0, PARENT_DIR)
 
-from PyQt6.QtCore import QByteArray, QEvent, QObject, QPoint, QSize, QStringListModel, Qt, QUrl, pyqtSignal
-from PyQt6.QtGui import QAction, QColor, QFont, QIcon, QKeySequence, QMouseEvent, QPainter, QPixmap, QShortcut
+from PyQt6.QtCore import QByteArray, QPoint, QSize, QStringListModel, Qt, QTimer, QUrl
+from PyQt6.QtGui import QColor, QIcon, QKeySequence, QPainter, QPixmap, QShortcut
 from PyQt6.QtNetwork import QNetworkProxy
 from PyQt6.QtSvg import QSvgRenderer
 from PyQt6.QtWebEngineCore import (
@@ -36,13 +37,13 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QStackedWidget,
     QStatusBar,
-    QTabBar,
     QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
 try:
+    from surf.constants import SURF_USER_AGENT
     from surf.database import Database
     from surf.i18n import get_language, set_language, tr
     from surf.utils.adblock import TrackingProtectionInterceptor
@@ -51,8 +52,11 @@ try:
     from surf.widgets.certificate_dialog import CertificateDialog, fetch_certificate_details
     from surf.widgets.download_manager import DownloadManagerDialog
     from surf.widgets.history_dialog import HistoryDialog
-    from surf.widgets.settings_dialog import SettingsDialog
+    from surf.widgets.settings_dialog import TAB_SLEEP_MINUTES, SettingsDialog
+    from surf.widgets.tab_bar import ClosableTabBar, ZoomWheelFilter
+    from surf.widgets.tracking_dialog import TrackingProtectionDialog
 except ModuleNotFoundError:
+    from constants import SURF_USER_AGENT
     from database import Database
     from i18n import get_language, set_language, tr
     from utils.adblock import TrackingProtectionInterceptor
@@ -62,6 +66,28 @@ except ModuleNotFoundError:
     from widgets.download_manager import DownloadManagerDialog
     from widgets.history_dialog import HistoryDialog
     from widgets.settings_dialog import SettingsDialog
+    from widgets.tab_bar import ClosableTabBar, ZoomWheelFilter
+    from widgets.tracking_dialog import TrackingProtectionDialog
+
+ICONS_DIR = os.path.join(CURRENT_DIR, "resources", "icons")
+JS_DIR = os.path.join(CURRENT_DIR, "resources", "js")
+STYLES_DIR = os.path.join(CURRENT_DIR, "styles")
+
+# Шаг масштаба и его границы (Ctrl+колесо, Ctrl+=/-)
+ZOOM_STEP = 0.1
+ZOOM_MIN = 0.3
+ZOOM_MAX = 3.0
+
+# Как часто проверять, не пора ли усыпить неактивные вкладки
+TAB_SLEEP_CHECK_MS = 60_000
+SLEEPING_TAB_COLOR = "#8e8e9a"
+
+
+def load_js(filename: str) -> str:
+    """Читает JS-скрипт, внедряемый в страницы, из resources/js."""
+    with open(os.path.join(JS_DIR, filename), encoding="utf-8") as f:
+        return f.read()
+
 
 def setup_chromium_environment() -> None:
     """Настраивает флаги Chromium для поддержки WebUSB, WebXR, WebRTC, устройств и ускорения."""
@@ -85,261 +111,29 @@ def setup_chromium_environment() -> None:
 
 setup_chromium_environment()
 
+PERSISTENT_PROFILE_NAME = "surf"
+_persistent_profile: QWebEngineProfile | None = None
+
+
+def get_persistent_profile() -> QWebEngineProfile:
+    """Возвращает общий постоянный профиль для всех обычных (не приватных) окон.
+
+    В Qt 6 QWebEngineProfile.defaultProfile() — приватный (off-the-record):
+    cookies, кэш и разрешения не сохраняются на диск, а браузер считает
+    каждое окно инкогнито и не пишет историю. Поэтому создаём именованный
+    профиль. Он один на всё приложение: два профиля с одним именем
+    одновременно Qt создать не даёт.
+    """
+    global _persistent_profile
+    if _persistent_profile is None:
+        _persistent_profile = QWebEngineProfile(PERSISTENT_PROFILE_NAME, QApplication.instance())
+    return _persistent_profile
+
+
 try:
     register_surf_scheme()
 except Exception:
     pass
-
-
-class ZoomWheelFilter(QObject):
-    def __init__(self, main_window):
-        super().__init__(main_window)
-        self.main_window = main_window
-
-    def eventFilter(self, obj, event):
-        if event.type() == QEvent.Type.Wheel and (event.modifiers() & Qt.KeyboardModifier.ControlModifier):
-            delta = event.angleDelta().y()
-            if delta > 0:
-                self.main_window._zoom_in()
-            elif delta < 0:
-                self.main_window._zoom_out()
-            return True
-        return False
-
-
-class ClosableTabBar(QTabBar):
-    """Фирменная панель вкладок surf: фавиконы, индикатор аудио/mute, кнопка закрытия, отрыв вкладок."""
-
-    tabAudioMuteRequested = pyqtSignal(int)
-    tabDetachRequested = pyqtSignal(int, QPoint)
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setTabsClosable(False)
-        self.setIconSize(QSize(16, 16))
-        self._is_dark = True
-        icon_dir = os.path.join(os.path.dirname(__file__), "resources", "icons")
-        self._close_icon_dark = QIcon(os.path.join(icon_dir, "close_dark.svg"))
-        self._close_icon_light = QIcon(os.path.join(icon_dir, "close_light.svg"))
-        self._vol_icon = QIcon(os.path.join(icon_dir, "volume-2.svg"))
-        self._vol_x_icon = QIcon(os.path.join(icon_dir, "volume-x.svg"))
-        self._audio_states: dict[int, tuple[bool, bool]] = {}
-
-        self._drag_start_pos: QPoint | None = None
-        self._drag_tab_idx: int = -1
-        self._is_detached_mode: bool = False
-        self._cursor_overridden: bool = False
-
-        self.tabMoved.connect(self._sync_audio_states_on_tab_moved)
-        self.update_movable_state()
-
-    def update_movable_state(self) -> None:
-        """Перемещать вкладки можно только когда их 2 или более."""
-        self.setMovable(self.count() > 1)
-
-    def _set_drag_cursor(self, enabled: bool) -> None:
-        if enabled and not self._cursor_overridden:
-            QApplication.setOverrideCursor(Qt.CursorShape.DragMoveCursor)
-            self._cursor_overridden = True
-        elif not enabled and self._cursor_overridden:
-            QApplication.restoreOverrideCursor()
-            self._cursor_overridden = False
-
-    def set_theme_mode(self, is_dark: bool, vol_icon: QIcon | None = None, vol_x_icon: QIcon | None = None) -> None:
-        self._is_dark = is_dark
-        if vol_icon and not vol_icon.isNull():
-            self._vol_icon = vol_icon
-        if vol_x_icon and not vol_x_icon.isNull():
-            self._vol_x_icon = vol_x_icon
-
-        close_icon = self._close_icon_dark if is_dark else self._close_icon_light
-        for i in range(self.count()):
-            container = self.tabButton(i, QTabBar.ButtonPosition.RightSide)
-            if container:
-                btn_close = container.findChild(QToolButton, "tabCloseBtn")
-                if btn_close:
-                    btn_close.setIcon(close_icon)
-                btn_audio = container.findChild(QToolButton, "tabAudioBtn")
-                if btn_audio and btn_audio.isVisible():
-                    _, muted = self._audio_states.get(i, (False, False))
-                    btn_audio.setIcon(self._vol_x_icon if muted else self._vol_icon)
-
-    def retranslate_close_buttons(self) -> None:
-        tip_close = tr("act_close_tab")
-        for i in range(self.count()):
-            container = self.tabButton(i, QTabBar.ButtonPosition.RightSide)
-            if container:
-                btn_close = container.findChild(QToolButton, "tabCloseBtn")
-                if btn_close:
-                    btn_close.setToolTip(tip_close)
-                btn_audio = container.findChild(QToolButton, "tabAudioBtn")
-                if btn_audio:
-                    _, muted = self._audio_states.get(i, (False, False))
-                    btn_audio.setToolTip(tr("tip_unmute_tab") if muted else tr("tip_mute_tab"))
-
-    def tabInserted(self, index: int) -> None:
-        super().tabInserted(index)
-        self.update_movable_state()
-
-        new_audio = {}
-        for k, v in self._audio_states.items():
-            if k >= index:
-                new_audio[k + 1] = v
-            else:
-                new_audio[k] = v
-        self._audio_states = new_audio
-
-        container = QWidget(self)
-        layout = QHBoxLayout(container)
-        layout.setContentsMargins(0, 0, 4, 0)
-        layout.setSpacing(2)
-
-        btn_audio = QToolButton(container)
-        btn_audio.setObjectName("tabAudioBtn")
-        btn_audio.setFixedSize(18, 18)
-        btn_audio.setIconSize(QSize(12, 12))
-        btn_audio.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_audio.setVisible(False)
-        btn_audio.clicked.connect(lambda _, c=container: self._on_audio_clicked(c))
-        layout.addWidget(btn_audio)
-
-        btn_close = QToolButton(container)
-        btn_close.setObjectName("tabCloseBtn")
-        btn_close.setIcon(self._close_icon_dark if self._is_dark else self._close_icon_light)
-        btn_close.setIconSize(QSize(12, 12))
-        btn_close.setFixedSize(18, 18)
-        btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_close.setToolTip(tr("act_close_tab"))
-        btn_close.clicked.connect(lambda _, c=container: self._on_close_clicked(c))
-        layout.addWidget(btn_close)
-
-        self.setTabButton(index, QTabBar.ButtonPosition.RightSide, container)
-
-    def tabRemoved(self, index: int) -> None:
-        super().tabRemoved(index)
-        self.update_movable_state()
-
-        new_audio = {}
-        for k, v in self._audio_states.items():
-            if k < index:
-                new_audio[k] = v
-            elif k > index:
-                new_audio[k - 1] = v
-        self._audio_states = new_audio
-
-    def _sync_audio_states_on_tab_moved(self, from_idx: int, to_idx: int) -> None:
-        if from_idx in self._audio_states:
-            st = self._audio_states.pop(from_idx)
-            new_audio = {}
-            for k, v in self._audio_states.items():
-                if from_idx < to_idx:
-                    if from_idx < k <= to_idx:
-                        new_audio[k - 1] = v
-                    else:
-                        new_audio[k] = v
-                else:
-                    if to_idx <= k < from_idx:
-                        new_audio[k + 1] = v
-                    else:
-                        new_audio[k] = v
-            new_audio[to_idx] = st
-            self._audio_states = new_audio
-
-    def mousePressEvent(self, event: QMouseEvent) -> None:
-        self.update_movable_state()
-        if event.button() == Qt.MouseButton.LeftButton:
-            self._drag_start_pos = event.pos()
-            self._drag_tab_idx = self.tabAt(event.pos())
-            self._is_detached_mode = False
-
-            if self.count() <= 1:
-                # Если вкладка всего одна, запрещаем внутреннее перемещение в QTabBar
-                idx = self.tabAt(event.pos())
-                if idx >= 0:
-                    self.setCurrentIndex(idx)
-                event.accept()
-                return
-
-        super().mousePressEvent(event)
-
-    def mouseMoveEvent(self, event: QMouseEvent) -> None:
-        if (event.buttons() & Qt.MouseButton.LeftButton) and self._drag_start_pos is not None and self._drag_tab_idx >= 0:
-            dist = (event.pos() - self._drag_start_pos).manhattanLength()
-            if dist > QApplication.startDragDistance():
-                if self.count() > 1:
-                    cur_global = event.globalPosition().toPoint()
-                    local_pt = self.mapFromGlobal(cur_global)
-                    win = self.window()
-                    win_geo = win.frameGeometry() if win else None
-
-                    # Проверяем, вытянут ли курсор за пределы окна или полосы вкладок
-                    is_outside = False
-                    if win_geo and not win_geo.contains(cur_global):
-                        is_outside = True
-                    elif local_pt.y() < -20 or local_pt.y() > self.height() + 35 or local_pt.x() < -30 or local_pt.x() > self.width() + 40:
-                        is_outside = True
-
-                    if is_outside:
-                        if not self._is_detached_mode:
-                            self._is_detached_mode = True
-                            self._set_drag_cursor(True)
-                    else:
-                        if self._is_detached_mode:
-                            self._is_detached_mode = False
-                            self._set_drag_cursor(False)
-
-        super().mouseMoveEvent(event)
-
-    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
-        if self._is_detached_mode:
-            self._set_drag_cursor(False)
-            self._is_detached_mode = False
-
-            if self.count() > 1:
-                cur_global = event.globalPosition().toPoint()
-                detach_idx = self.currentIndex()
-                if detach_idx < 0:
-                    detach_idx = self._drag_tab_idx
-                if 0 <= detach_idx < self.count():
-                    self.tabDetachRequested.emit(detach_idx, cur_global)
-
-                self._drag_start_pos = None
-                self._drag_tab_idx = -1
-                event.accept()
-                return
-
-        self._set_drag_cursor(False)
-        self._is_detached_mode = False
-        self._drag_start_pos = None
-        self._drag_tab_idx = -1
-        super().mouseReleaseEvent(event)
-
-    def set_tab_audio(self, index: int, audible: bool, muted: bool) -> None:
-        self._audio_states[index] = (audible, muted)
-        container = self.tabButton(index, QTabBar.ButtonPosition.RightSide)
-        if not container:
-            return
-        btn_audio = container.findChild(QToolButton, "tabAudioBtn")
-        if not btn_audio:
-            return
-        if audible or muted:
-            btn_audio.setVisible(True)
-            btn_audio.setIcon(self._vol_x_icon if muted else self._vol_icon)
-            btn_audio.setToolTip(tr("tip_unmute_tab") if muted else tr("tip_mute_tab"))
-        else:
-            btn_audio.setVisible(False)
-
-    def _on_close_clicked(self, container: QWidget) -> None:
-        for i in range(self.count()):
-            if self.tabButton(i, QTabBar.ButtonPosition.RightSide) == container:
-                self.tabCloseRequested.emit(i)
-                break
-
-    def _on_audio_clicked(self, container: QWidget) -> None:
-        for i in range(self.count()):
-            if self.tabButton(i, QTabBar.ButtonPosition.RightSide) == container:
-                self.tabAudioMuteRequested.emit(i)
-                break
 
 
 class MainWindow(QMainWindow):
@@ -354,7 +148,7 @@ class MainWindow(QMainWindow):
         self.resize(1200, 800)
 
         self.db = Database()
-        self.zoom_factor = 1.0
+        self._active_tab: BrowserTab | None = None
         self._active_downloads: list[QWebEngineDownloadRequest] = []
         self._recently_closed_urls: list[str] = []
         self._cert_cache: dict[str, dict] = {}
@@ -383,6 +177,12 @@ class MainWindow(QMainWindow):
         if restored == 0:
             self.add_new_tab()
 
+        # Усыпление неактивных вкладок для экономии памяти
+        self._sleep_timer = QTimer(self)
+        self._sleep_timer.setInterval(TAB_SLEEP_CHECK_MS)
+        self._sleep_timer.timeout.connect(self._sleep_inactive_tabs)
+        self._sleep_timer.start()
+
     def showEvent(self, event) -> None:
         super().showEvent(event)
         self._apply_dwm_titlebar()
@@ -396,7 +196,7 @@ class MainWindow(QMainWindow):
             from ctypes import byref, c_int, sizeof
 
             hwnd = int(self.winId())
-            is_dark = self.db.get_setting("theme", "dark") == "dark"
+            is_dark = self._is_dark_theme
 
             # 1. Тёмная/светлая тема для системных кнопок заголовка (DWMWA_USE_IMMERSIVE_DARK_MODE = 20)
             val = c_int(1 if is_dark else 0)
@@ -414,16 +214,24 @@ class MainWindow(QMainWindow):
             pass
 
     def _get_icon(self, name: str) -> QIcon:
-        is_dark = self.db.get_setting("theme", "dark") == "dark"
-        return self._render_themed_icon(name, is_dark)
+        """Иконка под текущую тему. Отрисовка SVG дорогая, поэтому результат кэшируется
+        (иконка «стоп/обновить» запрашивается на каждый тик загрузки страницы)."""
+        if not hasattr(self, "_icon_cache"):
+            self._icon_cache: dict[str, QIcon] = {}
+            self._is_dark_theme = self.db.get_setting("theme", "dark") == "dark"
+        icon = self._icon_cache.get(name)
+        if icon is None:
+            icon = self._render_themed_icon(name, self._is_dark_theme)
+            self._icon_cache[name] = icon
+        return icon
 
     def _render_themed_icon(self, name: str, is_dark: bool) -> QIcon:
-        path = os.path.join(os.path.dirname(__file__), "resources", "icons", f"{name}.svg")
+        path = os.path.join(ICONS_DIR, f"{name}.svg")
         if not os.path.exists(path):
             return QIcon()
 
         try:
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 svg_text = f.read()
         except Exception:
             return QIcon(path)
@@ -459,60 +267,13 @@ class MainWindow(QMainWindow):
         if self.is_private:
             self.profile = QWebEngineProfile(self)
         else:
-            self.profile = QWebEngineProfile.defaultProfile()
-
-        # Фирменный User-Agent surf с полной веб-совместимостью
-        default_ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Surf/1.0"
-        ua_type = self.db.get_setting("user_agent_type", "surf")
-        if ua_type in ("surf", "surf_pure"):
-            self.db.set_setting("user_agent_type", "surf")
-            self.db.set_setting("custom_user_agent", default_ua)
-
-        ua_str = self.db.get_setting("custom_user_agent", default_ua)
-        self.profile.setHttpUserAgent(ua_str)
+            self.profile = get_persistent_profile()
 
         # Фирменная инъекция брендинга surf и ospab foundation в объект navigator:
         # Убирает упоминания Mozilla, Netscape, Gecko и Google Inc. на сайтах проверки (internet.yandex.ru и др.)
         branding_script = QWebEngineScript()
         branding_script.setName("surf_branding_overrides")
-        branding_script.setSourceCode("""
-        (function() {
-            try {
-                Object.defineProperty(navigator, 'vendor', {
-                    get: () => 'ospab foundation',
-                    configurable: true,
-                    enumerable: true
-                });
-                Object.defineProperty(navigator, 'appCodeName', {
-                    get: () => 'Surf',
-                    configurable: true,
-                    enumerable: true
-                });
-                Object.defineProperty(navigator, 'appName', {
-                    get: () => 'Surf Browser',
-                    configurable: true,
-                    enumerable: true
-                });
-                Object.defineProperty(navigator, 'product', {
-                    get: () => 'SurfEngine',
-                    configurable: true,
-                    enumerable: true
-                });
-            } catch (e) {}
-
-            try {
-                document.addEventListener('click', function(e) {
-                    var a = e.target && e.target.closest ? e.target.closest('a') : null;
-                    if (!a || !a.href) return;
-                    if (e.ctrlKey || e.metaKey || e.button === 1) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        window.open(a.href, '_blank');
-                    }
-                }, true);
-            } catch (e) {}
-        })();
-        """)
+        branding_script.setSourceCode(load_js("branding.js"))
         branding_script.setInjectionPoint(QWebEngineScript.InjectionPoint.DocumentCreation)
         branding_script.setWorldId(QWebEngineScript.ScriptWorldId.MainWorld)
         branding_script.setRunsOnSubFrames(True)
@@ -523,112 +284,21 @@ class MainWindow(QMainWindow):
         if not self.profile.scripts().find("surf_device_routing"):
             device_script = QWebEngineScript()
             device_script.setName("surf_device_routing")
-            device_script.setSourceCode("""
-            (function() {
-                if (window.__surf_device_routing_installed) return;
-                window.__surf_device_routing_installed = true;
-
-                window.__surf_media_config = window.__surf_media_config || {
-                    allow_audio: true,
-                    selected_audio: "",
-                    allow_video: true,
-                    selected_video: ""
-                };
-
-                window.__surf_set_media_config = function(cfg) {
-                    if (!cfg) return;
-                    window.__surf_media_config = Object.assign(window.__surf_media_config, cfg);
-                };
-
-                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
-
-                var origGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
-                var origEnumerateDevices = navigator.mediaDevices.enumerateDevices.bind(navigator.mediaDevices);
-
-                async function matchDeviceId(kind, targetName) {
-                    if (!targetName) return null;
-                    try {
-                        var devices = await origEnumerateDevices();
-                        var targetLower = targetName.toLowerCase();
-                        for (var i = 0; i < devices.length; i++) {
-                            var d = devices[i];
-                            if (d.kind === kind && d.label && d.label.toLowerCase() === targetLower) {
-                                return d.deviceId;
-                            }
-                        }
-                        for (var i = 0; i < devices.length; i++) {
-                            var d = devices[i];
-                            if (d.kind === kind && d.label && (d.label.toLowerCase().includes(targetLower) || targetLower.includes(d.label.toLowerCase()))) {
-                                return d.deviceId;
-                            }
-                        }
-                    } catch (e) {}
-                    return null;
-                }
-
-                navigator.mediaDevices.getUserMedia = async function(constraints) {
-                    var cfg = window.__surf_media_config || {};
-                    var c = constraints ? Object.assign({}, constraints) : {};
-
-                    if (c.audio) {
-                        if (cfg.allow_audio === false) {
-                            delete c.audio;
-                        } else if (cfg.selected_audio) {
-                            var devId = await matchDeviceId('audioinput', cfg.selected_audio);
-                            if (devId) {
-                                if (typeof c.audio === 'object') {
-                                    c.audio = Object.assign({}, c.audio, { deviceId: { exact: devId } });
-                                } else {
-                                    c.audio = { deviceId: { exact: devId } };
-                                }
-                            }
-                        }
-                    }
-
-                    if (c.video) {
-                        if (cfg.allow_video === false) {
-                            delete c.video;
-                        } else if (cfg.selected_video) {
-                            var devId = await matchDeviceId('videoinput', cfg.selected_video);
-                            if (devId) {
-                                if (typeof c.video === 'object') {
-                                    c.video = Object.assign({}, c.video, { deviceId: { exact: devId } });
-                                } else {
-                                    c.video = { deviceId: { exact: devId } };
-                                }
-                            }
-                        }
-                    }
-
-                    if (!c.audio && !c.video) {
-                        var err = new Error('Permission denied: audio and video are disabled in surf');
-                        err.name = 'NotAllowedError';
-                        throw err;
-                    }
-
-                    return origGetUserMedia(c);
-                };
-            })();
-            """)
+            device_script.setSourceCode(load_js("device_routing.js"))
             device_script.setInjectionPoint(QWebEngineScript.InjectionPoint.DocumentCreation)
             device_script.setWorldId(QWebEngineScript.ScriptWorldId.MainWorld)
             device_script.setRunsOnSubFrames(True)
             self.profile.scripts().insert(device_script)
 
-        folder = self.db.get_setting(
-            "download_folder",
-            os.path.join(os.path.expanduser("~"), "Downloads"),
-        )
-        os.makedirs(folder, exist_ok=True)
-        self.profile.setDownloadPath(folder)
-
-        # Enhanced Tracking Protection (ETP) - перехватчик трекеров
-        if TrackingProtectionInterceptor is not None:
-            self.tracking_interceptor = TrackingProtectionInterceptor(self)
+        # Enhanced Tracking Protection (ETP) - перехватчик трекеров.
+        # Один на профиль: обычные окна делят общий профиль, и новое окно не должно
+        # подменять перехватчик (и обнулять счётчик) у уже открытых окон.
+        self.tracking_interceptor = getattr(self.profile, "surf_interceptor", None)
+        if self.tracking_interceptor is None:
+            self.tracking_interceptor = TrackingProtectionInterceptor(self.profile)
             self.profile.setUrlRequestInterceptor(self.tracking_interceptor)
-            self.tracking_interceptor.blocked_count_changed.connect(self._on_blocked_count_changed)
-        else:
-            self.tracking_interceptor = None
+            self.profile.surf_interceptor = self.tracking_interceptor
+        self.tracking_interceptor.blocked_count_changed.connect(self._on_blocked_count_changed)
 
         # Конфигурация WebEngineSettings: аппаратное ускорение, WebGL, WebRTC, захват экрана
         web_settings = self.profile.settings()
@@ -651,9 +321,45 @@ class MainWindow(QMainWindow):
         else:
             self.profile.setPersistentPermissionsPolicy(QWebEngineProfile.PersistentPermissionsPolicy.StoreInMemory)
 
-        # Обработчик служебных внутренних страниц surf://
-        self.scheme_handler = SurfSchemeHandler(self.db, self.profile, interceptor=self.tracking_interceptor)
-        self.profile.installUrlSchemeHandler(b"surf", self.scheme_handler)
+        # Обработчик служебных внутренних страниц surf:// (тоже один на профиль:
+        # повторная установка для той же схемы Qt отклоняет)
+        self.scheme_handler = self.profile.urlSchemeHandler(b"surf")
+        if self.scheme_handler is None:
+            self.scheme_handler = SurfSchemeHandler(self.db, self.profile, interceptor=self.tracking_interceptor)
+            self.profile.installUrlSchemeHandler(b"surf", self.scheme_handler)
+
+        self._apply_profile_settings()
+
+    def _apply_profile_settings(self) -> None:
+        """Применяет изменяемые настройки к УЖЕ созданному профилю.
+
+        Вызывается при старте и после сохранения настроек. Профиль, скрипты,
+        перехватчик трекеров и обработчик surf:// здесь не пересоздаются —
+        иначе открытые вкладки остались бы на старом профиле.
+        """
+        # Фирменный User-Agent surf с полной веб-совместимостью
+        default_ua = SURF_USER_AGENT
+        ua_type = self.db.get_setting("user_agent_type", "surf")
+        if ua_type in ("surf", "surf_pure"):
+            self.db.set_setting("user_agent_type", "surf")
+            self.db.set_setting("custom_user_agent", default_ua)
+
+        ua_str = self.db.get_setting("custom_user_agent", default_ua)
+        self.profile.setHttpUserAgent(ua_str)
+
+        folder = self.db.get_setting(
+            "download_folder",
+            os.path.join(os.path.expanduser("~"), "Downloads"),
+        )
+        os.makedirs(folder, exist_ok=True)
+        self.profile.setDownloadPath(folder)
+
+        # Do Not Track / Global Privacy Control
+        self.tracking_interceptor.send_dnt = self.db.get_setting("privacy_dnt", "1") == "1"
+
+        # Тёмная тема для всех сайтов (Chromium сам затемняет светлые страницы)
+        force_dark = self.db.get_setting("force_dark_sites", "0") == "1"
+        self.profile.settings().setAttribute(QWebEngineSettings.WebAttribute.ForceDarkMode, force_dark)
 
         self._apply_network_proxy()
 
@@ -806,12 +512,16 @@ class MainWindow(QMainWindow):
         self.act_star.triggered.connect(self._toggle_bookmark)
 
         # 2. Средняя кнопка (Reader)
-        self.act_reader = self.address_bar.addAction(self._get_icon("reader"), QLineEdit.ActionPosition.TrailingPosition)
+        self.act_reader = self.address_bar.addAction(
+            self._get_icon("reader"), QLineEdit.ActionPosition.TrailingPosition
+        )
         self.act_reader.setToolTip(tr("tip_reader"))
         self.act_reader.triggered.connect(self._toggle_reader_mode)
 
         # 3. Левая кнопка в правой группе (Shield - Enhanced Tracking Protection)
-        self.act_shield = self.address_bar.addAction(self._get_icon("shield"), QLineEdit.ActionPosition.TrailingPosition)
+        self.act_shield = self.address_bar.addAction(
+            self._get_icon("shield"), QLineEdit.ActionPosition.TrailingPosition
+        )
         self.act_shield.setToolTip(tr("tip_shield_protection"))
         self.act_shield.triggered.connect(self._show_tracking_protection_dialog)
 
@@ -841,7 +551,8 @@ class MainWindow(QMainWindow):
         if self.is_private:
             self.lbl_private = QLabel(f" {tr('private_badge')} ")
             self.lbl_private.setStyleSheet(
-                "background-color: #7c3aed; color: #ffffff; border-radius: 4px; font-weight: bold; font-size: 11px; padding: 2px 6px;"
+                "background-color: #7c3aed; color: #ffffff; border-radius: 4px; "
+                "font-weight: bold; font-size: 11px; padding: 2px 6px;"
             )
             layout.addWidget(self.lbl_private)
 
@@ -937,8 +648,9 @@ class MainWindow(QMainWindow):
         self.act_history.setShortcut(QKeySequence("Ctrl+H"))
         self.act_history.triggered.connect(self._open_history_dialog)
 
+        # Ctrl+Shift+T — «вернуть закрытую вкладку» (см. _setup_shortcuts), а при
+        # пустом списке закрытых вкладок он сам восстанавливает сессию
         self.act_restore_session = self.history_menu.addAction("")
-        self.act_restore_session.setShortcut(QKeySequence("Ctrl+Shift+T"))
         self.act_restore_session.triggered.connect(self.restore_previous_session)
 
         self.act_clear_hist = self.history_menu.addAction("")
@@ -979,6 +691,23 @@ class MainWindow(QMainWindow):
         self.act_about = self.help_menu.addAction("")
         self.act_about.triggered.connect(self._show_about)
 
+        # Привязываем действия меню ещё и к самому окну: при скрытой строке меню
+        # их сочетания клавиш продолжают работать. Дублировать их через QShortcut
+        # нельзя — при видимом меню Qt считает такие сочетания неоднозначными
+        # и не выполняет ни одно из них.
+        for menu in (
+            self.file_menu,
+            self.edit_menu,
+            self.view_menu,
+            self.history_menu,
+            self.bm_menu,
+            self.tools_menu,
+            self.help_menu,
+        ):
+            for action in menu.actions():
+                if not action.isSeparator():
+                    self.addAction(action)
+
     def _show_hamburger_menu(self) -> None:
         """Всплывающее главное меню при клике на гамбургер ≡."""
         menu = QMenu(self)
@@ -1014,7 +743,6 @@ class MainWindow(QMainWindow):
         act_hist.triggered.connect(self._open_history_dialog)
 
         act_rest = menu.addAction(tr("act_restore_session"))
-        act_rest.setShortcut(QKeySequence("Ctrl+Shift+T"))
         act_rest.triggered.connect(self.restore_previous_session)
 
         act_dl = menu.addAction(tr("act_downloads"))
@@ -1053,6 +781,7 @@ class MainWindow(QMainWindow):
         act_exit.triggered.connect(self.close)
 
         menu.exec(self.btn_menu.mapToGlobal(QPoint(0, self.btn_menu.height())))
+        menu.deleteLater()
 
     def _build_find_bar(self) -> None:
         self.find_bar = QWidget()
@@ -1167,11 +896,11 @@ class MainWindow(QMainWindow):
         self.tab_bar.retranslate_close_buttons()
 
     def _setup_shortcuts(self) -> None:
+        # Здесь только сочетания, которых НЕТ у действий меню (см. _build_menu):
+        # Ctrl+T, Ctrl+W, Ctrl+F, Ctrl+S, зум, F11 и т.п. обрабатываются QAction меню.
+
         # Навигация по вкладкам
-        QShortcut(QKeySequence("Ctrl+T"), self, lambda: self.add_new_tab())
-        QShortcut(QKeySequence("Ctrl+Shift+P"), self, self._open_private_window)
         QShortcut(QKeySequence("Ctrl+N"), self, lambda: self._open_new_window())
-        QShortcut(QKeySequence("Ctrl+W"), self, lambda: self.close_tab(self.tab_bar.currentIndex()))
         QShortcut(QKeySequence("Ctrl+Shift+T"), self, self._reopen_closed_tab)
         QShortcut(QKeySequence("Ctrl+Tab"), self, self._next_tab)
         QShortcut(QKeySequence("Ctrl+Shift+Tab"), self, self._prev_tab)
@@ -1198,37 +927,18 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Alt+Home"), self, self._go_home)
 
         # Диалоги и инструменты
-        QShortcut(QKeySequence("Ctrl+H"), self, self._open_history_dialog)
-        QShortcut(QKeySequence("Ctrl+J"), self, self._open_downloads_dialog)
-        QShortcut(QKeySequence("Ctrl+D"), self, self._toggle_bookmark)
-        QShortcut(QKeySequence("Ctrl+Shift+O"), self, self._open_history_dialog)
         QShortcut(QKeySequence("Ctrl+Shift+B"), self, self._open_history_dialog)
         QShortcut(QKeySequence("Ctrl+P"), self, self._save_page)
-        QShortcut(QKeySequence("Ctrl+S"), self, self._save_page)
-        QShortcut(QKeySequence("Ctrl+O"), self, self._open_local_file)
-        QShortcut(QKeySequence("Ctrl+Shift+S"), self, self._capture_screenshot)
-        QShortcut(QKeySequence("Ctrl+U"), self, self._show_page_source)
-        QShortcut(QKeySequence("Ctrl+Alt+R"), self, self._toggle_reader_mode)
 
         # Поиск
-        QShortcut(QKeySequence("Ctrl+F"), self, self._show_find_bar)
         QShortcut(QKeySequence("F3"), self, self._find_next)
         QShortcut(QKeySequence("Shift+F3"), self, self._find_prev)
         QShortcut(QKeySequence("Ctrl+G"), self, self._find_next)
         QShortcut(QKeySequence("Ctrl+Shift+G"), self, self._find_prev)
 
-        # Масштаб
-        QShortcut(QKeySequence("Ctrl+="), self, self._zoom_in)
-        QShortcut(QKeySequence("Ctrl++"), self, self._zoom_in)
-        QShortcut(QKeySequence("Ctrl+Shift+="), self, self._zoom_in)
-        QShortcut(QKeySequence("Ctrl+-"), self, self._zoom_out)
-        QShortcut(QKeySequence("Ctrl+_"), self, self._zoom_out)
-        QShortcut(QKeySequence("Ctrl+0"), self, self._zoom_reset)
-
         # Системные
         QShortcut(QKeySequence("Escape"), self, self._handle_escape)
         QShortcut(QKeySequence("F10"), self, self._toggle_menu_visibility)
-        QShortcut(QKeySequence("F11"), self, self._toggle_fullscreen)
 
     def _setup_downloads(self) -> None:
         try:
@@ -1241,11 +951,15 @@ class MainWindow(QMainWindow):
         theme_name = self.db.get_setting("theme", "dark")
         is_dark = theme_name == "dark"
         accent = self.db.get_setting("accent_color", "#0060df")
+
+        # Тема или акцент могли измениться — иконки нужно перерисовать
+        self._icon_cache = {}
+        self._is_dark_theme = is_dark
         style_file = f"{theme_name}.qss"
-        style_path = os.path.join(os.path.dirname(__file__), "styles", style_file)
+        style_path = os.path.join(STYLES_DIR, style_file)
 
         if os.path.exists(style_path):
-            with open(style_path, "r", encoding="utf-8") as f:
+            with open(style_path, encoding="utf-8") as f:
                 qss = f.read()
             # Динамически внедряем выбранный пользователем акцентный цвет
             qss = qss.replace("__ACCENT__", accent)
@@ -1321,7 +1035,7 @@ class MainWindow(QMainWindow):
         tab.url_changed.connect(lambda u, t=tab: self._update_tab_url(t, u))
         tab.icon_changed.connect(lambda icon, t=tab: self._on_tab_icon_changed(t, icon))
         tab.audio_state_changed.connect(lambda aud, mut, t=tab: self._on_tab_audio_state_changed(t, aud, mut))
-        tab.load_progress.connect(self._update_progress)
+        tab.load_progress.connect(lambda p, t=tab: self._on_tab_progress(t, p))
         tab.open_new_tab.connect(lambda u: self.add_new_tab(u))
         tab.web_view.loadFinished.connect(lambda ok, t=tab: self._on_tab_load_finished(t, ok))
         tab.web_view.page().linkHovered.connect(self._on_link_hovered)
@@ -1342,11 +1056,15 @@ class MainWindow(QMainWindow):
                 if save_to_recent and url and not url.startswith("surf://newtab") and url != "about:blank":
                     self._recently_closed_urls.append(url)
 
-            self.tab_bar.removeTab(index)
+            # Сначала убираем виджет из стека, затем вкладку из таббара: иначе
+            # currentChanged от removeTab() сработает, пока индексы стека ещё сдвинуты
             widget = self.tab_stack.widget(index)
             if widget:
                 self.tab_stack.removeWidget(widget)
+            self.tab_bar.removeTab(index)
+            if widget:
                 widget.deleteLater()
+            self._on_tab_bar_current_changed(self.tab_bar.currentIndex())
             self.tab_bar.update_movable_state()
         else:
             current = self.current_tab()
@@ -1366,7 +1084,6 @@ class MainWindow(QMainWindow):
             return
 
         url = old_tab.current_url
-        title = old_tab.current_title
 
         # Создаем новое окно браузера
         new_win = MainWindow(is_private=self.is_private)
@@ -1402,12 +1119,14 @@ class MainWindow(QMainWindow):
             if tab and isinstance(tab, BrowserTab):
                 url = tab.current_url
                 if url and not url.startswith("data:"):
-                    tabs.append({
-                        "url": url,
-                        "title": tab.current_title,
-                        "tab_index": i,
-                        "is_active": (i == self.tab_bar.currentIndex()),
-                    })
+                    tabs.append(
+                        {
+                            "url": url,
+                            "title": tab.current_title,
+                            "tab_index": i,
+                            "is_active": (i == self.tab_bar.currentIndex()),
+                        }
+                    )
         if tabs:
             self.db.save_session_tabs(tabs)
 
@@ -1425,7 +1144,11 @@ class MainWindow(QMainWindow):
         initial_is_blank = (
             self.tab_bar.count() == 1
             and cur_tab is not None
-            and (not cur_tab.current_url or cur_tab.current_url.startswith("surf://newtab") or cur_tab.current_url == "about:blank")
+            and (
+                not cur_tab.current_url
+                or cur_tab.current_url.startswith("surf://newtab")
+                or cur_tab.current_url == "about:blank"
+            )
         )
 
         active_idx = 0
@@ -1485,7 +1208,10 @@ class MainWindow(QMainWindow):
                 self.address_bar.setText("" if url.startswith("surf://newtab") else url)
                 self._update_bookmark_icon(url)
                 self._update_security_and_shield_icons(url)
-                tab.web_view.setZoomFactor(self.zoom_factor)
+                self._remember_tab_activity(tab)
+                self._wake_tab(tab)
+                self._apply_site_zoom(tab)
+                self._update_progress(getattr(tab, "load_progress_value", 100))
 
     def _on_tab_moved(self, from_idx: int, to_idx: int) -> None:
         widget = self.tab_stack.widget(from_idx)
@@ -1503,6 +1229,7 @@ class MainWindow(QMainWindow):
             self._refresh_completer()
 
     def _update_tab_url(self, tab: BrowserTab, url: str) -> None:
+        self._apply_site_zoom(tab)
         if tab == self.current_tab():
             self.address_bar.setText("" if url.startswith("surf://newtab") else url)
             self._update_bookmark_icon(url)
@@ -1523,14 +1250,20 @@ class MainWindow(QMainWindow):
         if tab and isinstance(tab, BrowserTab):
             tab.toggle_audio_mute()
 
+    def _on_tab_progress(self, tab: BrowserTab, progress: int) -> None:
+        """Запоминает прогресс вкладки; общий индикатор показывает только активную."""
+        tab.load_progress_value = progress
+        if tab is self.current_tab():
+            self._update_progress(progress)
+
     def _update_progress(self, progress: int) -> None:
-        if progress < 100:
-            self.progress_bar.setVisible(True)
-            self.progress_bar.setValue(progress)
-            self.btn_reload.setIcon(self._get_icon("stop"))
-        else:
-            self.progress_bar.setVisible(False)
-            self.btn_reload.setIcon(self._get_icon("reload"))
+        loading = progress < 100
+        self.progress_bar.setValue(progress)
+        # isHidden(), а не isVisible(): пока окно не показано, isVisible() всегда False
+        if loading == self.progress_bar.isHidden():
+            # Меняем видимость и иконку только при смене состояния, а не на каждый тик
+            self.progress_bar.setVisible(loading)
+            self.btn_reload.setIcon(self._get_icon("stop" if loading else "reload"))
 
     def _show_tab_context_menu(self, pos: QPoint) -> None:
         tab_idx = self.tab_bar.tabAt(pos)
@@ -1580,7 +1313,7 @@ class MainWindow(QMainWindow):
     def _reload_current(self) -> None:
         tab = self.current_tab()
         if tab:
-            if self.progress_bar.isVisible():
+            if getattr(tab, "load_progress_value", 100) < 100:
                 tab.web_view.stop()
             else:
                 tab.web_view.reload()
@@ -1624,8 +1357,11 @@ class MainWindow(QMainWindow):
         threading.Thread(target=worker, daemon=True).start()
 
     def _on_tab_load_finished(self, tab: BrowserTab, ok: bool) -> None:
+        # Загрузка завершена (в т.ч. остановлена/с ошибкой) — прогресс не должен «зависнуть»
+        self._on_tab_progress(tab, 100)
         if ok and tab.current_url:
             self._prefetch_certificate(tab.current_url)
+            self._apply_site_zoom(tab)
 
     def _update_security_and_shield_icons(self, url: str) -> None:
         if not hasattr(self, "act_ssl") or not hasattr(self, "act_shield"):
@@ -1669,9 +1405,7 @@ class MainWindow(QMainWindow):
 
         blocked_count = self.tracking_interceptor.blocked_count if self.tracking_interceptor else 0
         self.act_shield.setIcon(self._get_icon("shield"))
-        self.act_shield.setToolTip(
-            f"{tr('tip_shield_protection')}\n{tr('shield_blocked_text', count=blocked_count)}"
-        )
+        self.act_shield.setToolTip(f"{tr('tip_shield_protection')}\n{tr('shield_blocked_text', count=blocked_count)}")
 
     def _on_blocked_count_changed(self, count: int) -> None:
         tab = self.current_tab()
@@ -1694,25 +1428,7 @@ class MainWindow(QMainWindow):
         dlg.exec()
 
     def _show_tracking_protection_dialog(self) -> None:
-        if not self.tracking_interceptor:
-            return
-
-        cnt = self.tracking_interceptor.blocked_count
-        status_str = tr("shield_blocked_text", count=cnt)
-        state_btn = tr("shield_toggle_disable") if self.tracking_interceptor.is_enabled else tr("shield_toggle_enable")
-
-        msg_box = QMessageBox(self)
-        msg_box.setWindowTitle(tr("shield_title"))
-        msg_box.setText(f"<h3>{tr('shield_title')}</h3><p>{status_str}</p>")
-        btn_toggle = msg_box.addButton(state_btn, QMessageBox.ButtonRole.ActionRole)
-        btn_reset = msg_box.addButton(tr("btn_clear_list"), QMessageBox.ButtonRole.ResetRole)
-        msg_box.addButton(QMessageBox.StandardButton.Close)
-        msg_box.exec()
-
-        if msg_box.clickedButton() == btn_toggle:
-            self.tracking_interceptor.is_enabled = not self.tracking_interceptor.is_enabled
-        elif msg_box.clickedButton() == btn_reset:
-            self.tracking_interceptor.reset_count()
+        TrackingProtectionDialog(self.tracking_interceptor, self).exec()
 
         tab = self.current_tab()
         self._update_security_and_shield_icons(tab.current_url if tab else "")
@@ -1801,28 +1517,97 @@ class MainWindow(QMainWindow):
         elif self.main_menubar.isVisible() and self.db.get_setting("menu_bar_auto_hide", "1") == "1":
             self.main_menubar.setVisible(False)
 
-    # --- Масштабирование ---
+    # --- Масштабирование (запоминается отдельно для каждого сайта) ---
+
+    @staticmethod
+    def _site_host(url: str) -> str:
+        """Домен сайта, для которого храним масштаб ('' для служебных страниц)."""
+        if not url or url.startswith("surf://"):
+            return ""
+        return QUrl(url).host().lower()
+
+    @property
+    def zoom_factor(self) -> float:
+        """Масштаб текущей вкладки."""
+        tab = self.current_tab()
+        return round(tab.web_view.zoomFactor(), 2) if tab else 1.0
 
     def _zoom_in(self) -> None:
-        if self.zoom_factor < 3.0:
-            self.zoom_factor = round(self.zoom_factor + 0.1, 2)
-            self._apply_zoom()
+        self._set_zoom(min(ZOOM_MAX, self.zoom_factor + ZOOM_STEP))
 
     def _zoom_out(self) -> None:
-        if self.zoom_factor > 0.3:
-            self.zoom_factor = round(self.zoom_factor - 0.1, 2)
-            self._apply_zoom()
+        self._set_zoom(max(ZOOM_MIN, self.zoom_factor - ZOOM_STEP))
 
     def _zoom_reset(self) -> None:
-        self.zoom_factor = 1.0
-        self._apply_zoom()
+        self._set_zoom(1.0)
 
-    def _apply_zoom(self) -> None:
+    def _set_zoom(self, zoom: float) -> None:
+        """Меняет масштаб текущей вкладки и запоминает его для сайта (кроме приватного окна)."""
         tab = self.current_tab()
-        if tab:
-            tab.web_view.setZoomFactor(self.zoom_factor)
-        pct = int(round(self.zoom_factor * 100))
-        self.zoom_btn.setText(f"{pct}%")
+        if not tab:
+            return
+        zoom = round(zoom, 2)
+        tab.web_view.setZoomFactor(zoom)
+        host = self._site_host(tab.current_url)
+        if host and not self.is_private:
+            self.db.set_site_zoom(host, zoom)
+        self._update_zoom_label()
+
+    def _apply_site_zoom(self, tab: BrowserTab) -> None:
+        """Ставит вкладке сохранённый для её сайта масштаб (по умолчанию 100%)."""
+        zoom = self.db.get_site_zoom(self._site_host(tab.current_url)) or 1.0
+        if abs(tab.web_view.zoomFactor() - zoom) > 0.001:
+            tab.web_view.setZoomFactor(zoom)
+        if tab is self.current_tab():
+            self._update_zoom_label()
+
+    def _update_zoom_label(self) -> None:
+        self.zoom_btn.setText(f"{int(round(self.zoom_factor * 100))}%")
+
+    # --- Усыпление неактивных вкладок ---
+
+    def _remember_tab_activity(self, new_active: BrowserTab) -> None:
+        """Отмечает время, когда вкладка была активной в последний раз."""
+        now = time.monotonic()
+        if self._active_tab is not None and self._active_tab is not new_active:
+            self._active_tab.last_active = now
+        new_active.last_active = now
+        self._active_tab = new_active
+
+    def _sleep_inactive_tabs(self) -> None:
+        """Выгружает из памяти вкладки, которые давно не открывали (как в Chrome/Edge)."""
+        if self.db.get_setting("tab_sleep_enabled", "1") != "1":
+            return
+        now = time.monotonic()
+        limit_seconds = TAB_SLEEP_MINUTES * 60
+        current = self.current_tab()
+        for index in range(self.tab_stack.count()):
+            tab = self.tab_stack.widget(index)
+            if not isinstance(tab, BrowserTab) or tab is current:
+                continue
+            page = tab.web_view.page()
+            is_web_page = tab.stack.currentIndex() == 0 and tab.current_url.startswith(("http://", "https://"))
+            if (
+                not is_web_page
+                or page.lifecycleState() != QWebEnginePage.LifecycleState.Active
+                or page.recentlyAudible()  # не усыпляем вкладку, где играет звук
+                or now - getattr(tab, "last_active", now) < limit_seconds
+            ):
+                continue
+            page.setLifecycleState(QWebEnginePage.LifecycleState.Discarded)
+            if page.lifecycleState() == QWebEnginePage.LifecycleState.Discarded:
+                self.tab_bar.setTabTextColor(index, QColor(SLEEPING_TAB_COLOR))
+                self.tab_bar.setTabToolTip(index, tr("tip_tab_sleeping"))
+
+    def _wake_tab(self, tab: BrowserTab) -> None:
+        """Будит усыплённую вкладку: Chromium заново загружает страницу."""
+        page = tab.web_view.page()
+        if page.lifecycleState() != QWebEnginePage.LifecycleState.Active:
+            page.setLifecycleState(QWebEnginePage.LifecycleState.Active)
+        index = self.tab_stack.indexOf(tab)
+        if index >= 0:
+            self.tab_bar.setTabTextColor(index, QColor())  # вернуть цвет из темы
+            self.tab_bar.setTabToolTip(index, tab.current_title)
 
     def _toggle_fullscreen(self) -> None:
         if self.isFullScreen():
@@ -1850,7 +1635,7 @@ class MainWindow(QMainWindow):
     def _on_settings_updated(self) -> None:
         self._apply_theme()
         self._apply_menu_visibility()
-        self._setup_network_and_profile()
+        self._apply_profile_settings()
         self._retranslate_ui()
 
     def _quick_clear_history(self) -> None:
@@ -1992,9 +1777,8 @@ class MainWindow(QMainWindow):
             self.profile.clearHttpCache()
             self.profile.cookieStore().deleteAllCookies()
         elif self.db.get_setting("privacy_clear_on_exit", "0") == "1":
-            profile = QWebEngineProfile.defaultProfile()
-            profile.clearHttpCache()
-            profile.cookieStore().deleteAllCookies()
+            self.profile.clearHttpCache()
+            self.profile.cookieStore().deleteAllCookies()
             self.db.clear_history("all")
             self.db.clear_saved_session()
         super().closeEvent(event)

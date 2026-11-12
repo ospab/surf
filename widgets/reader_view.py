@@ -1,11 +1,11 @@
 import html
-from PyQt6.QtCore import Qt, pyqtSignal
+
+from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QSlider,
     QTextBrowser,
     QVBoxLayout,
     QWidget,
@@ -255,8 +255,9 @@ class ReaderViewWidget(QWidget):
         </head>
         <body>
             <h1>Браузер surf</h1>
-            <p><strong>surf</strong> — полнофункциональный легковесный веб-браузер, созданный <b>ospab foundation</b> на базе PyQt6 и современного движка рендеринга.</p>
-            
+            <p><strong>surf</strong> — полнофункциональный легковесный веб-браузер,
+            созданный <b>ospab foundation</b> на базе PyQt6 и современного движка рендеринга.</p>
+
             <h2>Горячие клавиши</h2>
             <table>
                 <tr><th>Сочетание</th><th>Действие</th></tr>
@@ -273,7 +274,8 @@ class ReaderViewWidget(QWidget):
             </table>
 
             <h2>Режим чтения</h2>
-            <p>Включается кнопкой в адресной строке или меню «Вид». Очищает страницу от рекламы, боковых меню и баннеров, оставляя только текст статьи и иллюстрации в удобной типографике.</p>
+            <p>Включается кнопкой в адресной строке или меню «Вид». Очищает страницу от рекламы,
+            боковых меню и баннеров, оставляя только текст статьи и иллюстрации в удобной типографике.</p>
         </body>
         </html>
         """

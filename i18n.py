@@ -11,7 +11,6 @@ TRANSLATIONS = {
         "address_placeholder": "Поиск в интернете или ввод URL...",
         "new_tab": "Новая вкладка",
         "untitled": "Без названия",
-
         # Меню
         "menu_file": "&Файл",
         "menu_edit": "&Правка",
@@ -20,7 +19,6 @@ TRANSLATIONS = {
         "menu_bookmarks": "&Закладки",
         "menu_tools": "&Инструменты",
         "menu_help": "&Справка",
-
         # Действия Файл
         "act_new_tab": "Новая вкладка",
         "act_close_tab": "Закрыть вкладку",
@@ -28,11 +26,9 @@ TRANSLATIONS = {
         "act_save_page": "Сохранить страницу как PDF...",
         "act_screenshot": "Сделать скриншот страницы...",
         "act_exit": "Выход",
-
         # Действия Правка
         "act_find": "Найти на этой странице...",
         "act_copy_url": "Копировать адрес страницы",
-
         # Действия Вид
         "act_reader": "Режим комфортного чтения",
         "act_source": "Исходный код страницы",
@@ -40,13 +36,11 @@ TRANSLATIONS = {
         "act_zoom_out": "Уменьшить масштаб",
         "act_zoom_reset": "Сбросить масштаб",
         "act_fullscreen": "Полноэкранный режим",
-
         # Действия Журнал и Закладки
         "act_show_history": "Показать всю историю",
         "act_clear_history": "Очистить историю...",
         "act_add_bookmark": "Добавить страницу в закладки",
         "act_manage_bookmarks": "Управление закладками",
-
         # Действия Инструменты и Справка
         "act_downloads": "Загрузки",
         "act_download_url": "Скачать по прямой ссылке...",
@@ -55,7 +49,6 @@ TRANSLATIONS = {
         "act_settings": "Настройки",
         "act_help": "Справка surf",
         "act_about": "О программе surf",
-
         # Подсказки кнопок (Tooltips)
         "tip_back": "Назад (Alt+Left)",
         "tip_forward": "Вперед (Alt+Right)",
@@ -66,19 +59,16 @@ TRANSLATIONS = {
         "tip_downloads": "Загрузки (Ctrl+J)",
         "tip_settings": "Настройки (Ctrl+,)",
         "tip_new_tab": "Новая вкладка (Ctrl+T)",
-
         # Панель поиска по странице
         "find_label": "Поиск:",
         "find_placeholder": "Найти на странице...",
         "find_next": "Далее",
         "find_prev": "Назад",
-
         # Контекстное меню вкладки
         "ctx_reload_tab": "Обновить вкладку",
         "ctx_duplicate_tab": "Дублировать вкладку",
         "ctx_close_tab": "Закрыть вкладку",
         "ctx_close_others": "Закрыть другие вкладки",
-
         # Уведомления и строка состояния
         "status_bookmark_added": "Закладка сохранена в Избранное",
         "status_bookmark_removed": "Закладка удалена",
@@ -97,7 +87,6 @@ TRANSLATIONS = {
         "save_pdf_dialog": "Сохранить веб-страницу как PDF",
         "save_screenshot_dialog": "Сохранить скриншот страницы",
         "save_download_dialog": "Сохранить загружаемый файл",
-
         # Быстрый доступ (Speed Dial / Top Sites)
         "speed_dial_title": "Быстрый доступ",
         "speed_dial_open": "Открыть",
@@ -113,7 +102,6 @@ TRANSLATIONS = {
         "speed_dial_url_placeholder": "https://example.com",
         "btn_save": "Сохранить",
         "btn_cancel": "Отмена",
-
         # Восстановление сессий (Session Restore)
         "act_restore_session": "Восстановить предыдущую сессию",
         "tip_restore_session": "Открыть вкладки из предыдущего сеанса",
@@ -121,7 +109,6 @@ TRANSLATIONS = {
         "status_session_restored": "Восстановлено вкладок: {count}",
         "status_no_session": "Нет сохранённых сессий для восстановления",
         "btn_restore_session": "Восстановить прошлую сессию",
-
         # О программе
         "about_title": "О программе surf",
         "about_text": (
@@ -136,7 +123,6 @@ TRANSLATIONS = {
             "<li>Настройки прокси, приватности, User-Agent и мультиязычность (RU/EN)</li>"
             "</ul>"
         ),
-
         # Окно настроек
         "settings_title": "Настройки surf",
         "tab_general": "Основные",
@@ -199,7 +185,6 @@ TRANSLATIONS = {
         "theme_light": "Светлая (surf Light)",
         "lbl_accent": "Акцентный цвет кнопок:",
         "btn_accent": "Выбрать акцент...",
-
         # Окно истории и закладок
         "history_dialog_title": "Журнал и закладки",
         "tab_history": "История",
@@ -211,6 +196,17 @@ TRANSLATIONS = {
         "filter_today": "За сегодня",
         "filter_yesterday": "За вчера",
         "filter_week": "За последнюю неделю",
+        "filter_range": "Диапазон дат...",
+        "msg_done_title": "Готово",
+        "msg_history_exported": "Экспортировано записей истории: {count}\n{path}",
+        "msg_bookmarks_exported": "Экспортировано закладок: {count}\n{path}",
+        "msg_bookmarks_imported": "Импортировано закладок: {count}\n{path}",
+        "chk_force_dark": "Тёмная тема для всех сайтов",
+        "chk_tab_sleep": "Усыплять неактивные вкладки через {minutes} мин (экономия памяти)",
+        "tip_tab_sleeping": "Вкладка спит, чтобы экономить память. Откройте её, чтобы разбудить.",
+        "shield_trackers_list": "Заблокированные трекеры за этот сеанс:",
+        "shield_list_empty": "Пока ни одного трекера не заблокировано",
+        "shield_requests": "запросов: {count}",
         "btn_export_csv": "Экспорт в CSV...",
         "btn_import_csv": "Импорт CSV...",
         "btn_delete_selected": "Удалить выбранное",
@@ -229,7 +225,6 @@ TRANSLATIONS = {
         "col_rank": "№",
         "col_domain": "Домен",
         "col_views": "Всего просмотров",
-
         # Окно загрузок
         "downloads_title": "Загрузки",
         "col_dl_name": "Имя файла",
@@ -239,14 +234,12 @@ TRANSLATIONS = {
         "col_dl_path": "Путь",
         "btn_open_folder": "Открыть папку с файлом",
         "btn_clear_list": "Очистить список",
-
         # Режим чтения
         "reader_title": "Режим комфортного чтения",
         "reader_prefix": "Чтение: ",
         "reader_source_prefix": "Исходный код: ",
         "reader_close_btn": "Закрыть чтение",
         "reader_source_label": "Источник:",
-
         # Приватность, SSL, контекстное меню и интерфейс surf
         "menu_new_private_window": "Новое приватное окно",
         "private_badge": "Приватный режим",
@@ -270,13 +263,15 @@ TRANSLATIONS = {
         "ctx_copy_image_url": "Копировать адрес изображения",
         "ctx_copy": "Копировать",
         "ctx_search_web": "Искать «{text}» в сети",
-
         # Окно сведений о сертификате безопасности
         "cert_dialog_title": "Сведения о сертификате безопасности",
         "cert_status_secure": "Безопасное соединение",
         "cert_status_secure_desc": "Соединение с этим веб-сайтом защищено современным шифрованием SSL/TLS.",
         "cert_status_insecure": "Незащищенное соединение",
-        "cert_status_insecure_desc": "Этот веб-сайт не использует шифрование (HTTP). Любая вводимая информация (пароли, сообщения, банковские данные) может быть перехвачена посторонними.",
+        "cert_status_insecure_desc": (
+            "Этот веб-сайт не использует шифрование (HTTP). Любая вводимая информация "
+            "(пароли, сообщения, банковские данные) может быть перехвачена посторонними."
+        ),
         "cert_tab_general": "Общие сведения",
         "cert_tab_details": "Технические детали",
         "cert_subject_header": "Кому выдан (Веб-сайт)",
@@ -301,7 +296,6 @@ TRANSLATIONS = {
         "address_placeholder": "Search the web or enter address...",
         "new_tab": "New Tab",
         "untitled": "Untitled",
-
         # Menus
         "menu_file": "&File",
         "menu_edit": "&Edit",
@@ -310,7 +304,6 @@ TRANSLATIONS = {
         "menu_bookmarks": "&Bookmarks",
         "menu_tools": "&Tools",
         "menu_help": "&Help",
-
         # File actions
         "act_new_tab": "New Tab",
         "act_close_tab": "Close Tab",
@@ -318,11 +311,9 @@ TRANSLATIONS = {
         "act_save_page": "Save Page as PDF...",
         "act_screenshot": "Take Page Screenshot...",
         "act_exit": "Exit",
-
         # Edit actions
         "act_find": "Find in This Page...",
         "act_copy_url": "Copy Page Address",
-
         # View actions
         "act_reader": "Reader View",
         "act_source": "Page Source",
@@ -330,13 +321,11 @@ TRANSLATIONS = {
         "act_zoom_out": "Zoom Out",
         "act_zoom_reset": "Reset Zoom",
         "act_fullscreen": "Full Screen",
-
         # History and Bookmarks actions
         "act_show_history": "Show All History",
         "act_clear_history": "Clear History...",
         "act_add_bookmark": "Bookmark This Page",
         "act_manage_bookmarks": "Manage Bookmarks",
-
         # Tools and Help actions
         "act_downloads": "Downloads",
         "act_download_url": "Download from Direct URL...",
@@ -345,7 +334,6 @@ TRANSLATIONS = {
         "act_settings": "Settings",
         "act_help": "surf Help",
         "act_about": "About surf",
-
         # Tooltips
         "tip_back": "Back (Alt+Left)",
         "tip_forward": "Forward (Alt+Right)",
@@ -356,19 +344,16 @@ TRANSLATIONS = {
         "tip_downloads": "Downloads (Ctrl+J)",
         "tip_settings": "Settings (Ctrl+,)",
         "tip_new_tab": "New Tab (Ctrl+T)",
-
         # Find bar
         "find_label": "Find:",
         "find_placeholder": "Find on page...",
         "find_next": "Next",
         "find_prev": "Previous",
-
         # Tab context menu
         "ctx_reload_tab": "Reload Tab",
         "ctx_duplicate_tab": "Duplicate Tab",
         "ctx_close_tab": "Close Tab",
         "ctx_close_others": "Close Other Tabs",
-
         # Status & notifications
         "status_bookmark_added": "Bookmark saved to Favorites",
         "status_bookmark_removed": "Bookmark removed",
@@ -387,7 +372,6 @@ TRANSLATIONS = {
         "save_pdf_dialog": "Save Web Page as PDF",
         "save_screenshot_dialog": "Save Page Screenshot",
         "save_download_dialog": "Save Downloaded File",
-
         # Speed Dial / Top Sites
         "speed_dial_title": "Top Sites",
         "speed_dial_open": "Open",
@@ -403,7 +387,6 @@ TRANSLATIONS = {
         "speed_dial_url_placeholder": "https://example.com",
         "btn_save": "Save",
         "btn_cancel": "Cancel",
-
         # Session Restore
         "act_restore_session": "Restore Previous Session",
         "tip_restore_session": "Open tabs from previous session",
@@ -411,7 +394,6 @@ TRANSLATIONS = {
         "status_session_restored": "Restored tabs: {count}",
         "status_no_session": "No saved session to restore",
         "btn_restore_session": "Restore Previous Session",
-
         # About
         "about_title": "About surf",
         "about_text": (
@@ -426,7 +408,6 @@ TRANSLATIONS = {
             "<li>Customizable Proxy, Privacy, User-Agent and Bilingual UI (RU/EN)</li>"
             "</ul>"
         ),
-
         # Settings
         "settings_title": "surf Settings",
         "tab_general": "General",
@@ -489,7 +470,6 @@ TRANSLATIONS = {
         "theme_light": "Light (surf Light)",
         "lbl_accent": "Button Accent Color:",
         "btn_accent": "Choose Accent...",
-
         # History and Bookmarks
         "history_dialog_title": "History & Bookmarks",
         "tab_history": "History",
@@ -501,6 +481,17 @@ TRANSLATIONS = {
         "filter_today": "Today",
         "filter_yesterday": "Yesterday",
         "filter_week": "Past Week",
+        "filter_range": "Date range...",
+        "msg_done_title": "Done",
+        "msg_history_exported": "History records exported: {count}\n{path}",
+        "msg_bookmarks_exported": "Bookmarks exported: {count}\n{path}",
+        "msg_bookmarks_imported": "Bookmarks imported: {count}\n{path}",
+        "chk_force_dark": "Dark mode for all websites",
+        "chk_tab_sleep": "Put inactive tabs to sleep after {minutes} min (saves memory)",
+        "tip_tab_sleeping": "This tab is asleep to save memory. Open it to wake it up.",
+        "shield_trackers_list": "Trackers blocked this session:",
+        "shield_list_empty": "No trackers blocked yet",
+        "shield_requests": "requests: {count}",
         "btn_export_csv": "Export CSV...",
         "btn_import_csv": "Import CSV...",
         "btn_delete_selected": "Delete Selected",
@@ -519,7 +510,6 @@ TRANSLATIONS = {
         "col_rank": "#",
         "col_domain": "Domain",
         "col_views": "Total Views",
-
         # Downloads
         "downloads_title": "Downloads",
         "col_dl_name": "File Name",
@@ -529,14 +519,12 @@ TRANSLATIONS = {
         "col_dl_path": "Path",
         "btn_open_folder": "Open Containing Folder",
         "btn_clear_list": "Clear List",
-
         # Reader View
         "reader_title": "Comfortable Reading Mode",
         "reader_prefix": "Reading: ",
         "reader_source_prefix": "Page Source: ",
         "reader_close_btn": "Close Reader",
         "reader_source_label": "Source:",
-
         # Privacy, SSL, context menu and surf interface
         "menu_new_private_window": "New Private Window",
         "private_badge": "Private Browsing",
@@ -560,13 +548,15 @@ TRANSLATIONS = {
         "ctx_copy_image_url": "Copy Image Address",
         "ctx_copy": "Copy",
         "ctx_search_web": "Search web for '{text}'",
-
         # Security certificate details dialog
         "cert_dialog_title": "Security Certificate Details",
         "cert_status_secure": "Secure Connection",
         "cert_status_secure_desc": "Connection to this website is secured with modern SSL/TLS encryption.",
         "cert_status_insecure": "Insecure Connection",
-        "cert_status_insecure_desc": "This website does not use encryption (HTTP). Any information you enter (passwords, messages, personal data) may be intercepted by third parties.",
+        "cert_status_insecure_desc": (
+            "This website does not use encryption (HTTP). Any information you enter "
+            "(passwords, messages, personal data) may be intercepted by third parties."
+        ),
         "cert_tab_general": "General",
         "cert_tab_details": "Technical Details",
         "cert_subject_header": "Issued To (Website)",

@@ -502,7 +502,7 @@ QLabel {
     color: #15141a;
 }
 
-QComboBox, QSpinBox {
+QComboBox, QSpinBox, QDateEdit {
     background-color: #ffffff;
     color: #15141a;
     border: 1.5px solid #c7c7cc;
@@ -510,7 +510,7 @@ QComboBox, QSpinBox {
     padding: 5px 10px;
 }
 
-QComboBox:focus, QSpinBox:focus {
+QComboBox:focus, QSpinBox:focus, QDateEdit:focus {
     border: 1.5px solid __ACCENT__;
 }
 
@@ -579,4 +579,44 @@ QTabWidget QTabBar::tab:selected {
     color: #15141a;
     font-weight: bold;
     border-bottom: 2px solid __ACCENT__;
+}
+
+QListWidget {
+    background-color: #ffffff;
+    color: #15141a;
+    border: 1px solid #c7c7cc;
+    border-radius: 8px;
+    selection-background-color: __ACCENT__;
+    selection-color: #ffffff;
+}
+
+QListWidget::item {
+    padding: 4px 8px;
+}
+
+QCalendarWidget QWidget {
+    background-color: #ffffff;
+    color: #15141a;
+    alternate-background-color: #f8f8fb;
+}
+
+QCalendarWidget QToolButton {
+    color: #15141a;
+    background-color: transparent;
+}
+
+QCalendarWidget QAbstractItemView:enabled {
+    background-color: #ffffff;
+    color: #15141a;
+    selection-background-color: __ACCENT__;
+    selection-color: #ffffff;
+}
+
+QCalendarWidget QAbstractItemView:disabled {
+    color: #a1a1aa;
+}
+
+QRadioButton {
+    color: #15141a;
+    spacing: 6px;
 }

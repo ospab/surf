@@ -1,0 +1,19 @@
+# Проверка стиля кода (PEP 8): python -m ruff check .
+line-length = 120
+target-version = "py310"
+extend-exclude = [".venv", "build", "dist", "ui/ui_history.py"]
+
+[lint]
+# E/W — pycodestyle (PEP 8), F — pyflakes (ошибки, неиспользуемое), I — порядок импортов,
+# B — частые ошибки (bugbear), UP — современный синтаксис Python
+select = ["E", "W", "F", "I", "B", "UP"]
+
+[lint.per-file-ignores]
+# Импорты после настройки sys.path / флагов Chromium — так задумано
+"main.py" = ["E402"]
+"test_*.py" = ["E402"]
+# HTML/CSS-шаблоны служебных страниц surf:// — длинные строки внутри разметки
+"utils/internal_pages.py" = ["E501"]
+
+[lint.isort]
+known-first-party = ["surf", "database", "i18n", "utils", "widgets", "ui"]

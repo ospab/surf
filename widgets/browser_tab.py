@@ -1,17 +1,15 @@
-import html
 import json
+import time
 import urllib.parse
 from urllib.parse import urlparse
 
-from PyQt6.QtCore import QEvent, QPoint, QRectF, Qt, QUrl, pyqtSignal
+from PyQt6.QtCore import QPoint, QRectF, Qt, QUrl, pyqtSignal
 from PyQt6.QtGui import (
     QBrush,
     QColor,
-    QFont,
     QFontMetrics,
     QIcon,
     QPainter,
-    QPainterPath,
     QPen,
     QPixmap,
 )
@@ -22,7 +20,6 @@ from PyQt6.QtWebEngineCore import (
     QWebEnginePage,
     QWebEnginePermission,
     QWebEngineProfile,
-    QWebEngineSettings,
 )
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWidgets import (
@@ -45,35 +42,35 @@ from PyQt6.QtWidgets import (
 try:
     from surf.database import Database
     from surf.i18n import tr
-    from surf.widgets.reader_view import ReaderViewWidget
-    from surf.widgets.permission_dialogs import (
-        DesktopMediaDialog,
-        FileSystemAccessDialog,
-        PermissionPromptBar,
-        normalize_origin,
-    )
     from surf.utils.favicon_service import (
         FaviconService,
         create_circular_favicon_badge,
         generate_fallback_badge,
         get_clean_domain,
     )
-except ModuleNotFoundError:
-    from database import Database
-    from i18n import tr
-    from widgets.reader_view import ReaderViewWidget
-    from widgets.permission_dialogs import (
+    from surf.widgets.permission_dialogs import (
         DesktopMediaDialog,
         FileSystemAccessDialog,
         PermissionPromptBar,
         normalize_origin,
     )
+    from surf.widgets.reader_view import ReaderViewWidget
+except ModuleNotFoundError:
+    from database import Database
+    from i18n import tr
     from utils.favicon_service import (
         FaviconService,
         create_circular_favicon_badge,
         generate_fallback_badge,
         get_clean_domain,
     )
+    from widgets.permission_dialogs import (
+        DesktopMediaDialog,
+        FileSystemAccessDialog,
+        PermissionPromptBar,
+        normalize_origin,
+    )
+    from widgets.reader_view import ReaderViewWidget
 
 
 def format_search_url(engine_template: str, query: str) -> str:
@@ -173,7 +170,11 @@ class BrowserPage(QWebEnginePage):
 
             saved = db.get_site_permission(origin_str, feat_key)
             if saved == "allow":
-                if feat_key in ("media", "audio", "video") and self.tab and hasattr(self.tab, "apply_saved_device_preferences"):
+                if (
+                    feat_key in ("media", "audio", "video")
+                    and self.tab
+                    and hasattr(self.tab, "apply_saved_device_preferences")
+                ):
                     self.tab.apply_saved_device_preferences(origin_str)
                 permission.grant()
                 return
@@ -198,19 +199,31 @@ class BrowserPage(QWebEnginePage):
                     if self.tab and hasattr(self.tab, "apply_device_config"):
                         self.tab.apply_device_config(dev_pref)
                     if dev_pref.get("allow_audio") or dev_pref.get("allow_video"):
-                        self.setFeaturePermission(security_origin, feature, QWebEnginePage.PermissionPolicy.PermissionGrantedByUser)
+                        self.setFeaturePermission(
+                            security_origin, feature, QWebEnginePage.PermissionPolicy.PermissionGrantedByUser
+                        )
                     else:
-                        self.setFeaturePermission(security_origin, feature, QWebEnginePage.PermissionPolicy.PermissionDeniedByUser)
+                        self.setFeaturePermission(
+                            security_origin, feature, QWebEnginePage.PermissionPolicy.PermissionDeniedByUser
+                        )
                     return
 
             saved = db.get_site_permission(origin_str, feat_key)
             if saved == "allow":
-                if feat_key in ("media", "audio", "video") and self.tab and hasattr(self.tab, "apply_saved_device_preferences"):
+                if (
+                    feat_key in ("media", "audio", "video")
+                    and self.tab
+                    and hasattr(self.tab, "apply_saved_device_preferences")
+                ):
                     self.tab.apply_saved_device_preferences(origin_str)
-                self.setFeaturePermission(security_origin, feature, QWebEnginePage.PermissionPolicy.PermissionGrantedByUser)
+                self.setFeaturePermission(
+                    security_origin, feature, QWebEnginePage.PermissionPolicy.PermissionGrantedByUser
+                )
                 return
             elif saved == "deny":
-                self.setFeaturePermission(security_origin, feature, QWebEnginePage.PermissionPolicy.PermissionDeniedByUser)
+                self.setFeaturePermission(
+                    security_origin, feature, QWebEnginePage.PermissionPolicy.PermissionDeniedByUser
+                )
                 return
 
         if self.tab and hasattr(self.tab, "request_permission"):
@@ -336,7 +349,12 @@ class SpeedDialEditDialog(QDialog):
             self.input_url.setFocus()
             return
 
-        if not (url.startswith("http://") or url.startswith("https://") or url.startswith("surf://") or url.startswith("file://")):
+        if not (
+            url.startswith("http://")
+            or url.startswith("https://")
+            or url.startswith("surf://")
+            or url.startswith("file://")
+        ):
             url = f"https://{url}"
 
         name = self.input_name.text().strip()
@@ -650,9 +668,7 @@ class SpeedDialWidget(QWidget):
         else:
             url = tile_data.get("url")
             if url:
-                with self.db._get_connection() as conn:
-                    conn.cursor().execute("DELETE FROM history WHERE url = ?", (url,))
-                    conn.commit()
+                self.db.delete_history_by_url(url)
         self.refresh_tiles()
 
     def _on_pin_tile(self, tile_data: dict) -> None:
@@ -694,6 +710,8 @@ class BrowserTab(QWidget):
         self.profile = profile or QWebEngineProfile.defaultProfile()
         self.current_title = tr("new_tab")
         self.current_url = ""
+        # Когда вкладку последний раз открывали (для усыпления неактивных вкладок)
+        self.last_active = time.monotonic()
         self._init_ui()
 
     def _init_ui(self) -> None:
@@ -740,9 +758,9 @@ class BrowserTab(QWidget):
         self.reader_view.open_link.connect(self.load_url)
         self.reader_view.close_reader.connect(self.show_normal_view)
 
-        self.stack.addWidget(self.web_view)      # Индекс 0
-        self.stack.addWidget(self.speed_dial)     # Индекс 1
-        self.stack.addWidget(self.reader_view)    # Индекс 2
+        self.stack.addWidget(self.web_view)  # Индекс 0
+        self.stack.addWidget(self.speed_dial)  # Индекс 1
+        self.stack.addWidget(self.reader_view)  # Индекс 2
 
         layout.addWidget(self.stack)
         self.show_speed_dial()
@@ -781,7 +799,11 @@ class BrowserTab(QWidget):
             menu.addSeparator()
 
         # 2. Если клик по изображению
-        if req and req.mediaType() == QWebEngineContextMenuRequest.MediaType.MediaTypeImage and req.mediaUrl().isValid():
+        if (
+            req
+            and req.mediaType() == QWebEngineContextMenuRequest.MediaType.MediaTypeImage
+            and req.mediaUrl().isValid()
+        ):
             img_url = req.mediaUrl().toString()
             act_img_tab = menu.addAction(tr("ctx_open_image_tab"))
             act_img_tab.triggered.connect(lambda: self.open_new_tab.emit(img_url))
@@ -838,7 +860,12 @@ class BrowserTab(QWidget):
             self.show_speed_dial()
             return
 
-        if not (url.startswith("http://") or url.startswith("https://") or url.startswith("file://") or url.startswith("surf://")):
+        if not (
+            url.startswith("http://")
+            or url.startswith("https://")
+            or url.startswith("file://")
+            or url.startswith("surf://")
+        ):
             if "." in url and " " not in url:
                 url = f"https://{url}"
             else:
@@ -891,7 +918,8 @@ class BrowserTab(QWidget):
 
         js_code = """
         (function() {
-            var article = document.querySelector('article') || document.querySelector('.article') || document.querySelector('main') || document.body;
+            var article = document.querySelector('article') || document.querySelector('.article')
+                || document.querySelector('main') || document.body;
             var clone = article.cloneNode(true);
             var toRemove = clone.querySelectorAll('script, style, nav, footer, header, aside, .ads, .ad, iframe');
             for (var i = 0; i < toRemove.length; i++) {
@@ -903,6 +931,7 @@ class BrowserTab(QWidget):
             };
         })();
         """
+
         def handle_extracted(data):
             if isinstance(data, dict):
                 title = data.get("title", self.current_title)
@@ -935,8 +964,9 @@ class BrowserTab(QWidget):
         if title:
             self.current_title = title
             self.title_changed.emit(title)
+            # Только обновляем заголовок: посещение засчитывается один раз в _on_load_finished
             if self.current_url and not self.current_url.startswith("surf://") and not self.profile.isOffTheRecord():
-                self.db.add_history_entry(self.current_url, title)
+                self.db.update_history_title(self.current_url, title)
 
     def _on_url_changed(self, qurl: QUrl) -> None:
         url_str = qurl.toString()
@@ -959,12 +989,14 @@ class BrowserTab(QWidget):
     def apply_device_config(self, config: dict) -> None:
         """Передает параметры выбранных аудио- и видеоустройств в контекст JavaScript страницы."""
         try:
-            cfg_json = json.dumps({
-                "allow_audio": bool(config.get("allow_audio", True)),
-                "selected_audio": str(config.get("selected_audio") or config.get("audio_device") or ""),
-                "allow_video": bool(config.get("allow_video", True)),
-                "selected_video": str(config.get("selected_video") or config.get("video_device") or ""),
-            })
+            cfg_json = json.dumps(
+                {
+                    "allow_audio": bool(config.get("allow_audio", True)),
+                    "selected_audio": str(config.get("selected_audio") or config.get("audio_device") or ""),
+                    "allow_video": bool(config.get("allow_video", True)),
+                    "selected_video": str(config.get("selected_video") or config.get("video_device") or ""),
+                }
+            )
             js_code = f"if (window.__surf_set_media_config) {{ window.__surf_set_media_config({cfg_json}); }}"
             self.browser_page.runJavaScript(js_code)
         except Exception:
@@ -982,12 +1014,14 @@ class BrowserTab(QWidget):
             def_audio = self.db.get_setting("default_audio_device", "") if self.db else ""
             def_video = self.db.get_setting("default_video_device", "") if self.db else ""
             if def_audio or def_video:
-                self.apply_device_config({
-                    "allow_audio": True,
-                    "selected_audio": def_audio,
-                    "allow_video": True,
-                    "selected_video": def_video,
-                })
+                self.apply_device_config(
+                    {
+                        "allow_audio": True,
+                        "selected_audio": def_audio,
+                        "allow_video": True,
+                        "selected_video": def_video,
+                    }
+                )
 
     def request_permission(
         self,
@@ -1007,7 +1041,10 @@ class BrowserTab(QWidget):
 
         # Если плашка для этого запроса уже показана, просто аккумулируем запрос
         if hasattr(self, "permission_bar") and self.permission_bar.isVisible():
-            if self.permission_bar._current_origin == origin_str and self.permission_bar._current_feature_key == feat_key:
+            if (
+                self.permission_bar._current_origin == origin_str
+                and self.permission_bar._current_feature_key == feat_key
+            ):
                 return
 
         def on_allow(result):

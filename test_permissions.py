@@ -5,6 +5,7 @@
 - сохранение выбора для сайта (site_device_preferences)
 - вкладка «Устройства» в настройках (SettingsDialog)
 """
+
 import os
 import sys
 import tempfile
@@ -17,16 +18,12 @@ from main import setup_chromium_environment
 
 setup_chromium_environment()
 
-from PyQt6.QtCore import QTimer, QUrl
-from PyQt6.QtWebEngineCore import QWebEnginePage
 from PyQt6.QtWidgets import QApplication
+
 from database import Database
 from utils.device_service import DeviceService
-from widgets.browser_tab import BrowserTab
 from widgets.permission_dialogs import (
     PermissionPromptBar,
-    get_feature_info,
-    normalize_origin,
 )
 from widgets.settings_dialog import SettingsDialog
 
@@ -43,7 +40,7 @@ def run_tests():
     print("  -> All Chromium flags for devices, WebUSB, WebXR, WebRTC are present!")
 
     print("\n=== 2. Testing DeviceService (QMediaDevices enumeration) ===")
-    app = QApplication.instance() or QApplication(sys.argv)
+    _app = QApplication.instance() or QApplication(sys.argv)  # нужен живой QApplication
     svc = DeviceService.instance()
     mics = svc.get_audio_inputs()
     cams = svc.get_video_inputs()

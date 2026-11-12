@@ -1,6 +1,7 @@
 """
 Headless unit and integration tests for Speed Dial (Top Sites) functionality.
 """
+
 import os
 import sys
 
@@ -12,10 +13,12 @@ for p in (BASE_DIR, PARENT_DIR):
         sys.path.insert(0, p)
 
 import tempfile
-import PyQt6.QtWebEngineWidgets
-from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import Qt, QPoint, QPointF
+
+# Импорт ради побочного эффекта: QtWebEngine нужно загрузить ДО создания QApplication
+import PyQt6.QtWebEngineWidgets  # noqa: F401
+from PyQt6.QtCore import QPointF, Qt
 from PyQt6.QtGui import QMouseEvent
+from PyQt6.QtWidgets import QApplication
 
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
@@ -25,24 +28,21 @@ if not app:
 
 try:
     from surf.database import Database
-    from surf.i18n import tr, set_language
+    from surf.i18n import set_language
     from surf.widgets.browser_tab import (
-        SpeedDialWidget,
         SpeedDialCard,
-        SpeedDialAddCard,
-        SpeedDialEditDialog,
+        SpeedDialWidget,
         generate_tile_badge,
     )
 except ModuleNotFoundError:
     from database import Database
-    from i18n import tr, set_language
+    from i18n import set_language
     from widgets.browser_tab import (
-        SpeedDialWidget,
         SpeedDialCard,
-        SpeedDialAddCard,
-        SpeedDialEditDialog,
+        SpeedDialWidget,
         generate_tile_badge,
     )
+
 
 def run_tests():
     print("=== 1. Testing Database Initialization and Clean Shortcuts ===")
@@ -88,7 +88,7 @@ def run_tests():
         print("  -> SpeedDialWidget instantiated with 1 item (Add Card) in grid")
 
         # Test adding a tile and clicking on card
-        new_id2 = db.add_speed_dial_tile("GitHub", "https://github.com")
+        db.add_speed_dial_tile("GitHub", "https://github.com")
         widget.refresh_tiles()
         assert widget.tiles_layout.count() == 2  # 1 tile + 1 add card
 
@@ -98,8 +98,20 @@ def run_tests():
         first_card = widget.tiles_layout.itemAt(0).widget()
         assert isinstance(first_card, SpeedDialCard)
         # Simulate click
-        press_event = QMouseEvent(QMouseEvent.Type.MouseButtonPress, QPointF(20, 20), Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
-        release_event = QMouseEvent(QMouseEvent.Type.MouseButtonRelease, QPointF(20, 20), Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+        press_event = QMouseEvent(
+            QMouseEvent.Type.MouseButtonPress,
+            QPointF(20, 20),
+            Qt.MouseButton.LeftButton,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+        )
+        release_event = QMouseEvent(
+            QMouseEvent.Type.MouseButtonRelease,
+            QPointF(20, 20),
+            Qt.MouseButton.LeftButton,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+        )
         first_card.mousePressEvent(press_event)
         first_card.mouseReleaseEvent(release_event)
         assert len(opened_urls) == 1
@@ -171,6 +183,7 @@ def run_tests():
                 os.remove(temp_db_path)
             except Exception:
                 pass
+
 
 if __name__ == "__main__":
     run_tests()
