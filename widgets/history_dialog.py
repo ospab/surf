@@ -185,8 +185,7 @@ class HistoryDialog(QDialog, Ui_HistoryDialog):
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if ans == QMessageBox.StandardButton.Yes:
-            # Удаляем ровно то, что сейчас показывает фильтр периода
-            # (раньше при фильтре «неделя» удалялась вся история)
+            # Удаляем только то, что сейчас видно в таблице
             period, date_from, date_to = self._current_filter()
             self.db.delete_history_filtered(period, date_from, date_to)
             self._reload_history()

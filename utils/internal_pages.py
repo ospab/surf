@@ -1,6 +1,6 @@
 """
 Модуль внутренних страниц surf://
-Генерирует современные адаптивные HTML-страницы для внутренних URL браузера surf:
+Собирает HTML служебных страниц surf://:
 - surf://pages (каталог страниц)
 - surf://about (о браузере и компонентах)
 - surf://history (журнал посещений с поиском)
@@ -40,7 +40,7 @@ def register_surf_scheme() -> None:
 
 
 def get_base_js() -> str:
-    """Возвращает общий JavaScript для внутренних страниц: перехват Ctrl+клик и клик колесом мыши для открытия в новой вкладке."""
+    """Общий скрипт служебных страниц: Ctrl+клик и средняя кнопка открывают ссылку в новой вкладке."""
     return """
     <script>
     document.addEventListener('click', function(e) {
@@ -265,7 +265,7 @@ def get_base_css(is_dark: bool, accent: str = "#0060df") -> str:
 
 
 def render_pages_directory(is_dark: bool, accent: str = "#0060df") -> str:
-    """Генерирует каталог всех внутренних страниц surf://pages."""
+    """Страница surf://pages со списком всех служебных страниц."""
     is_ru = get_language() == "ru"
     title = "Служебные страницы" if is_ru else "Internal Pages"
     subtitle = "Список внутренних адресов surf://" if is_ru else "List of internal surf:// addresses"
@@ -275,14 +275,14 @@ def render_pages_directory(is_dark: bool, accent: str = "#0060df") -> str:
         (
             "surf://about",
             "surf://about",
-            "Сведения о браузере и среде выполнения" if is_ru else "Browser and runtime environment details",
+            "Версия и среда выполнения" if is_ru else "Browser and runtime environment details",
         ),
         ("surf://history", "surf://history", "Журнал посещений" if is_ru else "Browsing history"),
         ("surf://bookmarks", "surf://bookmarks", "Сохранённые закладки" if is_ru else "Saved bookmarks"),
         ("surf://downloads", "surf://downloads", "Журнал загрузок" if is_ru else "Download records"),
         ("surf://protection", "surf://protection", "Защита от отслеживания" if is_ru else "Tracking protection"),
-        ("surf://gpu", "surf://gpu", "Сведения о графической подсистеме" if is_ru else "Graphics and GPU diagnostics"),
-        ("surf://settings", "surf://settings", "Параметры браузера" if is_ru else "Browser preferences"),
+        ("surf://gpu", "surf://gpu", "Видеокарта и отрисовка" if is_ru else "Graphics and GPU diagnostics"),
+        ("surf://settings", "surf://settings", "Настройки браузера" if is_ru else "Browser settings"),
         ("surf://help", "surf://help", "Горячие клавиши" if is_ru else "Keyboard shortcuts"),
         ("surf://newtab", "surf://newtab", "Новая вкладка" if is_ru else "New tab"),
     ]
@@ -426,7 +426,7 @@ def render_welcome_page(is_dark: bool, accent: str = "#0060df") -> str:
 
 
 def render_about_page(db: Database, is_dark: bool, accent: str = "#0060df") -> str:
-    """Генерирует минималистичную страницу surf://about строго в стиле mozilla без фиктивных элементов."""
+    """Страница surf://about: версия, движок и среда выполнения."""
     is_ru = get_language() == "ru"
     title = "О программе surf" if is_ru else "About surf"
 
@@ -545,7 +545,7 @@ def render_about_page(db: Database, is_dark: bool, accent: str = "#0060df") -> s
                 <div class="app-divider"></div>
 
                 <div class="app-motto">
-                    {"Быстрый, приватный и независимый веб-серфинг." if is_ru else "Fast, private, and independent web browsing experience."}
+                    {"Браузер на PyQt6." if is_ru else "A browser built with PyQt6."}
                 </div>
 
                 <div class="app-links">
@@ -575,7 +575,7 @@ def render_about_page(db: Database, is_dark: bool, accent: str = "#0060df") -> s
 
 
 def render_history_page(db: Database, is_dark: bool, accent: str = "#0060df") -> str:
-    """Генерирует веб-страницу surf://history с поиском."""
+    """Страница surf://history."""
     is_ru = get_language() == "ru"
     title = "Журнал посещений" if is_ru else "Browsing History"
     subtitle = "История переходов" if is_ru else "Chronological log of visited pages"
@@ -655,7 +655,7 @@ def render_history_page(db: Database, is_dark: bool, accent: str = "#0060df") ->
 
 
 def render_bookmarks_page(db: Database, is_dark: bool, accent: str = "#0060df") -> str:
-    """Генерирует веб-страницу закладок surf://bookmarks."""
+    """Страница surf://bookmarks."""
     is_ru = get_language() == "ru"
     title = "Закладки" if is_ru else "Bookmarks"
     subtitle = "Сохранённые закладки" if is_ru else "Saved bookmarks"
@@ -732,7 +732,7 @@ def render_bookmarks_page(db: Database, is_dark: bool, accent: str = "#0060df") 
 
 
 def render_downloads_page(db: Database, is_dark: bool, accent: str = "#0060df") -> str:
-    """Генерирует веб-страницу загрузок surf://downloads."""
+    """Страница surf://downloads."""
     is_ru = get_language() == "ru"
     title = "Загрузки" if is_ru else "Downloads"
     subtitle = "Список загруженных файлов" if is_ru else "Downloaded files history"
@@ -810,10 +810,10 @@ def render_downloads_page(db: Database, is_dark: bool, accent: str = "#0060df") 
 
 
 def render_protection_page(is_dark: bool, accent: str = "#0060df", interceptor=None) -> str:
-    """Генерирует страницу защиты от отслеживания surf://protection."""
+    """Страница surf://protection."""
     is_ru = get_language() == "ru"
     title = "Защита от отслеживания" if is_ru else "Tracking Protection"
-    subtitle = "Сетевая фильтрация трекеров и телеметрии" if is_ru else "Network-level tracker and telemetry filtering"
+    subtitle = "Какие трекеры блокирует surf" if is_ru else "Which trackers surf blocks"
 
     blocked_count = interceptor.blocked_count if interceptor and hasattr(interceptor, "blocked_count") else 0
     is_enabled = interceptor.is_enabled if interceptor and hasattr(interceptor, "is_enabled") else True
@@ -915,10 +915,10 @@ def render_protection_page(is_dark: bool, accent: str = "#0060df", interceptor=N
 
 
 def render_gpu_page(is_dark: bool, accent: str = "#0060df") -> str:
-    """Генерирует страницу графической и системной информации surf://gpu."""
+    """Страница surf://gpu."""
     is_ru = get_language() == "ru"
-    title = "Графическая подсистема" if is_ru else "Graphics Subsystem"
-    subtitle = "Параметры видеоподсистемы и среды отрисовки" if is_ru else "Graphics stack and display diagnostics"
+    title = "Графика" if is_ru else "Graphics"
+    subtitle = "Видеокарта, экран и отрисовка" if is_ru else "Graphics card, screen and rendering"
 
     app = QGuiApplication.instance()
     primary_screen = app.primaryScreen() if app else None
@@ -972,7 +972,7 @@ def render_gpu_page(is_dark: bool, accent: str = "#0060df") -> str:
 
 
 def render_help_page(is_dark: bool, accent: str = "#0060df") -> str:
-    """Генерирует справочник горячих клавиш surf://help."""
+    """Страница surf://help со списком горячих клавиш."""
     is_ru = get_language() == "ru"
     title = "Горячие клавиши" if is_ru else "Keyboard Shortcuts"
     subtitle = "Сочетания клавиш браузера" if is_ru else "Key combinations reference"
@@ -1084,10 +1084,10 @@ def render_help_page(is_dark: bool, accent: str = "#0060df") -> str:
 
 
 def render_settings_page(db: Database, is_dark: bool, accent: str = "#0060df") -> str:
-    """Генерирует веб-страницу параметров surf://settings."""
+    """Страница surf://settings."""
     is_ru = get_language() == "ru"
-    title = "Параметры браузера" if is_ru else "Browser Settings"
-    subtitle = "Текущая конфигурация" if is_ru else "Current configuration"
+    title = "Настройки" if is_ru else "Settings"
+    subtitle = "Что выбрано сейчас" if is_ru else "What is selected now"
 
     homepage = db.get_setting("homepage", "https://ya.ru")
     search_eng = db.get_setting("search_engine", "https://www.google.com/search?q=")
@@ -1132,9 +1132,9 @@ def render_settings_page(db: Database, is_dark: bool, accent: str = "#0060df") -
             </div>
 
             <div class="card">
-                <div class="card-title">{"Изменение параметров" if is_ru else "Change Settings"}</div>
+                <div class="card-title">{"Как поменять" if is_ru else "How to change"}</div>
                 <p style="font-size: 13px; color: var(--text-muted); line-height: 1.8;">
-                    {"Для изменения параметров используйте диалоговое окно настроек:" if is_ru else "To configure browser options open Settings dialog:"} <kbd>Ctrl+,</kbd>
+                    {"Откройте окно настроек:" if is_ru else "Open the Settings window:"} <kbd>Ctrl+,</kbd>
                 </p>
             </div>
         </div>
@@ -1144,7 +1144,7 @@ def render_settings_page(db: Database, is_dark: bool, accent: str = "#0060df") -
 
 
 class SurfSchemeHandler(QWebEngineUrlSchemeHandler):
-    """Обработчик кастомной схемы surf:// для прямого рендеринга служебных страниц."""
+    """Отдаёт служебные страницы по адресам surf://."""
 
     def __init__(self, db: Database, parent=None, interceptor=None):
         super().__init__(parent)

@@ -6,9 +6,9 @@
 TRANSLATIONS = {
     "ru": {
         "app_title": "surf",
-        "app_subtitle": "Быстрый, приватный и легковесный веб-серфинг",
-        "search_placeholder": "Искать в интернете или ввести адрес веб-сайта...",
-        "address_placeholder": "Поиск в интернете или ввод URL...",
+        "app_subtitle": "Браузер на PyQt6",
+        "search_placeholder": "Поиск или адрес сайта",
+        "address_placeholder": "Поиск или адрес сайта",
         "new_tab": "Новая вкладка",
         "untitled": "Без названия",
         # Меню
@@ -27,10 +27,10 @@ TRANSLATIONS = {
         "act_screenshot": "Сделать скриншот страницы...",
         "act_exit": "Выход",
         # Действия Правка
-        "act_find": "Найти на этой странице...",
+        "act_find": "Найти на странице...",
         "act_copy_url": "Копировать адрес страницы",
         # Действия Вид
-        "act_reader": "Режим комфортного чтения",
+        "act_reader": "Режим чтения",
         "act_source": "Исходный код страницы",
         "act_zoom_in": "Увеличить масштаб",
         "act_zoom_out": "Уменьшить масштаб",
@@ -73,7 +73,7 @@ TRANSLATIONS = {
         "status_bookmark_added": "Закладка сохранена в Избранное",
         "status_bookmark_removed": "Закладка удалена",
         "status_url_copied": "URL скопирован в буфер обмена",
-        "status_history_cleared": "История посещений успешно очищена",
+        "status_history_cleared": "История очищена",
         "status_download_started": "Началась загрузка: {name}",
         "status_download_finished": "Загрузка завершена: {name}",
         "status_pdf_saved": "Страница сохранена в PDF: {path}",
@@ -87,7 +87,7 @@ TRANSLATIONS = {
         "save_pdf_dialog": "Сохранить веб-страницу как PDF",
         "save_screenshot_dialog": "Сохранить скриншот страницы",
         "save_download_dialog": "Сохранить загружаемый файл",
-        # Быстрый доступ (Speed Dial / Top Sites)
+        # Плитки на новой вкладке
         "speed_dial_title": "Быстрый доступ",
         "speed_dial_open": "Открыть",
         "speed_dial_add": "Добавить сайт",
@@ -102,38 +102,25 @@ TRANSLATIONS = {
         "speed_dial_url_placeholder": "https://example.com",
         "btn_save": "Сохранить",
         "btn_cancel": "Отмена",
-        # Восстановление сессий (Session Restore)
+        # Вкладки с прошлого раза
         "act_restore_session": "Восстановить предыдущую сессию",
         "tip_restore_session": "Открыть вкладки из предыдущего сеанса",
         "pref_restore_session": "Восстанавливать вкладки прошлого сеанса при запуске",
         "status_session_restored": "Восстановлено вкладок: {count}",
-        "status_no_session": "Нет сохранённых сессий для восстановления",
+        "status_no_session": "Нет сохранённых вкладок",
         "btn_restore_session": "Восстановить прошлую сессию",
         # О программе
-        "about_title": "О программе surf",
-        "about_text": (
-            "<h3>surf 1.0</h3>"
-            "<p>Строгий веб-браузер на базе PyQt6 и WebEngine со скруглённым интерфейсом.</p>"
-            "<p><b>Особенности:</b></p>"
-            "<ul>"
-            "<li>Многовкладочный интерфейс с прокруткой и компактным сужением</li>"
-            "<li>Режим комфортного чтения без рекламы (Reader Mode)</li>"
-            "<li>Журнал истории, закладок и загрузок на SQLite</li>"
-            "<li>Экспорт и импорт данных в формате CSV</li>"
-            "<li>Настройки прокси, приватности, User-Agent и мультиязычность (RU/EN)</li>"
-            "</ul>"
-        ),
         # Окно настроек
         "settings_title": "Настройки surf",
         "tab_general": "Основные",
-        "tab_privacy": "Приватность и заголовок",
+        "tab_privacy": "Приватность",
         "tab_proxy": "Прокси-сервер",
         "tab_appearance": "Оформление",
         "tab_devices": "Устройства",
-        "group_default_devices": "Устройства мультимедиа по умолчанию",
+        "group_default_devices": "Устройства по умолчанию",
         "lbl_default_mic": "Микрофон:",
         "lbl_default_camera": "Веб-камера:",
-        "system_default_device": "(Системное по умолчанию)",
+        "system_default_device": "Как в системе",
         "lbl_default": "По умолчанию",
         "group_site_devices": "Разрешения сайтов на микрофон и камеру",
         "col_site": "Сайт",
@@ -159,9 +146,9 @@ TRANSLATIONS = {
         "lbl_language": "Язык интерфейса / Language:",
         "group_downloads": "Загрузки",
         "btn_browse": "Обзор...",
-        "group_user_agent": "User-Agent (идентификация браузера)",
-        "ua_surf": "Surf 1.0 (современный веб, рекомендуется)",
-        "ua_surf_pure": "Surf 1.0 (чистый идентификатор)",
+        "group_user_agent": "User-Agent",
+        "ua_surf": "Surf 1.0 (рекомендуется)",
+        "ua_surf_pure": "Surf 1.0 (только имя браузера)",
         "ua_chrome": "Google Chrome",
         "ua_firefox": "Mozilla Firefox",
         "ua_custom": "Пользовательский...",
@@ -169,7 +156,7 @@ TRANSLATIONS = {
         "chk_save_history": "Вести журнал посещенных страниц",
         "chk_clear_exit": "Очищать кэш и историю при выходе из браузера",
         "chk_dnt": "Отправлять веб-сайтам сигнал «Не отслеживать» (Do Not Track)",
-        "group_proxy": "Конфигурация сети",
+        "group_proxy": "Сеть",
         "lbl_proxy_type": "Тип прокси:",
         "proxy_none": "Без прокси (прямое соединение)",
         "proxy_system": "Системные настройки Windows",
@@ -179,12 +166,12 @@ TRANSLATIONS = {
         "lbl_proxy_port": "Порт:",
         "lbl_proxy_user": "Логин (опционально):",
         "lbl_proxy_pass": "Пароль (опционально):",
-        "group_style": "Стиль интерфейса",
+        "group_style": "Внешний вид",
         "lbl_theme": "Цветовая схема:",
-        "theme_dark": "Тёмная (surf Dark)",
-        "theme_light": "Светлая (surf Light)",
-        "lbl_accent": "Акцентный цвет кнопок:",
-        "btn_accent": "Выбрать акцент...",
+        "theme_dark": "Тёмная",
+        "theme_light": "Светлая",
+        "lbl_accent": "Цвет акцента:",
+        "btn_accent": "Выбрать цвет...",
         # Окно истории и закладок
         "history_dialog_title": "Журнал и закладки",
         "tab_history": "История",
@@ -213,18 +200,18 @@ TRANSLATIONS = {
         "btn_clear_history": "Очистить историю...",
         "btn_open_tab": "Открыть в новой вкладке",
         "btn_delete_bookmark": "Удалить закладку",
-        "stats_info": "Топ самых посещаемых доменов по данным истории:",
+        "stats_info": "Сайты, которые вы открываете чаще всего:",
         "btn_close": "Закрыть",
         "col_id": "ID",
         "col_title": "Заголовок",
         "col_url": "URL",
         "col_time": "Дата и время",
-        "col_visits": "Визитов",
+        "col_visits": "Посещений",
         "col_folder": "Папка",
         "col_added": "Дата добавления",
         "col_rank": "№",
         "col_domain": "Домен",
-        "col_views": "Всего просмотров",
+        "col_views": "Посещений",
         # Окно загрузок
         "downloads_title": "Загрузки",
         "col_dl_name": "Имя файла",
@@ -235,7 +222,7 @@ TRANSLATIONS = {
         "btn_open_folder": "Открыть папку с файлом",
         "btn_clear_list": "Очистить список",
         # Режим чтения
-        "reader_title": "Режим комфортного чтения",
+        "reader_title": "Режим чтения",
         "reader_prefix": "Чтение: ",
         "reader_source_prefix": "Исходный код: ",
         "reader_close_btn": "Закрыть чтение",
@@ -249,14 +236,14 @@ TRANSLATIONS = {
         "ssl_secure_title": "Безопасность соединения",
         "ssl_secure_msg": "Соединение защищено шифрованием SSL/TLS.\nХост: {host}",
         "ssl_insecure_msg": "Внимание! Соединение не зашифровано.\nХост: {host}",
-        "tip_shield_protection": "Улучшенная защита от отслеживания (ETP)",
+        "tip_shield_protection": "Защита от отслеживания",
         "shield_title": "Защита от отслеживания",
         "shield_blocked_text": "Заблокировано трекеров и рекламных запросов: {count}",
         "shield_toggle_enable": "Включить защиту",
         "shield_toggle_disable": "Отключить защиту",
         "tip_mute_tab": "Заглушить звук вкладки",
         "tip_unmute_tab": "Включить звук вкладки",
-        "tip_menu_surf": "Меню приложения (Alt+F)",
+        "tip_menu_surf": "Меню",
         "ctx_open_link_tab": "Открыть ссылку в новой вкладке",
         "ctx_copy_link": "Копировать адрес ссылки",
         "ctx_open_image_tab": "Открыть изображение в новой вкладке",
@@ -266,7 +253,7 @@ TRANSLATIONS = {
         # Окно сведений о сертификате безопасности
         "cert_dialog_title": "Сведения о сертификате безопасности",
         "cert_status_secure": "Безопасное соединение",
-        "cert_status_secure_desc": "Соединение с этим веб-сайтом защищено современным шифрованием SSL/TLS.",
+        "cert_status_secure_desc": "Соединение с сайтом зашифровано (SSL/TLS).",
         "cert_status_insecure": "Незащищенное соединение",
         "cert_status_insecure_desc": (
             "Этот веб-сайт не использует шифрование (HTTP). Любая вводимая информация "
@@ -274,8 +261,8 @@ TRANSLATIONS = {
         ),
         "cert_tab_general": "Общие сведения",
         "cert_tab_details": "Технические детали",
-        "cert_subject_header": "Кому выдан (Веб-сайт)",
-        "cert_issuer_header": "Кем выдан (Удостоверяющий центр / CA)",
+        "cert_subject_header": "Кому выдан",
+        "cert_issuer_header": "Кем выдан",
         "cert_validity_header": "Срок действия сертификата",
         "cert_common_name": "Общее имя (CN):",
         "cert_org": "Организация:",
@@ -291,7 +278,7 @@ TRANSLATIONS = {
     },
     "en": {
         "app_title": "surf",
-        "app_subtitle": "Fast, private and lightweight web browsing",
+        "app_subtitle": "A browser built with PyQt6",
         "search_placeholder": "Search the web or enter website URL...",
         "address_placeholder": "Search the web or enter address...",
         "new_tab": "New Tab",
@@ -358,7 +345,7 @@ TRANSLATIONS = {
         "status_bookmark_added": "Bookmark saved to Favorites",
         "status_bookmark_removed": "Bookmark removed",
         "status_url_copied": "URL copied to clipboard",
-        "status_history_cleared": "Browsing history cleared successfully",
+        "status_history_cleared": "History cleared",
         "status_download_started": "Download started: {name}",
         "status_download_finished": "Download completed: {name}",
         "status_pdf_saved": "Page saved as PDF: {path}",
@@ -372,7 +359,7 @@ TRANSLATIONS = {
         "save_pdf_dialog": "Save Web Page as PDF",
         "save_screenshot_dialog": "Save Page Screenshot",
         "save_download_dialog": "Save Downloaded File",
-        # Speed Dial / Top Sites
+        # New tab tiles
         "speed_dial_title": "Top Sites",
         "speed_dial_open": "Open",
         "speed_dial_add": "Add Shortcut",
@@ -387,7 +374,7 @@ TRANSLATIONS = {
         "speed_dial_url_placeholder": "https://example.com",
         "btn_save": "Save",
         "btn_cancel": "Cancel",
-        # Session Restore
+        # Previous session
         "act_restore_session": "Restore Previous Session",
         "tip_restore_session": "Open tabs from previous session",
         "pref_restore_session": "Restore previous session tabs on startup",
@@ -395,23 +382,10 @@ TRANSLATIONS = {
         "status_no_session": "No saved session to restore",
         "btn_restore_session": "Restore Previous Session",
         # About
-        "about_title": "About surf",
-        "about_text": (
-            "<h3>surf 1.0</h3>"
-            "<p>A fast, private and lightweight web browser built on PyQt6 and WebEngine.</p>"
-            "<p><b>Features:</b></p>"
-            "<ul>"
-            "<li>Tabbed interface with compact shrinking and scrolling</li>"
-            "<li>Distraction-free Reader Mode without ads</li>"
-            "<li>Local SQLite history, bookmarks and downloads</li>"
-            "<li>One-click CSV data export and import</li>"
-            "<li>Customizable Proxy, Privacy, User-Agent and Bilingual UI (RU/EN)</li>"
-            "</ul>"
-        ),
         # Settings
         "settings_title": "surf Settings",
         "tab_general": "General",
-        "tab_privacy": "Privacy & Header",
+        "tab_privacy": "Privacy",
         "tab_proxy": "Proxy Server",
         "tab_appearance": "Appearance",
         "tab_devices": "Devices",
@@ -445,7 +419,7 @@ TRANSLATIONS = {
         "group_downloads": "Downloads",
         "btn_browse": "Browse...",
         "group_user_agent": "User-Agent (Browser Identification)",
-        "ua_surf": "Surf 1.0 (Modern Web, Recommended)",
+        "ua_surf": "Surf 1.0 (recommended)",
         "ua_surf_pure": "Surf 1.0 (Pure Identifier)",
         "ua_chrome": "Google Chrome",
         "ua_firefox": "Mozilla Firefox",
@@ -454,7 +428,7 @@ TRANSLATIONS = {
         "chk_save_history": "Remember browsing history",
         "chk_clear_exit": "Clear cache and history when closing browser",
         "chk_dnt": "Send websites a 'Do Not Track' request (DNT)",
-        "group_proxy": "Network Configuration",
+        "group_proxy": "Network",
         "lbl_proxy_type": "Proxy Type:",
         "proxy_none": "No Proxy (Direct Connection)",
         "proxy_system": "System Windows Settings",
@@ -464,10 +438,10 @@ TRANSLATIONS = {
         "lbl_proxy_port": "Port:",
         "lbl_proxy_user": "Username (Optional):",
         "lbl_proxy_pass": "Password (Optional):",
-        "group_style": "Interface Style",
+        "group_style": "Appearance",
         "lbl_theme": "Color Scheme:",
-        "theme_dark": "Dark (surf Dark)",
-        "theme_light": "Light (surf Light)",
+        "theme_dark": "Dark",
+        "theme_light": "Light",
         "lbl_accent": "Button Accent Color:",
         "btn_accent": "Choose Accent...",
         # History and Bookmarks
@@ -498,7 +472,7 @@ TRANSLATIONS = {
         "btn_clear_history": "Clear History...",
         "btn_open_tab": "Open in New Tab",
         "btn_delete_bookmark": "Delete Bookmark",
-        "stats_info": "Top visited domains from history records:",
+        "stats_info": "Sites you visit most:",
         "btn_close": "Close",
         "col_id": "ID",
         "col_title": "Title",
@@ -520,7 +494,7 @@ TRANSLATIONS = {
         "btn_open_folder": "Open Containing Folder",
         "btn_clear_list": "Clear List",
         # Reader View
-        "reader_title": "Comfortable Reading Mode",
+        "reader_title": "Reader View",
         "reader_prefix": "Reading: ",
         "reader_source_prefix": "Page Source: ",
         "reader_close_btn": "Close Reader",
@@ -534,14 +508,14 @@ TRANSLATIONS = {
         "ssl_secure_title": "Connection Security",
         "ssl_secure_msg": "Connection is encrypted with SSL/TLS.\nHost: {host}",
         "ssl_insecure_msg": "Warning: Connection is not encrypted.\nHost: {host}",
-        "tip_shield_protection": "Enhanced Tracking Protection (ETP)",
-        "shield_title": "Enhanced Tracking Protection",
+        "tip_shield_protection": "Tracking protection",
+        "shield_title": "Tracking protection",
         "shield_blocked_text": "Trackers and ad requests blocked: {count}",
         "shield_toggle_enable": "Enable Protection",
         "shield_toggle_disable": "Disable Protection",
         "tip_mute_tab": "Mute tab audio",
         "tip_unmute_tab": "Unmute tab audio",
-        "tip_menu_surf": "Application Menu (Alt+F)",
+        "tip_menu_surf": "Menu",
         "ctx_open_link_tab": "Open Link in New Tab",
         "ctx_copy_link": "Copy Link Address",
         "ctx_open_image_tab": "Open Image in New Tab",
@@ -551,7 +525,7 @@ TRANSLATIONS = {
         # Security certificate details dialog
         "cert_dialog_title": "Security Certificate Details",
         "cert_status_secure": "Secure Connection",
-        "cert_status_secure_desc": "Connection to this website is secured with modern SSL/TLS encryption.",
+        "cert_status_secure_desc": "The connection to this site is encrypted (SSL/TLS).",
         "cert_status_insecure": "Insecure Connection",
         "cert_status_insecure_desc": (
             "This website does not use encryption (HTTP). Any information you enter "
@@ -560,7 +534,7 @@ TRANSLATIONS = {
         "cert_tab_general": "General",
         "cert_tab_details": "Technical Details",
         "cert_subject_header": "Issued To (Website)",
-        "cert_issuer_header": "Issued By (Certificate Authority / CA)",
+        "cert_issuer_header": "Issued by",
         "cert_validity_header": "Certificate Validity Period",
         "cert_common_name": "Common Name (CN):",
         "cert_org": "Organization:",

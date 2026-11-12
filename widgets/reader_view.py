@@ -11,6 +11,11 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+try:
+    from surf.i18n import tr
+except ModuleNotFoundError:
+    from i18n import tr
+
 
 class ReaderViewWidget(QWidget):
     open_link = pyqtSignal(str)
@@ -30,13 +35,13 @@ class ReaderViewWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # Верхняя панель управления режимом чтения
+        # Панель сверху: заголовок, шрифт, закрыть
         self.toolbar = QWidget()
         self.toolbar.setObjectName("readerToolbar")
         tb_layout = QHBoxLayout(self.toolbar)
         tb_layout.setContentsMargins(16, 8, 16, 8)
 
-        self.title_label = QLabel("Режим комфортного чтения")
+        self.title_label = QLabel(tr("reader_title"))
         self.title_label.setObjectName("readerTitleLabel")
 
         self.zoom_out_btn = QPushButton("A-")
@@ -58,7 +63,7 @@ class ReaderViewWidget(QWidget):
         tb_layout.addSpacing(12)
         tb_layout.addWidget(self.exit_btn)
 
-        # Сам QTextBrowser (Тема QT 4)
+        # Сам текст статьи
         self.browser = QTextBrowser()
         self.browser.setObjectName("readerBrowser")
         self.browser.setOpenExternalLinks(False)
@@ -255,8 +260,8 @@ class ReaderViewWidget(QWidget):
         </head>
         <body>
             <h1>Браузер surf</h1>
-            <p><strong>surf</strong> — полнофункциональный легковесный веб-браузер,
-            созданный <b>ospab foundation</b> на базе PyQt6 и современного движка рендеринга.</p>
+            <p><strong>surf</strong> это браузер на PyQt6 от <b>ospab foundation</b>.
+            Страницы показывает Chromium через QtWebEngine.</p>
 
             <h2>Горячие клавиши</h2>
             <table>
@@ -274,8 +279,8 @@ class ReaderViewWidget(QWidget):
             </table>
 
             <h2>Режим чтения</h2>
-            <p>Включается кнопкой в адресной строке или меню «Вид». Очищает страницу от рекламы,
-            боковых меню и баннеров, оставляя только текст статьи и иллюстрации в удобной типографике.</p>
+            <p>Включается значком книжки в адресной строке или через меню «Вид».
+            Убирает со страницы рекламу, меню и баннеры, остаются текст статьи и картинки.</p>
         </body>
         </html>
         """

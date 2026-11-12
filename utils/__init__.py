@@ -1,1 +1,1 @@
-# Utilities package for surf browser
+# Вспомогательные модули без окон

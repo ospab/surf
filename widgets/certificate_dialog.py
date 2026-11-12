@@ -26,7 +26,7 @@ except ModuleNotFoundError:
 
 
 def fetch_certificate_details(url: str, timeout: float = 3.5) -> dict:
-    """Извлекает настоящие данные SSL/TLS сертификата узла через защищённый сокет."""
+    """Подключается к сайту по SSL и читает его сертификат."""
     parsed = urlparse(url)
     scheme = parsed.scheme.lower()
     host = parsed.hostname or ""
@@ -98,7 +98,7 @@ def fetch_certificate_details(url: str, timeout: float = 3.5) -> dict:
 
 
 class CertificateDialog(QDialog):
-    """Информативное диалоговое окно со всеми деталями SSL/TLS сертификата узла."""
+    """Окно со сведениями о сертификате сайта."""
 
     def __init__(self, url: str, cert_data: dict | None = None, parent=None):
         super().__init__(parent)
@@ -136,7 +136,7 @@ class CertificateDialog(QDialog):
         main_layout.setContentsMargins(18, 18, 18, 18)
         main_layout.setSpacing(14)
 
-        # 1. Верхний баннер статуса соединения
+        # Сверху: защищено соединение или нет
         banner = QWidget()
         banner.setObjectName("certBanner")
         banner_layout = QHBoxLayout(banner)
@@ -165,7 +165,7 @@ class CertificateDialog(QDialog):
             }}
         """)
 
-        # Круглый бейдж 42x42 с векторной иконкой замка / щита
+        # Кружок с замком или щитом
         icon_badge = QLabel()
         icon_badge.setObjectName("certIconBadge")
         icon_badge.setFixedSize(42, 42)
@@ -177,7 +177,7 @@ class CertificateDialog(QDialog):
         if not pix.isNull():
             icon_badge.setPixmap(pix)
         else:
-            icon_badge.setText("🔒" if is_secure else "⚠️")
+            icon_badge.setText("OK" if is_secure else "!")
 
         banner_layout.addWidget(icon_badge)
 
@@ -203,7 +203,7 @@ class CertificateDialog(QDialog):
 
         main_layout.addWidget(banner)
 
-        # 2. Вкладки со сведениями
+        # Вкладки со сведениями
         if is_secure:
             tabs = QTabWidget()
 
@@ -291,7 +291,7 @@ class CertificateDialog(QDialog):
             main_layout.addWidget(err_box)
             main_layout.addStretch()
 
-        # 3. Кнопка Закрыть
+        # Кнопка «Закрыть»
         btn_box = QHBoxLayout()
         btn_box.addStretch()
         btn_close = QPushButton(tr("btn_close"))

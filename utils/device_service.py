@@ -8,7 +8,7 @@ from PyQt6.QtMultimedia import QMediaDevices
 
 
 class DeviceService(QObject):
-    """Служба перечисления и мониторинга аппаратных аудио- и видеоустройств."""
+    """Список микрофонов и камер."""
 
     audio_inputs_changed = pyqtSignal()
     video_inputs_changed = pyqtSignal()
