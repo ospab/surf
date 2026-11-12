@@ -2,11 +2,16 @@ import os
 import re
 import threading
 import urllib.request
-from urllib.parse import urlparse
 from typing import Optional
+from urllib.parse import urlparse
 
 from PyQt6.QtCore import QObject, QRectF, Qt, pyqtSignal
-from PyQt6.QtGui import QBrush, QColor, QFont, QPainter, QPainterPath, QPen, QPixmap
+from PyQt6.QtGui import QBrush, QColor, QFont, QPainter, QPen, QPixmap
+
+try:
+    from surf.constants import SURF_USER_AGENT
+except ModuleNotFoundError:
+    from constants import SURF_USER_AGENT
 
 
 def get_clean_domain(url_or_domain: str) -> str:
@@ -86,9 +91,18 @@ def generate_fallback_badge(title: str, domain: str, is_dark: bool = True, size:
     circle_rect = QRectF(2, 2, size - 4, size - 4)
 
     palette = [
-        "#0060df", "#00875a", "#e53e3e", "#805ad5",
-        "#dd6b20", "#319795", "#0284c7", "#d946ef",
-        "#059669", "#d97706", "#2563eb", "#7c3aed",
+        "#0060df",
+        "#00875a",
+        "#e53e3e",
+        "#805ad5",
+        "#dd6b20",
+        "#319795",
+        "#0284c7",
+        "#d946ef",
+        "#059669",
+        "#d97706",
+        "#2563eb",
+        "#7c3aed",
     ]
     key = domain or title or "site"
     color_hex = palette[abs(hash(key)) % len(palette)]
@@ -98,7 +112,7 @@ def generate_fallback_badge(title: str, domain: str, is_dark: bool = True, size:
     painter.drawEllipse(circle_rect)
 
     letter = ""
-    for ch in (title.strip() or domain.strip()):
+    for ch in title.strip() or domain.strip():
         if ch.isalnum():
             letter = ch.upper()
             break
@@ -131,7 +145,7 @@ class FaviconService(QObject):
         self._fetching_domains: set[str] = set()
         self._lock = threading.Lock()
 
-    def get_cached(self, url_or_domain: str) -> Optional[QPixmap]:
+    def get_cached(self, url_or_domain: str) -> QPixmap | None:
         """Возвращает кэшированную фавиконку из оперативной памяти или с диска, если есть."""
         domain = get_clean_domain(url_or_domain)
         if not domain:
@@ -193,9 +207,7 @@ class FaviconService(QObject):
         file_path = get_cache_file_path(domain)
         pix = None
 
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Surf/1.0"
-        }
+        headers = {"User-Agent": SURF_USER_AGENT}
 
         # 1. Первая попытка: Google Favicon API (надёжно возвращает 64x64 PNG с прозрачностью)
         api_url = f"https://www.google.com/s2/favicons?domain={domain}&sz=64"

@@ -2,6 +2,7 @@
 Модуль обнаружения и перечисления системных устройств мультимедиа (микрофоны, камеры, аудиовыходы).
 Использует аппаратную подсистему QtMultimedia (QMediaDevices).
 """
+
 from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtMultimedia import QMediaDevices
 
@@ -34,11 +35,13 @@ class DeviceService(QObject):
             if not desc:
                 continue
             dev_id = dev.id().data().decode("utf-8", errors="ignore")
-            inputs.append({
-                "id": dev_id,
-                "name": desc,
-                "is_default": dev.isDefault(),
-            })
+            inputs.append(
+                {
+                    "id": dev_id,
+                    "name": desc,
+                    "is_default": dev.isDefault(),
+                }
+            )
         return inputs
 
     def get_video_inputs(self) -> list[dict]:
@@ -49,11 +52,13 @@ class DeviceService(QObject):
             if not desc:
                 continue
             dev_id = dev.id().data().decode("utf-8", errors="ignore")
-            inputs.append({
-                "id": dev_id,
-                "name": desc,
-                "is_default": dev.isDefault(),
-            })
+            inputs.append(
+                {
+                    "id": dev_id,
+                    "name": desc,
+                    "is_default": dev.isDefault(),
+                }
+            )
         return inputs
 
     def get_default_audio_name(self) -> str:

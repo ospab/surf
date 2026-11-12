@@ -4,7 +4,7 @@ import ssl
 from urllib.parse import urlparse
 
 from PyQt6.QtCore import QByteArray, Qt
-from PyQt6.QtGui import QFont, QIcon, QPainter, QPixmap
+from PyQt6.QtGui import QFont, QPainter, QPixmap
 from PyQt6.QtSvg import QSvgRenderer
 from PyQt6.QtWidgets import (
     QDialog,
@@ -13,7 +13,6 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QScrollArea,
     QTabWidget,
     QTextEdit,
     QVBoxLayout,
@@ -115,9 +114,13 @@ class CertificateDialog(QDialog):
         if not os.path.exists(path):
             return QPixmap()
         try:
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 svg_text = f.read()
-            svg_text = svg_text.replace("#fbfbfe", color).replace("#15141a", color).replace('stroke="white"', f'stroke="{color}"')
+            svg_text = (
+                svg_text.replace("#fbfbfe", color)
+                .replace("#15141a", color)
+                .replace('stroke="white"', f'stroke="{color}"')
+            )
             renderer = QSvgRenderer(QByteArray(svg_text.encode("utf-8")))
             pix = QPixmap(size, size)
             pix.fill(Qt.GlobalColor.transparent)

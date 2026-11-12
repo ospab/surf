@@ -1,4 +1,4 @@
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import QDate, pyqtSignal
 from PyQt6.QtWidgets import (
     QDialog,
     QFileDialog,
@@ -16,6 +16,11 @@ except ModuleNotFoundError:
     from i18n import tr
     from ui.ui_history import Ui_HistoryDialog
 
+# Пункты выпадающего списка периода (порядок совпадает с history.ui)
+PERIOD_FILTERS = ("all", "today", "yesterday", "week", "range")
+RANGE_INDEX = PERIOD_FILTERS.index("range")
+DATE_FORMAT_SQL = "yyyy-MM-dd"
+
 
 class HistoryDialog(QDialog, Ui_HistoryDialog):
     # Способ 2: форма history.ui скомпилирована pyuic6 в ui_history.py
@@ -28,8 +33,38 @@ class HistoryDialog(QDialog, Ui_HistoryDialog):
 
         self._retranslate_ui()
         self._setup_tables()
+        self._setup_date_range()
         self._connect_signals()
         self.reload_all()
+
+    def _setup_date_range(self) -> None:
+        """Поля «с … по …» (QDateEdit с всплывающим QCalendarWidget) для режима «Диапазон дат»."""
+        today = QDate.currentDate()
+        self.dateFromEdit.setDate(today.addDays(-7))
+        self.dateToEdit.setDate(today)
+        self.dateFromEdit.setMaximumDate(today)
+        self.dateToEdit.setMaximumDate(today)
+        self._update_date_range_visibility()
+
+    def _update_date_range_visibility(self) -> None:
+        is_range = self.periodCombo.currentIndex() == RANGE_INDEX
+        for widget in (self.dateFromEdit, self.dateDashLabel, self.dateToEdit):
+            widget.setVisible(is_range)
+
+    def _on_period_changed(self) -> None:
+        self._update_date_range_visibility()
+        self._reload_history()
+
+    def _current_filter(self) -> tuple[str, str | None, str | None]:
+        """Возвращает (период, дата_с, дата_по) в формате для Database."""
+        period = PERIOD_FILTERS[self.periodCombo.currentIndex()]
+        if period != "range":
+            return period, None, None
+        date_from = self.dateFromEdit.date()
+        date_to = self.dateToEdit.date()
+        if date_from > date_to:
+            date_from, date_to = date_to, date_from
+        return "all", date_from.toString(DATE_FORMAT_SQL), date_to.toString(DATE_FORMAT_SQL)
 
     def _retranslate_ui(self) -> None:
         self.setWindowTitle(tr("history_dialog_title"))
@@ -44,6 +79,7 @@ class HistoryDialog(QDialog, Ui_HistoryDialog):
         self.periodCombo.setItemText(1, tr("filter_today"))
         self.periodCombo.setItemText(2, tr("filter_yesterday"))
         self.periodCombo.setItemText(3, tr("filter_week"))
+        self.periodCombo.setItemText(RANGE_INDEX, tr("filter_range"))
 
         self.exportHistoryCsvBtn.setText(tr("btn_export_csv"))
         self.deleteHistoryBtn.setText(tr("btn_delete_selected"))
@@ -60,9 +96,9 @@ class HistoryDialog(QDialog, Ui_HistoryDialog):
 
     def _setup_tables(self) -> None:
         self.historyTable.setColumnCount(5)
-        self.historyTable.setHorizontalHeaderLabels([
-            tr("col_id"), tr("col_title"), tr("col_url"), tr("col_time"), tr("col_visits")
-        ])
+        self.historyTable.setHorizontalHeaderLabels(
+            [tr("col_id"), tr("col_title"), tr("col_url"), tr("col_time"), tr("col_visits")]
+        )
         self.historyTable.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
         self.historyTable.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         self.historyTable.setSelectionBehavior(self.historyTable.SelectionBehavior.SelectRows)
@@ -70,9 +106,9 @@ class HistoryDialog(QDialog, Ui_HistoryDialog):
         self.historyTable.setColumnHidden(0, True)
 
         self.bookmarksTable.setColumnCount(5)
-        self.bookmarksTable.setHorizontalHeaderLabels([
-            tr("col_id"), tr("col_title"), tr("col_url"), tr("col_folder"), tr("col_added")
-        ])
+        self.bookmarksTable.setHorizontalHeaderLabels(
+            [tr("col_id"), tr("col_title"), tr("col_url"), tr("col_folder"), tr("col_added")]
+        )
         self.bookmarksTable.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
         self.bookmarksTable.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         self.bookmarksTable.setSelectionBehavior(self.bookmarksTable.SelectionBehavior.SelectRows)
@@ -80,15 +116,15 @@ class HistoryDialog(QDialog, Ui_HistoryDialog):
         self.bookmarksTable.setColumnHidden(0, True)
 
         self.statsTable.setColumnCount(3)
-        self.statsTable.setHorizontalHeaderLabels([
-            tr("col_rank"), tr("col_domain"), tr("col_views")
-        ])
+        self.statsTable.setHorizontalHeaderLabels([tr("col_rank"), tr("col_domain"), tr("col_views")])
         self.statsTable.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.statsTable.setSelectionBehavior(self.statsTable.SelectionBehavior.SelectRows)
 
     def _connect_signals(self) -> None:
         self.historySearchEdit.textChanged.connect(self._reload_history)
-        self.periodCombo.currentIndexChanged.connect(self._reload_history)
+        self.periodCombo.currentIndexChanged.connect(self._on_period_changed)
+        self.dateFromEdit.dateChanged.connect(self._reload_history)
+        self.dateToEdit.dateChanged.connect(self._reload_history)
         self.deleteHistoryBtn.clicked.connect(self._delete_selected_history)
         self.clearAllHistoryBtn.clicked.connect(self._clear_history)
         self.exportHistoryCsvBtn.clicked.connect(self._export_history_csv)
@@ -122,11 +158,8 @@ class HistoryDialog(QDialog, Ui_HistoryDialog):
 
     def _reload_history(self) -> None:
         search = self.historySearchEdit.text().strip()
-        period_idx = self.periodCombo.currentIndex()
-        periods = {0: "all", 1: "today", 2: "yesterday", 3: "week"}
-        filter_period = periods.get(period_idx, "all")
-
-        records = self.db.get_history(search_query=search, date_filter=filter_period)
+        period, date_from, date_to = self._current_filter()
+        records = self.db.get_history(search_query=search, date_filter=period, date_from=date_from, date_to=date_to)
         self.historyTable.setRowCount(len(records))
 
         for row_idx, row in enumerate(records):
@@ -152,9 +185,10 @@ class HistoryDialog(QDialog, Ui_HistoryDialog):
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if ans == QMessageBox.StandardButton.Yes:
-            period_idx = self.periodCombo.currentIndex()
-            periods = {0: "all", 1: "day", 2: "day", 3: "all"}
-            self.db.clear_history(periods.get(period_idx, "all"))
+            # Удаляем ровно то, что сейчас показывает фильтр периода
+            # (раньше при фильтре «неделя» удалялась вся история)
+            period, date_from, date_to = self._current_filter()
+            self.db.delete_history_filtered(period, date_from, date_to)
             self._reload_history()
             self._reload_stats()
 
@@ -176,8 +210,8 @@ class HistoryDialog(QDialog, Ui_HistoryDialog):
             count = self.db.export_history_to_csv(path)
             QMessageBox.information(
                 self,
-                "OK",
-                f"Exported {count} records to:\n{path}",
+                tr("msg_done_title"),
+                tr("msg_history_exported", count=count, path=path),
             )
 
     # --- Обработка закладок ---
@@ -220,8 +254,8 @@ class HistoryDialog(QDialog, Ui_HistoryDialog):
             count = self.db.export_bookmarks_to_csv(path)
             QMessageBox.information(
                 self,
-                "OK",
-                f"Exported {count} bookmarks to:\n{path}",
+                tr("msg_done_title"),
+                tr("msg_bookmarks_exported", count=count, path=path),
             )
 
     def _import_bookmarks_csv(self) -> None:
@@ -236,8 +270,8 @@ class HistoryDialog(QDialog, Ui_HistoryDialog):
             self._reload_bookmarks()
             QMessageBox.information(
                 self,
-                "OK",
-                f"Imported {count} bookmarks from:\n{path}",
+                tr("msg_done_title"),
+                tr("msg_bookmarks_imported", count=count, path=path),
             )
 
     # --- Статистика ---

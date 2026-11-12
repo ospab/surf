@@ -1,11 +1,11 @@
 import os
-from PyQt6.QtCore import Qt, QUrl
+
+from PyQt6.QtCore import QUrl
 from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import (
     QDialog,
     QHBoxLayout,
     QHeaderView,
-    QLabel,
     QMessageBox,
     QPushButton,
     QTableWidget,
@@ -35,9 +35,9 @@ class DownloadManagerDialog(QDialog):
 
         self.table = QTableWidget()
         self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels([
-            tr("col_dl_name"), tr("col_dl_size"), tr("col_dl_status"), tr("col_dl_time"), tr("col_dl_path")
-        ])
+        self.table.setHorizontalHeaderLabels(
+            [tr("col_dl_name"), tr("col_dl_size"), tr("col_dl_status"), tr("col_dl_time"), tr("col_dl_path")]
+        )
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
         self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)

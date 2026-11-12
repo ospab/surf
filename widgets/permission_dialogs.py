@@ -1,26 +1,26 @@
 """
 Модуль системных запросов разрешений на устройства и медиа (Permissions & Device Prompts).
 Реализует:
-- Выпадающую панель разрешения устройств (PermissionPromptBar) с разделением на микрофоны и камеры и выбором конкретного девайса
+- Выпадающую панель разрешения устройств (PermissionPromptBar) с разделением
+  на микрофоны и камеры и выбором конкретного девайса
 - Диалог выбора экрана/окна для демонстрации (DesktopMediaDialog)
 - Подтверждение доступа к файловой системе (FileSystemAccessDialog)
 """
+
 import html
 import os
+
 from PyQt6.QtCore import QSize, Qt, QUrl, pyqtSignal
-from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
+from PyQt6.QtGui import QFont, QPainter, QPixmap
 from PyQt6.QtSvg import QSvgRenderer
 from PyQt6.QtWebEngineCore import (
     QWebEngineDesktopMediaRequest,
     QWebEngineFileSystemAccessRequest,
-    QWebEnginePage,
-    QWebEnginePermission,
 )
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
-    QFrame,
     QHBoxLayout,
     QLabel,
     QListView,
@@ -31,10 +31,10 @@ from PyQt6.QtWidgets import (
 )
 
 try:
-    from surf.i18n import get_language, tr
+    from surf.i18n import get_language
     from surf.utils.device_service import DeviceService
 except ModuleNotFoundError:
-    from i18n import get_language, tr
+    from i18n import get_language
     from utils.device_service import DeviceService
 
 
@@ -126,7 +126,7 @@ def load_themed_icon(icon_name: str, color_hex: str = "#fbfbfe", size: int = 18)
         icon_path = os.path.join(icon_dir, "settings.svg")
 
     try:
-        with open(icon_path, "r", encoding="utf-8") as f:
+        with open(icon_path, encoding="utf-8") as f:
             svg_data = f.read()
         svg_data = svg_data.replace('stroke="currentColor"', f'stroke="{color_hex}"')
         svg_data = svg_data.replace('fill="currentColor"', f'fill="{color_hex}"')
@@ -151,8 +151,8 @@ class PermissionPromptBar(QWidget):
     и камеру, выпадающими списками конкретных устройств и кнопками действий.
     """
 
-    allowed = pyqtSignal(object)   # remember or dict
-    denied = pyqtSignal(bool)     # remember: bool
+    allowed = pyqtSignal(object)  # remember or dict
+    denied = pyqtSignal(bool)  # remember: bool
     dismissed = pyqtSignal()
 
     def __init__(self, parent=None):
@@ -429,18 +429,14 @@ class PermissionPromptBar(QWidget):
 
         # Текст
         if is_ru:
-            self.text_label.setText(
-                f"Сайт <b>{html.escape(clean_host)}</b> запрашивает {friendly_text}"
-            )
+            self.text_label.setText(f"Сайт <b>{html.escape(clean_host)}</b> запрашивает {friendly_text}")
             self.remember_cb.setText("Запомнить выбор")
             self.btn_allow.setText("Разрешить")
             self.btn_deny.setText("Заблокировать")
             self.mic_check.setText("Микрофон:")
             self.cam_check.setText("Камера:")
         else:
-            self.text_label.setText(
-                f"<b>{html.escape(clean_host)}</b> requests {friendly_text}"
-            )
+            self.text_label.setText(f"<b>{html.escape(clean_host)}</b> requests {friendly_text}")
             self.remember_cb.setText("Remember decision")
             self.btn_allow.setText("Allow")
             self.btn_deny.setText("Block")
@@ -538,7 +534,9 @@ class DesktopMediaDialog(QDialog):
     Системный диалог выбора экрана или окна приложения для демонстрации (getDisplayMedia).
     """
 
-    def __init__(self, request: QWebEngineDesktopMediaRequest, is_dark: bool = True, accent: str = "#0060df", parent=None):
+    def __init__(
+        self, request: QWebEngineDesktopMediaRequest, is_dark: bool = True, accent: str = "#0060df", parent=None
+    ):
         super().__init__(parent)
         self.request = request
         self._is_dark = is_dark
@@ -696,7 +694,9 @@ class DesktopMediaDialog(QDialog):
 class FileSystemAccessDialog(QDialog):
     """Подтверждение доступа к локальной файловой системе (FileSystemAccess API)."""
 
-    def __init__(self, request: QWebEngineFileSystemAccessRequest, is_dark: bool = True, accent: str = "#0060df", parent=None):
+    def __init__(
+        self, request: QWebEngineFileSystemAccessRequest, is_dark: bool = True, accent: str = "#0060df", parent=None
+    ):
         super().__init__(parent)
         self.request = request
         self._is_dark = is_dark
@@ -717,8 +717,8 @@ class FileSystemAccessDialog(QDialog):
         msg = QLabel(
             f"Сайт <b>{html.escape(origin_str)}</b> запрашивает доступ к файлу:<br><br>"
             f"<code>{html.escape(file_path)}</code>"
-            if is_ru else
-            f"Site <b>{html.escape(origin_str)}</b> requests access to file:<br><br>"
+            if is_ru
+            else f"Site <b>{html.escape(origin_str)}</b> requests access to file:<br><br>"
             f"<code>{html.escape(file_path)}</code>",
             self,
         )

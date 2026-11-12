@@ -11,20 +11,21 @@
 - surf://help (справочник хоткеев)
 - surf://settings (обзор параметров)
 """
+
 import html
 import os
 import platform
-import sys
-from PyQt6.QtCore import QBuffer, QIODevice, QSize, QUrl
+
+from PyQt6.QtCore import QBuffer, QIODevice
 from PyQt6.QtGui import QGuiApplication
 from PyQt6.QtWebEngineCore import QWebEngineUrlScheme, QWebEngineUrlSchemeHandler
 
 try:
     from surf.database import Database
-    from surf.i18n import get_language, tr
+    from surf.i18n import get_language
 except ModuleNotFoundError:
     from database import Database
-    from i18n import get_language, tr
+    from i18n import get_language
 
 
 def register_surf_scheme() -> None:
@@ -270,7 +271,11 @@ def render_pages_directory(is_dark: bool, accent: str = "#0060df") -> str:
     subtitle = "Список внутренних адресов surf://" if is_ru else "List of internal surf:// addresses"
 
     pages = [
-        ("surf://about", "surf://about", "Сведения о браузере и среде выполнения" if is_ru else "Browser and runtime environment details"),
+        (
+            "surf://about",
+            "surf://about",
+            "Сведения о браузере и среде выполнения" if is_ru else "Browser and runtime environment details",
+        ),
         ("surf://history", "surf://history", "Журнал посещений" if is_ru else "Browsing history"),
         ("surf://bookmarks", "surf://bookmarks", "Сохранённые закладки" if is_ru else "Saved bookmarks"),
         ("surf://downloads", "surf://downloads", "Журнал загрузок" if is_ru else "Download records"),
@@ -323,7 +328,6 @@ def render_about_page(db: Database, is_dark: bool, accent: str = "#0060df") -> s
     is_ru = get_language() == "ru"
     title = "О программе surf" if is_ru else "About surf"
 
-    import PyQt6
     from PyQt6.QtCore import PYQT_VERSION_STR, QT_VERSION_STR
 
     ua_str = db.get_setting(
@@ -751,7 +755,11 @@ def render_protection_page(is_dark: bool, accent: str = "#0060df", interceptor=N
         </tr>
         """
 
-    status_badge = '<span class="badge badge-success">Включена</span>' if is_enabled else '<span class="badge badge-danger">Отключена</span>'
+    status_badge = (
+        '<span class="badge badge-success">Включена</span>'
+        if is_enabled
+        else '<span class="badge badge-danger">Отключена</span>'
+    )
 
     return f"""<!DOCTYPE html>
     <html>
@@ -872,25 +880,45 @@ def render_help_page(is_dark: bool, accent: str = "#0060df") -> str:
         ("Вкладки" if is_ru else "Tabs", "Новое приватное окно" if is_ru else "New private window", "Ctrl+Shift+P"),
         ("Вкладки" if is_ru else "Tabs", "Новое окно" if is_ru else "New window", "Ctrl+N"),
         ("Вкладки" if is_ru else "Tabs", "Закрыть текущую вкладку" if is_ru else "Close tab", "Ctrl+W"),
-        ("Вкладки" if is_ru else "Tabs", "Восстановить закрытую вкладку" if is_ru else "Reopen closed tab", "Ctrl+Shift+T"),
+        (
+            "Вкладки" if is_ru else "Tabs",
+            "Восстановить закрытую вкладку" if is_ru else "Reopen closed tab",
+            "Ctrl+Shift+T",
+        ),
         ("Вкладки" if is_ru else "Tabs", "Следующая вкладка" if is_ru else "Next tab", "Ctrl+Tab"),
         ("Вкладки" if is_ru else "Tabs", "Предыдущая вкладка" if is_ru else "Previous tab", "Ctrl+Shift+Tab"),
         ("Вкладки" if is_ru else "Tabs", "Перейти на вкладку 1..9" if is_ru else "Go to tab 1..9", "Ctrl+1..Ctrl+9"),
-        ("Адресная строка" if is_ru else "Address Bar", "Фокус на строку адреса" if is_ru else "Focus address bar", "Ctrl+L / Alt+D / F6"),
+        (
+            "Адресная строка" if is_ru else "Address Bar",
+            "Фокус на строку адреса" if is_ru else "Focus address bar",
+            "Ctrl+L / Alt+D / F6",
+        ),
         ("Навигация" if is_ru else "Navigation", "Назад" if is_ru else "Back", "Alt+Left"),
         ("Навигация" if is_ru else "Navigation", "Вперед" if is_ru else "Forward", "Alt+Right"),
         ("Навигация" if is_ru else "Navigation", "Обновить страницу" if is_ru else "Reload", "F5 / Ctrl+R"),
-        ("Навигация" if is_ru else "Navigation", "Перезагрузка без кэша" if is_ru else "Hard reload", "Ctrl+Shift+R / Ctrl+F5"),
+        (
+            "Навигация" if is_ru else "Navigation",
+            "Перезагрузка без кэша" if is_ru else "Hard reload",
+            "Ctrl+Shift+R / Ctrl+F5",
+        ),
         ("Навигация" if is_ru else "Navigation", "Домашняя страница" if is_ru else "Home", "Alt+Home"),
         ("Поиск" if is_ru else "Search", "Найти на странице" if is_ru else "Find in page", "Ctrl+F"),
         ("Поиск" if is_ru else "Search", "Следующее совпадение" if is_ru else "Find next", "F3 / Ctrl+G"),
-        ("Поиск" if is_ru else "Search", "Предыдущее совпадение" if is_ru else "Find previous", "Shift+F3 / Ctrl+Shift+G"),
+        (
+            "Поиск" if is_ru else "Search",
+            "Предыдущее совпадение" if is_ru else "Find previous",
+            "Shift+F3 / Ctrl+Shift+G",
+        ),
         ("Масштаб" if is_ru else "Zoom", "Увеличить масштаб" if is_ru else "Zoom in", "Ctrl++ / Ctrl+="),
         ("Масштаб" if is_ru else "Zoom", "Уменьшить масштаб" if is_ru else "Zoom out", "Ctrl+-"),
         ("Масштаб" if is_ru else "Zoom", "Сбросить масштаб" if is_ru else "Reset zoom", "Ctrl+0"),
         ("Масштаб" if is_ru else "Zoom", "Полноэкранный режим" if is_ru else "Fullscreen", "F11"),
         ("Инструменты" if is_ru else "Tools", "Добавить закладку" if is_ru else "Bookmark page", "Ctrl+D"),
-        ("Инструменты" if is_ru else "Tools", "Закладки и история" if is_ru else "Bookmarks & History", "Ctrl+Shift+O / Ctrl+H"),
+        (
+            "Инструменты" if is_ru else "Tools",
+            "Закладки и история" if is_ru else "Bookmarks & History",
+            "Ctrl+Shift+O / Ctrl+H",
+        ),
         ("Инструменты" if is_ru else "Tools", "Загрузки" if is_ru else "Downloads", "Ctrl+J"),
         ("Инструменты" if is_ru else "Tools", "Режим чтения" if is_ru else "Reader view", "Ctrl+Alt+R"),
         ("Инструменты" if is_ru else "Tools", "Печать / Экспорт в PDF" if is_ru else "Print / PDF", "Ctrl+P"),

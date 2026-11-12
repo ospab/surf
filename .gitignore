@@ -28,3 +28,9 @@ surf.db
 .pytest_cache/
 *.log
 cache/
+
+# Материалы к защите (локально, не в репозиторий)
+defense/
+
+# Генерируется PyInstaller при сборке (build.py)
+*.spec

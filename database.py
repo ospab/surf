@@ -1,8 +1,15 @@
 import csv
 import os
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from urllib.parse import urlparse
+
+try:
+    from surf.constants import SURF_USER_AGENT
+except ModuleNotFoundError:
+    from constants import SURF_USER_AGENT
 
 DEFAULT_DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "surf.db")
 
@@ -16,7 +23,7 @@ DEFAULT_SETTINGS = {
     "language": "ru",
     "menu_bar_auto_hide": "1",
     "user_agent_type": "surf",
-    "custom_user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Surf/1.0",
+    "custom_user_agent": SURF_USER_AGENT,
     "privacy_save_history": "1",
     "privacy_clear_on_exit": "0",
     "privacy_dnt": "1",
@@ -28,6 +35,8 @@ DEFAULT_SETTINGS = {
     "download_folder": os.path.expanduser("~/Downloads"),
     "speed_dial_initialized": "0",
     "restore_session_on_startup": "1",
+    "force_dark_sites": "0",
+    "tab_sleep_enabled": "1",
 }
 
 DEFAULT_SPEED_DIAL_TILES = []
@@ -38,10 +47,23 @@ class Database:
         self.db_path = db_path
         self._init_db()
 
-    def _get_connection(self) -> sqlite3.Connection:
+    @contextmanager
+    def _get_connection(self) -> Iterator[sqlite3.Connection]:
+        """Открывает соединение, фиксирует транзакцию и ОБЯЗАТЕЛЬНО закрывает его.
+
+        Обычный `with sqlite3.connect(...)` только завершает транзакцию,
+        но не закрывает соединение, из-за чего они копились.
+        """
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
-        return conn
+        try:
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
     def _init_db(self) -> None:
         with self._get_connection() as conn:
@@ -107,9 +129,7 @@ class Database:
                 cursor.execute(
                     "UPDATE settings SET value = 'https://www.google.com/search?q=' WHERE key = 'search_engine'"
                 )
-                cursor.execute(
-                    "UPDATE settings SET value = 'google' WHERE key = 'search_engine_type'"
-                )
+                cursor.execute("UPDATE settings SET value = 'google' WHERE key = 'search_engine_type'")
                 cursor.execute(
                     "UPDATE settings SET value = 'https://www.google.com' WHERE key = 'homepage' AND value = 'https://ya.ru'"
                 )
@@ -127,17 +147,13 @@ class Database:
                 """
             )
 
-            cursor.execute("SELECT COUNT(*) AS count FROM speed_dial_tiles")
-            has_tiles = cursor.fetchone()["count"] > 0
             cursor.execute("SELECT value FROM settings WHERE key = 'speed_dial_initialized'")
             init_row = cursor.fetchone()
             dial_initialized = init_row is not None and init_row["value"] == "1"
 
             if not dial_initialized:
                 # На новом браузере оставляем список шорткатов чистым/пустым
-                cursor.execute(
-                    "INSERT OR REPLACE INTO settings (key, value) VALUES ('speed_dial_initialized', '1')"
-                )
+                cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('speed_dial_initialized', '1')")
 
             # Сессии открытых вкладок (Session Restore)
             cursor.execute(
@@ -179,7 +195,41 @@ class Database:
                 """
             )
 
+            # Масштаб страницы, запомненный для каждого сайта (домена)
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS site_zoom (
+                    host TEXT PRIMARY KEY,
+                    zoom REAL NOT NULL
+                )
+                """
+            )
+
             conn.commit()
+
+    # --- Масштаб сайтов ---
+
+    def get_site_zoom(self, host: str) -> float | None:
+        """Возвращает сохранённый масштаб для домена или None (значит 100%)."""
+        if not host:
+            return None
+        with self._get_connection() as conn:
+            row = conn.execute("SELECT zoom FROM site_zoom WHERE host = ?", (host,)).fetchone()
+            return row["zoom"] if row else None
+
+    def set_site_zoom(self, host: str, zoom: float) -> None:
+        """Запоминает масштаб для домена. Масштаб 100% не храним — удаляем запись."""
+        if not host:
+            return
+        with self._get_connection() as conn:
+            if abs(zoom - 1.0) < 1e-6:
+                conn.execute("DELETE FROM site_zoom WHERE host = ?", (host,))
+            else:
+                conn.execute(
+                    "INSERT INTO site_zoom (host, zoom) VALUES (?, ?) "
+                    "ON CONFLICT(host) DO UPDATE SET zoom = excluded.zoom",
+                    (host, zoom),
+                )
 
     # --- История ---
 
@@ -213,37 +263,80 @@ class Database:
                 )
             conn.commit()
 
-    def get_history(self, search_query: str = "", date_filter: str = "all", limit: int = 300) -> list[dict]:
+    def update_history_title(self, url: str, title: str) -> None:
+        """Обновляет заголовок последней записи истории для URL, не засчитывая новое посещение."""
+        title = title.strip() if title else ""
+        if not url or not title:
+            return
         with self._get_connection() as conn:
-            cursor = conn.cursor()
-            query = "SELECT id, url, title, visit_time, visit_count FROM history WHERE 1=1"
-            params: list = []
+            conn.execute(
+                "UPDATE history SET title = ? WHERE id = (SELECT MAX(id) FROM history WHERE url = ?)",
+                (title, url),
+            )
 
-            if search_query:
-                query += " AND (title LIKE ? OR url LIKE ?)"
-                like = f"%{search_query}%"
-                params.extend([like, like])
+    def delete_history_by_url(self, url: str) -> None:
+        with self._get_connection() as conn:
+            conn.execute("DELETE FROM history WHERE url = ?", (url,))
 
-            now = datetime.now()
-            if date_filter == "today":
-                start = now.strftime("%Y-%m-%d 00:00:00")
-                query += " AND visit_time >= ?"
-                params.append(start)
-            elif date_filter == "yesterday":
-                start = (now - timedelta(days=1)).strftime("%Y-%m-%d 00:00:00")
-                end = now.strftime("%Y-%m-%d 00:00:00")
-                query += " AND visit_time >= ? AND visit_time < ?"
-                params.extend([start, end])
-            elif date_filter == "week":
-                start = (now - timedelta(days=7)).strftime("%Y-%m-%d 00:00:00")
-                query += " AND visit_time >= ?"
-                params.append(start)
+    def get_history(
+        self,
+        search_query: str = "",
+        date_filter: str = "all",
+        limit: int = 300,
+        date_from: str | None = None,
+        date_to: str | None = None,
+    ) -> list[dict]:
+        """Возвращает историю. date_from/date_to ('YYYY-MM-DD', включительно) задают произвольный диапазон."""
+        where, params = self._history_filter_sql(search_query, date_filter, date_from, date_to)
+        query = (
+            "SELECT id, url, title, visit_time, visit_count FROM history "
+            f"WHERE {where} ORDER BY visit_time DESC LIMIT ?"
+        )
+        with self._get_connection() as conn:
+            rows = conn.execute(query, [*params, limit]).fetchall()
+            return [dict(row) for row in rows]
 
-            query += " ORDER BY visit_time DESC LIMIT ?"
-            params.append(limit)
+    def delete_history_filtered(
+        self, date_filter: str = "all", date_from: str | None = None, date_to: str | None = None
+    ) -> None:
+        """Удаляет записи истории, подходящие под тот же фильтр, что и get_history."""
+        where, params = self._history_filter_sql("", date_filter, date_from, date_to)
+        with self._get_connection() as conn:
+            conn.execute(f"DELETE FROM history WHERE {where}", params)
 
-            cursor.execute(query, params)
-            return [dict(row) for row in cursor.fetchall()]
+    @staticmethod
+    def _history_filter_sql(
+        search_query: str, date_filter: str, date_from: str | None, date_to: str | None
+    ) -> tuple[str, list]:
+        """Собирает условие WHERE и параметры для фильтров истории (общий код выборки и удаления)."""
+        conditions = ["1=1"]
+        params: list = []
+
+        if search_query:
+            conditions.append("(title LIKE ? OR url LIKE ?)")
+            like = f"%{search_query}%"
+            params.extend([like, like])
+
+        now = datetime.now()
+        today_start = now.strftime("%Y-%m-%d 00:00:00")
+        if date_filter == "today":
+            conditions.append("visit_time >= ?")
+            params.append(today_start)
+        elif date_filter == "yesterday":
+            conditions.append("visit_time >= ? AND visit_time < ?")
+            params.extend([(now - timedelta(days=1)).strftime("%Y-%m-%d 00:00:00"), today_start])
+        elif date_filter == "week":
+            conditions.append("visit_time >= ?")
+            params.append((now - timedelta(days=7)).strftime("%Y-%m-%d 00:00:00"))
+
+        if date_from:
+            conditions.append("visit_time >= ?")
+            params.append(f"{date_from} 00:00:00")
+        if date_to:
+            conditions.append("visit_time <= ?")
+            params.append(f"{date_to} 23:59:59")
+
+        return " AND ".join(conditions), params
 
     def delete_history_entry(self, entry_id: int) -> None:
         with self._get_connection() as conn:
@@ -341,7 +434,9 @@ class Database:
 
     # --- Загрузки ---
 
-    def add_download(self, file_name: str, file_path: str, url: str, total_bytes: int, status: str = "completed") -> None:
+    def add_download(
+        self, file_name: str, file_path: str, url: str, total_bytes: int, status: str = "completed"
+    ) -> None:
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -402,9 +497,9 @@ class Database:
         if not os.path.exists(filepath):
             return 0
 
-        with open(filepath, "r", encoding="utf-8") as f:
+        with open(filepath, encoding="utf-8") as f:
             reader = csv.reader(f, delimiter=";")
-            header = next(reader, None)
+            next(reader, None)  # пропускаем строку заголовков
             for row in reader:
                 if len(row) >= 2:
                     title, url = row[0], row[1]
@@ -427,9 +522,7 @@ class Database:
     def get_speed_dial_tiles(self) -> list[dict]:
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT id, title, url, icon, position FROM speed_dial_tiles ORDER BY position ASC, id ASC"
-            )
+            cursor.execute("SELECT id, title, url, icon, position FROM speed_dial_tiles ORDER BY position ASC, id ASC")
             return [dict(row) for row in cursor.fetchall()]
 
     def add_speed_dial_tile(self, title: str, url: str, icon: str = "") -> int:
@@ -489,14 +582,16 @@ class Database:
                 if not title or title == url:
                     parsed = urlparse(url)
                     title = parsed.netloc.replace("www.", "") or url
-                result.append({
-                    "id": None,
-                    "title": title,
-                    "url": url,
-                    "icon": "",
-                    "position": 0,
-                    "is_fallback": True,
-                })
+                result.append(
+                    {
+                        "id": None,
+                        "title": title,
+                        "url": url,
+                        "icon": "",
+                        "position": 0,
+                        "is_fallback": True,
+                    }
+                )
             return result
 
     get_most_visited_sites = get_top_visited_sites
@@ -605,7 +700,8 @@ class Database:
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT origin, audio_device, video_device, allow_audio, allow_video FROM site_device_preferences WHERE origin = ?",
+                "SELECT origin, audio_device, video_device, allow_audio, allow_video "
+                "FROM site_device_preferences WHERE origin = ?",
                 (origin,),
             )
             row = cursor.fetchone()
@@ -629,7 +725,8 @@ class Database:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                INSERT INTO site_device_preferences (origin, audio_device, video_device, allow_audio, allow_video, updated_at)
+                INSERT INTO site_device_preferences
+                    (origin, audio_device, video_device, allow_audio, allow_video, updated_at)
                 VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 ON CONFLICT(origin) DO UPDATE SET
                     audio_device = excluded.audio_device,
@@ -650,12 +747,19 @@ class Database:
             conn.commit()
             return cursor.rowcount > 0
 
+    def clear_site_device_preferences(self) -> None:
+        """Удаляет выбор устройств для всех сайтов и связанные решения по микрофону и камере."""
+        with self._get_connection() as conn:
+            conn.execute("DELETE FROM site_device_preferences")
+            conn.execute("DELETE FROM site_permissions WHERE feature IN ('media', 'audio', 'video')")
+
     def get_all_site_device_preferences(self) -> list[dict]:
         """Возвращает список сохранённых конфигураций девайсов для всех сайтов."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT origin, audio_device, video_device, allow_audio, allow_video, updated_at FROM site_device_preferences ORDER BY origin ASC"
+                "SELECT origin, audio_device, video_device, allow_audio, allow_video, updated_at "
+                "FROM site_device_preferences ORDER BY origin ASC"
             )
             res = []
             for row in cursor.fetchall():
