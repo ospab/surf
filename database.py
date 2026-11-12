@@ -37,6 +37,7 @@ DEFAULT_SETTINGS = {
     "restore_session_on_startup": "1",
     "force_dark_sites": "0",
     "tab_sleep_enabled": "1",
+    "first_run_done": "0",
 }
 
 DEFAULT_SPEED_DIAL_TILES = []

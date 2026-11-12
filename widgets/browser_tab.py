@@ -1,4 +1,5 @@
 import json
+import re
 import time
 import urllib.parse
 from urllib.parse import urlparse
@@ -702,6 +703,7 @@ class BrowserTab(QWidget):
     load_progress = pyqtSignal(int)
     open_new_tab = pyqtSignal(str)
     audio_state_changed = pyqtSignal(bool, bool)
+    pdf_saved = pyqtSignal(str)
 
     def __init__(self, db: Database, parent=None, profile: QWebEngineProfile | None = None):
         super().__init__(parent)
@@ -836,7 +838,7 @@ class BrowserTab(QWidget):
 
         menu.addSeparator()
         act_save = menu.addAction(tr("act_save_page"))
-        act_save.triggered.connect(self._save_page_pdf)
+        act_save.triggered.connect(self.save_page_pdf)
 
         act_reader = menu.addAction(tr("act_reader"))
         act_reader.triggered.connect(self.toggle_reader_mode)
@@ -947,6 +949,16 @@ class BrowserTab(QWidget):
             self.stack.setCurrentIndex(2)
 
         self.web_view.page().toHtml(handle_source)
+
+    def save_page_pdf(self) -> None:
+        """Сохраняет текущую страницу в PDF (меню «Файл», Ctrl+S и контекстное меню страницы)."""
+        if not self.current_url or self.stack.currentIndex() != 0:
+            return
+        safe_title = re.sub(r'[\\/:*?"<>|]+', " ", self.current_title).strip()[:80] or "page"
+        path, _ = QFileDialog.getSaveFileName(self, tr("save_pdf_dialog"), f"{safe_title}.pdf", "PDF (*.pdf)")
+        if path:
+            self.web_view.page().printToPdf(path)
+            self.pdf_saved.emit(path)
 
     def capture_screenshot(self) -> None:
         pixmap = self.web_view.grab()
