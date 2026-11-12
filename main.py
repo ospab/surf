@@ -2,8 +2,7 @@ import os
 import sys
 import time
 
-# Поддержка прямого запуска 'python ./main.py' из папки проекта,
-# а также запуска как модуля 'python -m surf.main' из внешнего каталога
+# Чтобы работали и 'python main.py' из папки проекта, и 'python -m surf.main' снаружи
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 PARENT_DIR = os.path.dirname(CURRENT_DIR)
 if CURRENT_DIR not in sys.path:
@@ -90,7 +89,7 @@ def load_js(filename: str) -> str:
 
 
 def setup_chromium_environment() -> None:
-    """Настраивает флаги Chromium для поддержки WebUSB, WebXR, WebRTC, устройств и ускорения."""
+    """Флаги Chromium: WebUSB, WebXR, WebRTC, ускорение."""
     flags = [
         "--enable-features=WebXR,WebXRGamepadSupport,WebUSB,WebBluetooth,WebHID,WebSerial,EnumerateDevices,UserMediaScreenCapturing",
         "--enable-experimental-web-platform-features",
@@ -165,7 +164,7 @@ class MainWindow(QMainWindow):
         self._apply_menu_visibility()
         self._retranslate_ui()
 
-        # Глобальный фильтр колесика мыши с зажатым Ctrl для масштабирования
+        # Ctrl+колесо мыши меняет масштаб
         self.zoom_filter = ZoomWheelFilter(self)
         app = QApplication.instance()
         if app:
@@ -175,13 +174,13 @@ class MainWindow(QMainWindow):
         if not self.is_private and self.db.get_setting("restore_session_on_startup", "1") == "1":
             restored = self.restore_previous_session()
         if self._is_first_run():
-            # Первый запуск: показываем стартовую страницу с подсказками
+            # При первом запуске открываем стартовую страницу
             self.add_new_tab(WELCOME_URL)
             self.db.set_setting("first_run_done", "1")
         elif restored == 0:
             self.add_new_tab()
 
-        # Усыпление неактивных вкладок для экономии памяти
+        # Раз в минуту проверяем, какие вкладки пора усыпить
         self._sleep_timer = QTimer(self)
         self._sleep_timer.setInterval(TAB_SLEEP_CHECK_MS)
         self._sleep_timer.timeout.connect(self._sleep_inactive_tabs)
@@ -195,7 +194,7 @@ class MainWindow(QMainWindow):
         self._apply_dwm_titlebar()
 
     def _apply_dwm_titlebar(self) -> None:
-        """Стилизует заголовок окна Windows (Title Bar), убирая чёрную полосу."""
+        """Красит заголовок окна Windows под тему."""
         if sys.platform != "win32":
             return
         try:
@@ -221,8 +220,7 @@ class MainWindow(QMainWindow):
             pass
 
     def _get_icon(self, name: str) -> QIcon:
-        """Иконка под текущую тему. Отрисовка SVG дорогая, поэтому результат кэшируется
-        (иконка «стоп/обновить» запрашивается на каждый тик загрузки страницы)."""
+        """Иконка под текущую тему. Отрисованные иконки кэшируются, рисовать SVG каждый раз долго."""
         if not hasattr(self, "_icon_cache"):
             self._icon_cache: dict[str, QIcon] = {}
             self._is_dark_theme = self.db.get_setting("theme", "dark") == "dark"
@@ -276,8 +274,7 @@ class MainWindow(QMainWindow):
         else:
             self.profile = get_persistent_profile()
 
-        # Фирменная инъекция брендинга surf и ospab foundation в объект navigator:
-        # Убирает упоминания Mozilla, Netscape, Gecko и Google Inc. на сайтах проверки (internet.yandex.ru и др.)
+        # Подменяем navigator.vendor и подобное, чтобы сайты проверки браузера показывали surf
         branding_script = QWebEngineScript()
         branding_script.setName("surf_branding_overrides")
         branding_script.setSourceCode(load_js("branding.js"))
@@ -287,7 +284,7 @@ class MainWindow(QMainWindow):
         if not self.profile.scripts().find("surf_branding_overrides"):
             self.profile.scripts().insert(branding_script)
 
-        # Скрипт маршрутизации медиаустройств (микрофоны, камеры) для WebRTC
+        # Скрипт, который подставляет выбранные микрофон и камеру в getUserMedia
         if not self.profile.scripts().find("surf_device_routing"):
             device_script = QWebEngineScript()
             device_script.setName("surf_device_routing")
@@ -297,8 +294,7 @@ class MainWindow(QMainWindow):
             device_script.setRunsOnSubFrames(True)
             self.profile.scripts().insert(device_script)
 
-        # Enhanced Tracking Protection (ETP) - перехватчик трекеров.
-        # Один на профиль: обычные окна делят общий профиль, и новое окно не должно
+        # Перехватчик трекеров. Один на профиль: обычные окна делят общий профиль, и новое окно не должно
         # подменять перехватчик (и обнулять счётчик) у уже открытых окон.
         self.tracking_interceptor = getattr(self.profile, "surf_interceptor", None)
         if self.tracking_interceptor is None:
@@ -307,7 +303,7 @@ class MainWindow(QMainWindow):
             self.profile.surf_interceptor = self.tracking_interceptor
         self.tracking_interceptor.blocked_count_changed.connect(self._on_blocked_count_changed)
 
-        # Конфигурация WebEngineSettings: аппаратное ускорение, WebGL, WebRTC, захват экрана
+        # Настройки страниц: ускорение, WebGL, WebRTC, захват экрана
         web_settings = self.profile.settings()
         web_settings.setAttribute(QWebEngineSettings.WebAttribute.Accelerated2dCanvasEnabled, True)
         web_settings.setAttribute(QWebEngineSettings.WebAttribute.WebGLEnabled, True)
@@ -322,14 +318,13 @@ class MainWindow(QMainWindow):
         web_settings.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True)
         web_settings.setAttribute(QWebEngineSettings.WebAttribute.DnsPrefetchEnabled, True)
 
-        # Политика хранения разрешений на устройства и системные API
+        # Где хранить разрешения сайтов: на диске или только в памяти
         if not self.is_private:
             self.profile.setPersistentPermissionsPolicy(QWebEngineProfile.PersistentPermissionsPolicy.StoreOnDisk)
         else:
             self.profile.setPersistentPermissionsPolicy(QWebEngineProfile.PersistentPermissionsPolicy.StoreInMemory)
 
-        # Обработчик служебных внутренних страниц surf:// (тоже один на профиль:
-        # повторная установка для той же схемы Qt отклоняет)
+        # Обработчик страниц surf://, тоже один на профиль: второй раз Qt его не установит
         self.scheme_handler = self.profile.urlSchemeHandler(b"surf")
         if self.scheme_handler is None:
             self.scheme_handler = SurfSchemeHandler(self.db, self.profile, interceptor=self.tracking_interceptor)
@@ -338,13 +333,13 @@ class MainWindow(QMainWindow):
         self._apply_profile_settings()
 
     def _apply_profile_settings(self) -> None:
-        """Применяет изменяемые настройки к УЖЕ созданному профилю.
+        """Применяет настройки к уже созданному профилю.
 
         Вызывается при старте и после сохранения настроек. Профиль, скрипты,
         перехватчик трекеров и обработчик surf:// здесь не пересоздаются —
         иначе открытые вкладки остались бы на старом профиле.
         """
-        # Фирменный User-Agent surf с полной веб-совместимостью
+        # User-Agent
         default_ua = SURF_USER_AGENT
         ua_type = self.db.get_setting("user_agent_type", "surf")
         if ua_type in ("surf", "surf_pure"):
@@ -402,26 +397,26 @@ class MainWindow(QMainWindow):
 
         self._build_menu()
 
-        # 1. Линия парящих вкладок НАД панелью адреса (surf)
+        # Вкладки над адресной строкой
         self._build_tab_strip()
 
-        # 2. Панель навигации со встроенным AwesomeBar
+        # Кнопки навигации и адресная строка
         self._build_toolbar()
 
-        # 3. Тонкий прогресс-бар загрузки
+        # Тонкая полоска загрузки
         self.progress_bar = QProgressBar()
         self.progress_bar.setFixedHeight(2)
         self.progress_bar.setTextVisible(False)
         self.progress_bar.setVisible(False)
         self.main_layout.addWidget(self.progress_bar)
 
-        # 4. Контейнер страниц
+        # Сюда кладутся вкладки
         self.tab_stack = QStackedWidget()
         self.main_layout.addWidget(self.tab_stack)
 
         self._build_find_bar()
 
-        # 5. Строка состояния с интерактивным масштабом
+        # Строка состояния, справа кнопка с масштабом
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
 
@@ -439,7 +434,7 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(6, 2, 6, 0)
         layout.setSpacing(4)
 
-        # Панель вкладок со сжатием и прокруткой
+        # Панель вкладок
         self.tab_bar = ClosableTabBar()
         self.tab_bar.setDocumentMode(True)
         self.tab_bar.setMovable(True)
@@ -501,31 +496,30 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.btn_reload)
         layout.addWidget(self.btn_home)
 
-        # Скруглённая адресная строка AwesomeBar со встроенными экшенами (SSL, Shield, Reader, Star)
+        # Адресная строка со значками: замок слева, щит, книжка и звезда справа
         self.address_bar = QLineEdit()
         self.address_bar.setObjectName("addressBar")
         self.address_bar.setMinimumHeight(28)
         self.address_bar.returnPressed.connect(self._navigate_from_address_bar)
 
-        # Ведущая кнопка (слева): Замок SSL/TLS или иконка поиска
+        # Слева: замок или лупа
         self.act_ssl = self.address_bar.addAction(self._get_icon("search"), QLineEdit.ActionPosition.LeadingPosition)
         self.act_ssl.setToolTip(tr("tip_ssl_secure"))
         self.act_ssl.triggered.connect(self._show_security_info)
 
-        # Завершающие кнопки (справа, порядок появления слева-направо: Shield, Reader, Star):
-        # 1. Крайняя правая кнопка (Star)
+        # Справа значки добавляются от края к центру: сначала звезда
         self.act_star = self.address_bar.addAction(self._get_icon("star"), QLineEdit.ActionPosition.TrailingPosition)
         self.act_star.setToolTip(tr("tip_bookmark"))
         self.act_star.triggered.connect(self._toggle_bookmark)
 
-        # 2. Средняя кнопка (Reader)
+        # потом книжка (режим чтения)
         self.act_reader = self.address_bar.addAction(
             self._get_icon("reader"), QLineEdit.ActionPosition.TrailingPosition
         )
         self.act_reader.setToolTip(tr("tip_reader"))
         self.act_reader.triggered.connect(self._toggle_reader_mode)
 
-        # 3. Левая кнопка в правой группе (Shield - Enhanced Tracking Protection)
+        # потом щит (трекеры)
         self.act_shield = self.address_bar.addAction(
             self._get_icon("shield"), QLineEdit.ActionPosition.TrailingPosition
         )
@@ -554,7 +548,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.btn_downloads)
         layout.addWidget(self.btn_settings)
 
-        # Бейдж приватного режима (surf Private Window)
+        # Метка приватного окна
         if self.is_private:
             self.lbl_private = QLabel(f" {tr('private_badge')} ")
             self.lbl_private.setStyleSheet(
@@ -563,7 +557,7 @@ class MainWindow(QMainWindow):
             )
             layout.addWidget(self.lbl_private)
 
-        # Кнопка меню-гамбургер (≡)
+        # Кнопка меню ≡
         self.btn_menu = QToolButton()
         self.btn_menu.setObjectName("btnMenu")
         self.btn_menu.setIcon(self._get_icon("menu_burger"))
@@ -655,8 +649,8 @@ class MainWindow(QMainWindow):
         self.act_history.setShortcut(QKeySequence("Ctrl+H"))
         self.act_history.triggered.connect(self._open_history_dialog)
 
-        # Ctrl+Shift+T — «вернуть закрытую вкладку» (см. _setup_shortcuts), а при
-        # пустом списке закрытых вкладок он сам восстанавливает сессию
+        # У этого пункта нет сочетания: Ctrl+Shift+T возвращает закрытую вкладку,
+        # а если закрытых нет, сам восстанавливает сессию (см. _setup_shortcuts)
         self.act_restore_session = self.history_menu.addAction("")
         self.act_restore_session.triggered.connect(self.restore_previous_session)
 
@@ -698,10 +692,9 @@ class MainWindow(QMainWindow):
         self.act_about = self.help_menu.addAction("")
         self.act_about.triggered.connect(self._show_about)
 
-        # Привязываем действия меню ещё и к самому окну: при скрытой строке меню
-        # их сочетания клавиш продолжают работать. Дублировать их через QShortcut
-        # нельзя — при видимом меню Qt считает такие сочетания неоднозначными
-        # и не выполняет ни одно из них.
+        # Добавляем пункты меню ещё и в само окно, иначе при скрытой строке меню их
+        # сочетания клавиш не работают. Через QShortcut дублировать нельзя: если меню
+        # видно, Qt видит два одинаковых сочетания и не срабатывает ни одно.
         for menu in (
             self.file_menu,
             self.edit_menu,
@@ -716,7 +709,7 @@ class MainWindow(QMainWindow):
                     self.addAction(action)
 
     def _show_hamburger_menu(self) -> None:
-        """Всплывающее главное меню при клике на гамбургер ≡."""
+        """Меню по кнопке ≡."""
         menu = QMenu(self)
 
         act_nt = menu.addAction(tr("act_new_tab"))
@@ -903,8 +896,7 @@ class MainWindow(QMainWindow):
         self.tab_bar.retranslate_close_buttons()
 
     def _setup_shortcuts(self) -> None:
-        # Здесь только сочетания, которых НЕТ у действий меню (см. _build_menu):
-        # Ctrl+T, Ctrl+W, Ctrl+F, Ctrl+S, зум, F11 и т.п. обрабатываются QAction меню.
+        # Тут только сочетания, которых нет в меню. Ctrl+T, Ctrl+W, Ctrl+F и другие висят на пунктах меню
 
         # Навигация по вкладкам
         QShortcut(QKeySequence("Ctrl+N"), self, lambda: self._open_new_window())
@@ -959,7 +951,7 @@ class MainWindow(QMainWindow):
         is_dark = theme_name == "dark"
         accent = self.db.get_setting("accent_color", "#0060df")
 
-        # Тема или акцент могли измениться — иконки нужно перерисовать
+        # Тема или цвет могли поменяться, иконки рисуем заново
         self._icon_cache = {}
         self._is_dark_theme = is_dark
         style_file = f"{theme_name}.qss"
@@ -968,17 +960,17 @@ class MainWindow(QMainWindow):
         if os.path.exists(style_path):
             with open(style_path, encoding="utf-8") as f:
                 qss = f.read()
-            # Динамически внедряем выбранный пользователем акцентный цвет
+            # Подставляем цвет акцента
             qss = qss.replace("__ACCENT__", accent)
             self.setStyleSheet(qss)
 
-        # Обновляем тему таббара
+        # Панель вкладок
         if hasattr(self, "tab_bar") and isinstance(self.tab_bar, ClosableTabBar):
             vol_icon = self._get_icon("volume-2")
             vol_x_icon = self._get_icon("volume-x")
             self.tab_bar.set_theme_mode(is_dark, vol_icon, vol_x_icon)
 
-        # Обновляем все тулбарные иконки в соответствии с темой
+        # Иконки на панели инструментов
         if hasattr(self, "btn_back"):
             self.btn_back.setIcon(self._get_icon("back"))
             self.btn_forward.setIcon(self._get_icon("forward"))
@@ -995,13 +987,13 @@ class MainWindow(QMainWindow):
         if hasattr(self, "act_reader"):
             self.act_reader.setIcon(self._get_icon("reader"))
 
-        # Обновляем значки безопасности и закладок в строке адреса
+        # Значки в адресной строке
         tab = self.current_tab()
         current_url = tab.current_url if tab else ""
         self._update_bookmark_icon(current_url)
         self._update_security_and_shield_icons(current_url)
 
-        # Обновляем тему всех открытых вкладок и режима чтения
+        # Открытые вкладки и режим чтения
         if hasattr(self, "tab_stack"):
             for i in range(self.tab_stack.count()):
                 t = self.tab_stack.widget(i)
@@ -1081,7 +1073,7 @@ class MainWindow(QMainWindow):
             self.tab_bar.update_movable_state()
 
     def _detach_tab_to_new_window(self, tab_idx: int, drop_pos: QPoint) -> None:
-        """Отрывает вкладку и открывает её в отдельном новом окне браузера."""
+        """Переносит вкладку в новое окно."""
         if self.tab_bar.count() <= 1:
             return
         if not (0 <= tab_idx < self.tab_stack.count()):
@@ -1093,19 +1085,19 @@ class MainWindow(QMainWindow):
 
         url = old_tab.current_url
 
-        # Создаем новое окно браузера
+        # Новое окно
         new_win = MainWindow(is_private=self.is_private)
         new_win.resize(self.size())
 
-        # Позиционируем окно в месте сброса курсора
+        # Ставим его туда, где отпустили мышь
         target_x = max(20, drop_pos.x() - 140)
         target_y = max(20, drop_pos.y() - 30)
         new_win.move(target_x, target_y)
 
-        # Закрываем вкладку в исходном окне
+        # Закрываем вкладку в старом окне
         self.close_tab(tab_idx, save_to_recent=False)
 
-        # Открываем перенесённый URL в новом окне
+        # И открываем её адрес в новом
         target_tab = new_win.current_tab()
         if target_tab:
             if url and not url.startswith("surf://newtab") and url != "about:blank":
@@ -1147,7 +1139,7 @@ class MainWindow(QMainWindow):
             self.status_bar.showMessage(tr("status_no_session"), 3000)
             return 0
 
-        # Если текущая единственная вкладка пустая/speed dial, закроем её после восстановления
+        # Если открыта одна пустая вкладка, после восстановления она не нужна
         cur_tab = self.current_tab()
         initial_is_blank = (
             self.tab_bar.count() == 1
@@ -1365,7 +1357,7 @@ class MainWindow(QMainWindow):
         threading.Thread(target=worker, daemon=True).start()
 
     def _on_tab_load_finished(self, tab: BrowserTab, ok: bool) -> None:
-        # Загрузка завершена (в т.ч. остановлена/с ошибкой) — прогресс не должен «зависнуть»
+        # Загрузка закончилась (или её остановили), убираем полоску
         self._on_tab_progress(tab, 100)
         if ok and tab.current_url:
             self._prefetch_certificate(tab.current_url)
@@ -1379,7 +1371,7 @@ class MainWindow(QMainWindow):
         is_internal = url.startswith("surf://")
 
         if is_new_tab:
-            # На новой вкладке / главной странице скрываем специфичные веб-значки
+            # На новой вкладке значки сайта не нужны
             self.act_ssl.setIcon(self._get_icon("search"))
             self.act_ssl.setToolTip(tr("search_placeholder"))
             self.act_shield.setVisible(False)
@@ -1388,7 +1380,7 @@ class MainWindow(QMainWindow):
             return
 
         if is_internal:
-            # На внутренних страницах surf:// (about, history, settings, help, pages и др.)
+            # На страницах surf:// тоже
             self.act_ssl.setIcon(self._get_icon("globe"))
             self.act_ssl.setToolTip(f"surf 1.0 — {url}")
             self.act_shield.setVisible(False)
@@ -1396,7 +1388,7 @@ class MainWindow(QMainWindow):
             self.act_star.setVisible(False)
             return
 
-        # На реальных веб-страницах показываем весь инструментарий
+        # На обычном сайте показываем все значки
         self.act_shield.setVisible(True)
         self.act_reader.setVisible(True)
         self.act_star.setVisible(True)
@@ -1442,7 +1434,7 @@ class MainWindow(QMainWindow):
         self._update_security_and_shield_icons(tab.current_url if tab else "")
 
     def _open_private_window(self) -> None:
-        """Открывает новое приватное окно surf (Off-The-Record)."""
+        """Открывает приватное окно."""
         win = MainWindow(is_private=True)
         win.show()
 
@@ -1583,7 +1575,7 @@ class MainWindow(QMainWindow):
         self._active_tab = new_active
 
     def _sleep_inactive_tabs(self) -> None:
-        """Выгружает из памяти вкладки, которые давно не открывали (как в Chrome/Edge)."""
+        """Выгружает из памяти вкладки, которые давно не открывали."""
         if self.db.get_setting("tab_sleep_enabled", "1") != "1":
             return
         now = time.monotonic()
@@ -1783,7 +1775,7 @@ class MainWindow(QMainWindow):
 
 
 def set_windows_app_id() -> None:
-    """Свой AppUserModelID: иначе Windows группирует окна под значком python.exe на панели задач."""
+    """Без своего AppUserModelID Windows показывает на панели задач значок python.exe."""
     if sys.platform != "win32":
         return
     try:

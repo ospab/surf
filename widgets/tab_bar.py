@@ -32,7 +32,7 @@ class ZoomWheelFilter(QObject):
 
 
 class ClosableTabBar(QTabBar):
-    """Фирменная панель вкладок surf: фавиконы, индикатор аудио/mute, кнопка закрытия, отрыв вкладок."""
+    """Панель вкладок: значки сайтов, кнопка звука, крестик, перетаскивание в новое окно."""
 
     tabAudioMuteRequested = pyqtSignal(int)
     tabDetachRequested = pyqtSignal(int, QPoint)
@@ -200,7 +200,7 @@ class ClosableTabBar(QTabBar):
                     win = self.window()
                     win_geo = win.frameGeometry() if win else None
 
-                    # Проверяем, вытянут ли курсор за пределы окна или полосы вкладок
+                    # Вкладку вытащили за пределы окна или панели?
                     is_outside = False
                     if win_geo and not win_geo.contains(cur_global):
                         is_outside = True

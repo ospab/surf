@@ -34,8 +34,7 @@ def build_executable():
         "--noconsole",
         "--onedir",
         "--clean",
-        # Перезаписывать dist/surf без вопроса: иначе повторная сборка падает,
-        # если папка уже существует
+        # Без этого флага повторная сборка падает, если dist/surf уже есть
         "--noconfirm",
         f"--icon={os.path.join(resources_dir, 'icons', 'app.ico')}",
         *data_args,

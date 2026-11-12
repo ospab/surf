@@ -1,4 +1,4 @@
-/* surf - Высококонтрастная светлая тема со скруглённым интерфейсом */
+/* surf: светлая тема. __ACCENT__ заменяется на выбранный цвет акцента */
 
 QMainWindow, QDialog {
     background-color: #f2f2f7;
@@ -27,7 +27,7 @@ QTabBar {
     qproperty-drawBase: 0;
 }
 
-/* Парящие вкладки surf */
+/* Вкладки */
 QTabBar::tab {
     background-color: transparent;
     color: #48484a;
@@ -163,7 +163,7 @@ QLineEdit#addressBar:focus {
     background-color: #ffffff;
 }
 
-/* Значки действий внутри адресной строки (SSL, Shield, Reader, Bookmark) */
+/* Значки внутри адресной строки */
 QLineEdit QToolButton {
     background-color: transparent;
     border: none;
@@ -327,7 +327,7 @@ QStatusBar QLabel {
     background-color: #ffffff;
 }
 
-/* Сетка плиток быстрого доступа (Speed Dial / Top Sites) */
+/* Плитки на новой вкладке */
 #speedDialContainer {
     background: transparent;
 }

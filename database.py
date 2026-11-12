@@ -50,10 +50,9 @@ class Database:
 
     @contextmanager
     def _get_connection(self) -> Iterator[sqlite3.Connection]:
-        """Открывает соединение, фиксирует транзакцию и ОБЯЗАТЕЛЬНО закрывает его.
+        """Соединение с базой: сохраняет изменения и закрывает соединение.
 
-        Обычный `with sqlite3.connect(...)` только завершает транзакцию,
-        но не закрывает соединение, из-за чего они копились.
+        Обычный `with sqlite3.connect(...)` соединение не закрывает.
         """
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
@@ -123,7 +122,7 @@ class Database:
                     (key, val),
                 )
 
-            # Миграция: поисковая система по умолчанию - Google
+            # Раньше по умолчанию был Яндекс, переводим на Google
             cursor.execute("SELECT value FROM settings WHERE key = 'search_engine'")
             row = cursor.fetchone()
             if row and row[0] == "https://yandex.ru/search/?text=":
@@ -135,7 +134,7 @@ class Database:
                     "UPDATE settings SET value = 'https://www.google.com' WHERE key = 'homepage' AND value = 'https://ya.ru'"
                 )
 
-            # Плитки быстрого доступа (Speed Dial / Top Sites)
+            # Плитки на новой вкладке
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS speed_dial_tiles (
@@ -153,10 +152,10 @@ class Database:
             dial_initialized = init_row is not None and init_row["value"] == "1"
 
             if not dial_initialized:
-                # На новом браузере оставляем список шорткатов чистым/пустым
+                # В новом браузере плиток нет
                 cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('speed_dial_initialized', '1')")
 
-            # Сессии открытых вкладок (Session Restore)
+            # Вкладки, которые откроются при следующем запуске
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS session_tabs (
@@ -169,7 +168,7 @@ class Database:
                 """
             )
 
-            # Системные разрешения сайтов на девайсы и API (микрофон, камера, геолокация и т.д.)
+            # Разрешения сайтов: микрофон, камера, геолокация и т.д.
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS site_permissions (
@@ -182,7 +181,7 @@ class Database:
                 """
             )
 
-            # Выбор конкретных устройств ввода (микрофон, камера) для сайтов
+            # Какой микрофон и какую камеру использовать на сайте
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS site_device_preferences (
@@ -196,7 +195,7 @@ class Database:
                 """
             )
 
-            # Масштаб страницы, запомненный для каждого сайта (домена)
+            # Масштаб для каждого сайта
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS site_zoom (
@@ -219,7 +218,7 @@ class Database:
             return row["zoom"] if row else None
 
     def set_site_zoom(self, host: str, zoom: float) -> None:
-        """Запоминает масштаб для домена. Масштаб 100% не храним — удаляем запись."""
+        """Запоминает масштаб для домена. 100% не храним, запись просто удаляется."""
         if not host:
             return
         with self._get_connection() as conn:
@@ -482,7 +481,7 @@ class Database:
             )
             conn.commit()
 
-    # --- Работа с файлами CSV / TXT ---
+    # --- CSV ---
 
     def export_bookmarks_to_csv(self, filepath: str) -> int:
         bookmarks = self.get_bookmarks()
@@ -518,7 +517,7 @@ class Database:
                 writer.writerow([h["id"], h["title"], h["url"], h["visit_time"], h["visit_count"]])
         return len(history)
 
-    # --- Плитки быстрого доступа (Speed Dial / Top Sites) ---
+    # --- Плитки новой вкладки ---
 
     def get_speed_dial_tiles(self) -> list[dict]:
         with self._get_connection() as conn:
@@ -597,7 +596,7 @@ class Database:
 
     get_most_visited_sites = get_top_visited_sites
 
-    # --- Восстановление сессий (Session Restore) ---
+    # --- Сохранённая сессия ---
 
     def save_session_tabs(self, tabs: list[dict]) -> None:
         """Сохраняет список вкладок текущей сессии."""
@@ -635,7 +634,7 @@ class Database:
             cursor.execute("DELETE FROM session_tabs")
             conn.commit()
 
-    # --- Разрешения сайтов на системные устройства (Permissions) ---
+    # --- Разрешения сайтов ---
 
     def get_site_permission(self, origin: str, feature: str) -> str | None:
         """Возвращает сохранённое решение ('allow' или 'deny') для источника и фичи/устройства."""
@@ -694,7 +693,7 @@ class Database:
                 cursor.execute("DELETE FROM site_permissions")
             conn.commit()
 
-    # --- Настройки конкретных устройств мультимедиа (микрофоны, камеры) ---
+    # --- Микрофон и камера для сайтов ---
 
     def get_site_device_preference(self, origin: str) -> dict | None:
         """Возвращает настройки выбранных микрофона и камеры для источника."""
@@ -741,7 +740,7 @@ class Database:
             conn.commit()
 
     def delete_site_device_preference(self, origin: str) -> bool:
-        """Удаляет сохранённую конфигурацию устройств для источника."""
+        """Забывает устройства, выбранные для сайта."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM site_device_preferences WHERE origin = ?", (origin,))
@@ -755,7 +754,7 @@ class Database:
             conn.execute("DELETE FROM site_permissions WHERE feature IN ('media', 'audio', 'video')")
 
     def get_all_site_device_preferences(self) -> list[dict]:
-        """Возвращает список сохранённых конфигураций девайсов для всех сайтов."""
+        """Устройства, выбранные для всех сайтов."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(

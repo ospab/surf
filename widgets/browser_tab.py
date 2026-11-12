@@ -75,7 +75,7 @@ except ModuleNotFoundError:
 
 
 def format_search_url(engine_template: str, query: str) -> str:
-    """Форматирует URL поискового запроса с поддержкой шаблонов %s, {query} и прямого добавления."""
+    """Собирает адрес поиска. В шаблоне может быть %s, {query}, или запрос просто дописывается в конец."""
     encoded_query = urllib.parse.quote_plus(query)
     if "%s" in engine_template:
         return engine_template.replace("%s", encoded_query)
@@ -96,7 +96,7 @@ class BrowserPage(QWebEnginePage):
         self.main_window = main_window
         self.tab = tab
 
-        # Подключение обработчиков системных запросов разрешений и девайсов
+        # Запросы разрешений от сайта
         self.permissionRequested.connect(self._on_permission_requested)
         self.featurePermissionRequested.connect(self._on_feature_permission_requested)
         self.desktopMediaRequested.connect(self._on_desktop_media_requested)
@@ -121,7 +121,7 @@ class BrowserPage(QWebEnginePage):
     def acceptNavigationRequest(self, url: QUrl, nav_type: QWebEnginePage.NavigationType, is_main_frame: bool) -> bool:
         modifiers = QApplication.keyboardModifiers()
         is_ctrl = bool(modifiers & Qt.KeyboardModifier.ControlModifier)
-        # Если клик по ссылке был с зажатой клавишей Ctrl — открываем в новой вкладке
+        # Ctrl+клик по ссылке открывает её в новой вкладке
         if nav_type == QWebEnginePage.NavigationType.NavigationTypeLinkClicked and is_ctrl:
             win = self._get_main_window()
             if win and hasattr(win, "add_new_tab"):
@@ -256,7 +256,7 @@ class BrowserPage(QWebEnginePage):
 
 
 def generate_tile_badge(title: str, url: str, is_add_btn: bool = False, is_dark: bool = True) -> QPixmap:
-    """Генерирует высокочеткую круглую иконку для плитки быстрого доступа."""
+    """Круглый значок для плитки на новой вкладке."""
     if is_add_btn:
         pixmap = QPixmap(84, 84)
         pixmap.fill(Qt.GlobalColor.transparent)
@@ -286,7 +286,7 @@ def generate_tile_badge(title: str, url: str, is_add_btn: bool = False, is_dark:
 
 
 class SpeedDialEditDialog(QDialog):
-    """Модальное окно добавления или редактирования плитки быстрого доступа."""
+    """Окно добавления и изменения плитки."""
 
     def __init__(self, parent=None, title: str = "", url: str = "", is_new: bool = True):
         super().__init__(parent)
@@ -304,7 +304,6 @@ class SpeedDialEditDialog(QDialog):
         layout.setSpacing(12)
         layout.setContentsMargins(20, 20, 20, 20)
 
-        # Поле Название
         lbl_name = QLabel(tr("speed_dial_name_label"))
         layout.addWidget(lbl_name)
 
@@ -313,7 +312,6 @@ class SpeedDialEditDialog(QDialog):
         self.input_name.setMinimumHeight(36)
         layout.addWidget(self.input_name)
 
-        # Поле URL
         lbl_url = QLabel(tr("speed_dial_url_label"))
         layout.addWidget(lbl_url)
 
@@ -325,7 +323,6 @@ class SpeedDialEditDialog(QDialog):
 
         layout.addSpacing(6)
 
-        # Кнопки действия
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(10)
         btn_layout.addStretch()
@@ -374,7 +371,7 @@ class SpeedDialEditDialog(QDialog):
 
 
 class SpeedDialCard(QFrame):
-    """Интерактивная плитка веб-сайта с реальной фавиконкой с сайта."""
+    """Плитка сайта на новой вкладке."""
 
     clicked = pyqtSignal(str)
     open_new_tab = pyqtSignal(str)
@@ -393,7 +390,7 @@ class SpeedDialCard(QFrame):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self._init_ui()
 
-        # Автоматическое подтягивание фавиконки сайта
+        # Когда скачается значок сайта, подменим картинку
         FaviconService.instance().favicon_loaded.connect(self._on_favicon_loaded)
         if self.domain:
             FaviconService.instance().request_favicon(self.domain)
@@ -409,7 +406,6 @@ class SpeedDialCard(QFrame):
         layout.setSpacing(4)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # Круглая иконка
         self.icon_label = QLabel(self)
         self.icon_label.setFixedSize(42, 42)
         self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -424,7 +420,6 @@ class SpeedDialCard(QFrame):
         self.icon_label.setPixmap(pixmap)
         layout.addWidget(self.icon_label, 0, Qt.AlignmentFlag.AlignCenter)
 
-        # Название сайта
         title_text = self.tile_data.get("title", "")
         self.title_label = QLabel(self)
         self.title_label.setObjectName("speedDialCardTitle")
@@ -436,11 +431,10 @@ class SpeedDialCard(QFrame):
         self.title_label.setText(elided)
         layout.addWidget(self.title_label)
 
-        # Подсказка с полным адресом
         url = self.tile_data.get("url", "")
         self.setToolTip(f"{title_text}\n{url}" if url else title_text)
 
-        # Кнопка меню (три точки) в верхнем правом углу
+        # Кнопка с тремя точками в углу
         self.menu_btn = QPushButton("···", self)
         self.menu_btn.setObjectName("tileMenuBtn")
         self.menu_btn.setFixedSize(20, 18)
@@ -514,7 +508,6 @@ class SpeedDialAddCard(QFrame):
         layout.setSpacing(4)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # Круг с плюсом
         self.icon_label = QLabel(self)
         self.icon_label.setFixedSize(42, 42)
         self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -524,7 +517,6 @@ class SpeedDialAddCard(QFrame):
         self.icon_label.setPixmap(pixmap)
         layout.addWidget(self.icon_label, 0, Qt.AlignmentFlag.AlignCenter)
 
-        # Текст Добавить
         self.title_label = QLabel(tr("speed_dial_add"), self)
         self.title_label.setObjectName("speedDialAddTitle")
         self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -568,7 +560,7 @@ class SpeedDialWidget(QWidget):
         box_layout.setSpacing(18)
         box_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # Минималистичный логотип surf
+        # Логотип
         logo_layout = QHBoxLayout()
         logo_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -582,7 +574,7 @@ class SpeedDialWidget(QWidget):
         self.subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         box_layout.addWidget(self.subtitle_label)
 
-        # Поле поиска со скругленными краями (pill-shape)
+        # Поле поиска
         self.search_input = QLineEdit()
         self.search_input.setObjectName("speedDialSearch")
         self.search_input.setPlaceholderText(tr("search_placeholder"))
@@ -590,7 +582,7 @@ class SpeedDialWidget(QWidget):
         self.search_input.returnPressed.connect(self._handle_search)
         box_layout.addWidget(self.search_input)
 
-        # Сетка плиток быстрого доступа
+        # Сетка плиток
         self.tiles_container = QWidget()
         self.tiles_container.setObjectName("speedDialContainer")
         self.tiles_layout = QGridLayout(self.tiles_container)
@@ -602,7 +594,7 @@ class SpeedDialWidget(QWidget):
         main_layout.addWidget(center_box)
 
     def refresh_tiles(self) -> None:
-        """Перезагружает сетку плиток из БД (или топа истории) с кнопкой добавления."""
+        """Заново строит сетку плиток."""
         while self.tiles_layout.count():
             item = self.tiles_layout.takeAt(0)
             w = item.widget()
@@ -611,10 +603,10 @@ class SpeedDialWidget(QWidget):
 
         is_dark = self.db.get_setting("theme", "dark") == "dark"
 
-        # 1. Загрузка закрепленных плиток из базы данных
+        # Сначала закреплённые плитки из базы
         tiles = self.db.get_speed_dial_tiles()
 
-        # 2. Если закрепленных плиток нет, автоматически отображаем топ посещаемых сайтов
+        # Если их нет, показываем самые посещаемые сайты
         if not tiles:
             tiles = self.db.get_top_visited_sites(limit=6)
 
@@ -634,7 +626,7 @@ class SpeedDialWidget(QWidget):
             self.tiles_layout.addWidget(card, row, col)
             index += 1
 
-        # Плитка добавления (+)
+        # Плитка «+»
         add_card = SpeedDialAddCard(is_dark=is_dark, parent=self.tiles_container)
         add_card.clicked.connect(self._on_add_tile)
         row = index // columns
@@ -723,19 +715,19 @@ class BrowserTab(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # Плашка запроса системных разрешений на устройства
+        # Плашка с запросом разрешения
         self.permission_bar = PermissionPromptBar(self)
         layout.addWidget(self.permission_bar)
 
-        # Стопка клеток (QStackedWidget)
+        # Три экрана вкладки в QStackedWidget
         self.stack = QStackedWidget()
 
-        # 0: Веб-страница (QWebEngineView)
+        # 0: страница
         self.web_view = QWebEngineView()
         self.browser_page = BrowserPage(self.profile, self.web_view, main_window=self.main_window, tab=self)
         self.web_view.setPage(self.browser_page)
 
-        # Устранение белой вспышки (White Flash)
+        # Фон под цвет темы, чтобы при загрузке не мигало белым
         self._apply_background_color()
 
         self.web_view.titleChanged.connect(self._on_title_changed)
@@ -744,18 +736,18 @@ class BrowserTab(QWidget):
         self.web_view.loadProgress.connect(self.load_progress.emit)
         self.web_view.loadFinished.connect(self._on_load_finished)
 
-        # Контекстное меню и отслеживание аудио
+        # Своё контекстное меню и значок звука
         self.web_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.web_view.customContextMenuRequested.connect(self._show_web_context_menu)
         self.browser_page.recentlyAudibleChanged.connect(self._on_audio_state_changed)
         self.browser_page.audioMutedChanged.connect(self._on_audio_state_changed)
 
-        # 1: Стартовая панель быстрого поиска
+        # 1: новая вкладка
         self.speed_dial = SpeedDialWidget(self.db)
         self.speed_dial.open_url.connect(self.load_url)
         self.speed_dial.open_new_tab.connect(self.open_new_tab.emit)
 
-        # 2: Режим чтения (QTextBrowser)
+        # 2: режим чтения
         self.reader_view = ReaderViewWidget()
         self.reader_view.open_link.connect(self.load_url)
         self.reader_view.close_reader.connect(self.show_normal_view)
@@ -790,7 +782,7 @@ class BrowserTab(QWidget):
         req = self.web_view.lastContextMenuRequest()
         menu = QMenu(self)
 
-        # 1. Если клик по ссылке
+        # Клик по ссылке
         if req and req.linkUrl().isValid() and req.linkUrl().toString():
             link_url = req.linkUrl().toString()
             act_tab = menu.addAction(tr("ctx_open_link_tab"))
@@ -800,7 +792,7 @@ class BrowserTab(QWidget):
             act_copy_link.triggered.connect(lambda: QApplication.clipboard().setText(link_url))
             menu.addSeparator()
 
-        # 2. Если клик по изображению
+        # Клик по картинке
         if (
             req
             and req.mediaType() == QWebEngineContextMenuRequest.MediaType.MediaTypeImage
@@ -814,7 +806,7 @@ class BrowserTab(QWidget):
             act_copy_img.triggered.connect(lambda: QApplication.clipboard().setText(img_url))
             menu.addSeparator()
 
-        # 3. Если выделен текст
+        # Выделен текст
         if req and req.selectedText():
             sel_text = req.selectedText().strip()
             act_copy = menu.addAction(tr("ctx_copy"))
@@ -824,7 +816,7 @@ class BrowserTab(QWidget):
             act_search.triggered.connect(lambda: self._search_selected_text(sel_text))
             menu.addSeparator()
 
-        # 4. Навигация и общие действия
+        # Остальные пункты
         act_back = menu.addAction(tr("tip_back"))
         act_back.setEnabled(self.web_view.history().canGoBack())
         act_back.triggered.connect(self.web_view.back)
@@ -999,7 +991,7 @@ class BrowserTab(QWidget):
         self.url_changed.emit(url_str)
 
     def apply_device_config(self, config: dict) -> None:
-        """Передает параметры выбранных аудио- и видеоустройств в контекст JavaScript страницы."""
+        """Передаёт странице, какие микрофон и камеру использовать."""
         try:
             cfg_json = json.dumps(
                 {
@@ -1015,7 +1007,7 @@ class BrowserTab(QWidget):
             pass
 
     def apply_saved_device_preferences(self, url_str: str) -> None:
-        """Загружает сохраненные или стандартные устройства для текущего сайта."""
+        """Ставит устройства, сохранённые для сайта, или устройства по умолчанию."""
         if not url_str or url_str.startswith("surf://") or url_str == "about:blank":
             return
         origin_str = normalize_origin(QUrl(url_str))
@@ -1043,7 +1035,7 @@ class BrowserTab(QWidget):
         origin_url: QUrl = None,
         feature: QWebEnginePage.Feature = None,
     ) -> None:
-        """Обрабатывает и координирует системные запросы разрешений на устройства."""
+        """Показывает плашку с запросом разрешения и запоминает ответ."""
         req_key = f"{origin_str}:{feat_key}"
         if req_key not in self._pending_perm_requests:
             self._pending_perm_requests[req_key] = []
@@ -1051,7 +1043,7 @@ class BrowserTab(QWidget):
         item = {"permission": permission, "origin_url": origin_url, "feature": feature}
         self._pending_perm_requests[req_key].append(item)
 
-        # Если плашка для этого запроса уже показана, просто аккумулируем запрос
+        # Плашка для такого запроса уже висит, просто запомним его
         if hasattr(self, "permission_bar") and self.permission_bar.isVisible():
             if (
                 self.permission_bar._current_origin == origin_str

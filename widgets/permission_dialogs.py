@@ -119,7 +119,7 @@ def get_feature_info(feature_or_type, is_ru: bool) -> tuple[str, str, str]:
 
 
 def load_themed_icon(icon_name: str, color_hex: str = "#fbfbfe", size: int = 18) -> QPixmap:
-    """Загружает SVG иконку с динамической перекраской."""
+    """Загружает SVG-иконку нужного цвета."""
     icon_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources", "icons")
     icon_path = os.path.join(icon_dir, icon_name)
     if not os.path.exists(icon_path):
@@ -173,7 +173,7 @@ class PermissionPromptBar(QWidget):
         main_layout.setContentsMargins(16, 10, 16, 10)
         main_layout.setSpacing(8)
 
-        # 1. Верхняя строка: Иконка + Заголовок + Быстрый крестик
+        # Сверху: значок, текст и крестик
         top_row = QHBoxLayout()
         top_row.setSpacing(10)
 
@@ -195,7 +195,7 @@ class PermissionPromptBar(QWidget):
         top_row.addWidget(self.btn_close)
         main_layout.addLayout(top_row)
 
-        # 2. Блок выбора конкретных устройств (Микрофон / Камера)
+        # Выбор микрофона и камеры
         self.device_box = QWidget(self)
         device_box_layout = QVBoxLayout(self.device_box)
         device_box_layout.setContentsMargins(30, 2, 0, 2)
@@ -247,7 +247,7 @@ class PermissionPromptBar(QWidget):
 
         main_layout.addWidget(self.device_box)
 
-        # 3. Нижняя строка действий
+        # Кнопки
         bottom_row = QHBoxLayout()
         bottom_row.setSpacing(10)
         bottom_row.setContentsMargins(30, 2, 0, 0)
@@ -443,7 +443,7 @@ class PermissionPromptBar(QWidget):
             self.mic_check.setText("Microphone:")
             self.cam_check.setText("Camera:")
 
-        # Настройка отображения устройств в зависимости от запрашиваемого типа
+        # Показываем только те списки устройств, которые нужны
         if feature_key in ("media", "audio", "video"):
             self._populate_devices()
             self.device_box.show()
@@ -489,7 +489,7 @@ class PermissionPromptBar(QWidget):
         remember = self.remember_cb.isChecked()
         cb = self._on_allow_cb
 
-        # Если это запрос медиаустройств — передаем подробную конфигурацию разделения девайсов
+        # Для микрофона и камеры отдаём, что именно выбрали
         if self._current_feature_key in ("media", "audio", "video") and self.device_box.isVisible():
             allow_audio = self.mic_check.isChecked() and not self.mic_row.isHidden()
             selected_audio = self.mic_combo.currentData() or self.mic_combo.currentText()
@@ -692,7 +692,7 @@ class DesktopMediaDialog(QDialog):
 
 
 class FileSystemAccessDialog(QDialog):
-    """Подтверждение доступа к локальной файловой системе (FileSystemAccess API)."""
+    """Окно: разрешить сайту доступ к файлу?"""
 
     def __init__(
         self, request: QWebEngineFileSystemAccessRequest, is_dark: bool = True, accent: str = "#0060df", parent=None

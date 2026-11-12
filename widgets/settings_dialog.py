@@ -76,7 +76,7 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         self.db = db
 
-        # Способ 1: динамическая загрузка .ui файла без предварительной компиляции
+        # Способ 1: .ui загружается во время работы, без pyuic6
         ui_path = os.path.join(os.path.dirname(__file__), "..", "ui", "settings.ui")
         uic.loadUi(ui_path, self)
 
@@ -90,7 +90,7 @@ class SettingsDialog(QDialog):
         self._connect_signals()
 
     def _setup_devices_tab(self) -> None:
-        """Создает и настраивает вкладку 'Устройства' для выбора микрофона, камеры и разрешений сайтов."""
+        """Вкладка «Устройства»: микрофон и камера по умолчанию, разрешения сайтов."""
         self.devicesTab = QWidget()
         dev_layout = QVBoxLayout(self.devicesTab)
         dev_layout.setContentsMargins(16, 16, 16, 16)
@@ -365,7 +365,7 @@ class SettingsDialog(QDialog):
         current_dir = self.downloadPathEdit.text()
         chosen = QFileDialog.getExistingDirectory(
             self,
-            "Выбор папки для загрузок",
+            "Папка для загрузок",
             current_dir or os.path.expanduser("~"),
         )
         if chosen:
@@ -373,7 +373,7 @@ class SettingsDialog(QDialog):
 
     def _choose_accent_color(self) -> None:
         initial = QColor(self.accent_color)
-        color = QColorDialog.getColor(initial, self, "Выбор акцентного цвета интерфейса")
+        color = QColorDialog.getColor(initial, self, "Цвет акцента")
         if color.isValid():
             self.accent_color = color.name()
             self._update_color_button(self.accent_color)

@@ -1,4 +1,4 @@
-/* surf - Тёмная тема со скруглённым интерфейсом и динамическим акцентом */
+/* surf: тёмная тема. __ACCENT__ заменяется на выбранный цвет акцента */
 
 QMainWindow, QDialog {
     background-color: #1a1a20;
@@ -27,7 +27,7 @@ QTabBar {
     qproperty-drawBase: 0;
 }
 
-/* Парящие вкладки surf */
+/* Вкладки */
 QTabBar::tab {
     background-color: transparent;
     color: #a4a4b2;
@@ -75,7 +75,7 @@ QTabBar::tab:hover:!selected {
     background-color: rgba(255, 255, 255, 0.35);
 }
 
-/* Кнопки прокрутки вкладок (при >50-200 вкладках) */
+/* Стрелки прокрутки, когда вкладки не помещаются */
 QTabBar QToolButton {
     background-color: #24242d;
     border: 1px solid #353542;
@@ -117,7 +117,7 @@ QTabBar QToolButton:hover {
     max-height: 38px;
 }
 
-/* Кнопки навигации тулбара (только прямые потомки) */
+/* Кнопки навигации */
 #navToolbar > QToolButton {
     background-color: transparent;
     color: #fbfbfe;
@@ -138,7 +138,7 @@ QTabBar QToolButton:hover {
     background-color: #424254;
 }
 
-/* Скруглённая адресная строка */
+/* Адресная строка */
 QLineEdit#addressBar {
     background-color: #1a1a20;
     color: #fbfbfe;
@@ -155,7 +155,7 @@ QLineEdit#addressBar:focus {
     background-color: #202028;
 }
 
-/* Значки действий внутри адресной строки (SSL, Shield, Reader, Bookmark) */
+/* Значки внутри адресной строки */
 QLineEdit QToolButton {
     background-color: transparent;
     border: none;
@@ -312,7 +312,7 @@ QStatusBar {
     background-color: #2a2a35;
 }
 
-/* Сетка плиток быстрого доступа (Speed Dial / Top Sites) */
+/* Плитки на новой вкладке */
 #speedDialContainer {
     background: transparent;
 }
@@ -425,7 +425,7 @@ QGroupBox::title {
     color: __ACCENT__;
 }
 
-/* Вкладки в диалогах (QTabWidget) */
+/* Вкладки в диалогах */
 QTabWidget::pane {
     border: 1px solid #353542;
     border-radius: 6px;

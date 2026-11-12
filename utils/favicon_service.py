@@ -46,7 +46,7 @@ def get_cache_file_path(domain: str) -> str:
 
 
 def create_circular_favicon_badge(pixmap: QPixmap, is_dark: bool = True, size: int = 42) -> QPixmap:
-    """Создаёт скруглённый круговой бейдж 42x42 с фавиконкой сайта по центру."""
+    """Круглый значок 42x42 с иконкой сайта в центре."""
     result = QPixmap(size, size)
     result.fill(Qt.GlobalColor.transparent)
 
@@ -81,7 +81,7 @@ def create_circular_favicon_badge(pixmap: QPixmap, is_dark: bool = True, size: i
 
 
 def generate_fallback_badge(title: str, domain: str, is_dark: bool = True, size: int = 42) -> QPixmap:
-    """Создаёт стильный цветной бейдж с первой буквой названия сайта."""
+    """Цветной кружок с первой буквой сайта, если иконки нет."""
     pixmap = QPixmap(size, size)
     pixmap.fill(Qt.GlobalColor.transparent)
 
@@ -128,7 +128,7 @@ def generate_fallback_badge(title: str, domain: str, is_dark: bool = True, size:
 
 
 class FaviconService(QObject):
-    """Асинхронный сервис подтягивания и дискового кэширования фавиконок сайтов."""
+    """Скачивает значки сайтов в фоне и хранит их на диске."""
 
     favicon_loaded = pyqtSignal(str, QPixmap)  # domain, pixmap
     _instance: Optional["FaviconService"] = None
@@ -151,11 +151,11 @@ class FaviconService(QObject):
         if not domain:
             return None
 
-        # 1. Проверяем кэш в памяти
+        # Сначала кэш в памяти
         if domain in self._memory_cache:
             return self._memory_cache[domain]
 
-        # 2. Проверяем кэш на диске
+        # Потом на диске
         file_path = get_cache_file_path(domain)
         if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
             pix = QPixmap(file_path)
@@ -179,7 +179,7 @@ class FaviconService(QObject):
             pass
 
     def request_favicon(self, url_or_domain: str) -> None:
-        """Запрашивает фавиконку. Если нет в кэше — асинхронно скачивает из сети."""
+        """Возвращает значок сайта. Если его нет в кэше, скачивает в фоне."""
         domain = get_clean_domain(url_or_domain)
         if not domain:
             return
@@ -209,7 +209,7 @@ class FaviconService(QObject):
 
         headers = {"User-Agent": SURF_USER_AGENT}
 
-        # 1. Первая попытка: Google Favicon API (надёжно возвращает 64x64 PNG с прозрачностью)
+        # Сначала спрашиваем сервис значков Google, он отдаёт PNG 64x64
         api_url = f"https://www.google.com/s2/favicons?domain={domain}&sz=64"
         try:
             req = urllib.request.Request(api_url, headers=headers)
@@ -223,7 +223,7 @@ class FaviconService(QObject):
         except Exception:
             pix = None
 
-        # 2. Вторая попытка (резервная): прямой запрос https://domain/favicon.ico
+        # Не вышло, берём https://домен/favicon.ico
         if pix is None:
             for scheme in ("https", "http"):
                 try:
