@@ -18,6 +18,8 @@ except ModuleNotFoundError:
 
 
 class ReaderViewWidget(QWidget):
+    """Режим чтения на QTextBrowser: статья, исходный код страницы или справка."""
+
     open_link = pyqtSignal(str)
     close_reader = pyqtSignal()
 
@@ -84,6 +86,7 @@ class ReaderViewWidget(QWidget):
             self.set_help_content()
 
     def set_article(self, title: str, content_html: str, source_url: str) -> None:
+        """Показывает статью: цвета под тему, шрифт Georgia, ширина текста до 760 px."""
         self._last_mode = "article"
         self._last_data = {"title": title, "content": content_html, "url": source_url}
         self._current_url = source_url
@@ -170,6 +173,7 @@ class ReaderViewWidget(QWidget):
         self.browser.setHtml(styled_html)
 
     def set_source_code(self, title: str, raw_html: str, source_url: str) -> None:
+        """Показывает исходный HTML страницы. Он экранируется, чтобы теги выводились текстом."""
         self._last_mode = "source"
         self._last_data = {"title": title, "raw_html": raw_html, "url": source_url}
         self._current_url = source_url

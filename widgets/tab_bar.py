@@ -13,6 +13,8 @@ except ModuleNotFoundError:
 
 
 class ZoomWheelFilter(QObject):
+    """Фильтр событий: Ctrl+колесо мыши в окне меняет масштаб страницы."""
+
     def __init__(self, main_window):
         super().__init__(main_window)
         self.main_window = main_window
@@ -102,6 +104,10 @@ class ClosableTabBar(QTabBar):
                     btn_audio.setToolTip(tr("tip_unmute_tab") if muted else tr("tip_mute_tab"))
 
     def tabInserted(self, index: int) -> None:
+        """Qt вызывает при добавлении вкладки: вешаем на неё кнопки звука и закрытия.
+
+        Номера вкладок после вставленной сдвигаются, поэтому сдвигаем и ключи в _audio_states.
+        """
         super().tabInserted(index)
         self.update_movable_state()
 
@@ -140,6 +146,7 @@ class ClosableTabBar(QTabBar):
         self.setTabButton(index, QTabBar.ButtonPosition.RightSide, container)
 
     def tabRemoved(self, index: int) -> None:
+        """Вкладку убрали: сдвигаем номера в _audio_states, чтобы значки звука не перепутались."""
         super().tabRemoved(index)
         self.update_movable_state()
 
@@ -152,6 +159,7 @@ class ClosableTabBar(QTabBar):
         self._audio_states = new_audio
 
     def _sync_audio_states_on_tab_moved(self, from_idx: int, to_idx: int) -> None:
+        """Вкладку перетащили: переносим её состояние звука, а остальные вкладки между from и to сдвигаем."""
         if from_idx in self._audio_states:
             st = self._audio_states.pop(from_idx)
             new_audio = {}
@@ -170,6 +178,7 @@ class ClosableTabBar(QTabBar):
             self._audio_states = new_audio
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
+        """Запоминаем, какую вкладку начали тащить. Если вкладка одна, двигать её по панели не даём."""
         self.update_movable_state()
         if event.button() == Qt.MouseButton.LeftButton:
             self._drag_start_pos = event.pos()
@@ -187,6 +196,7 @@ class ClosableTabBar(QTabBar):
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        """Следим, не вытащили ли вкладку за окно. Если да, меняем курсор: при отпускании она уйдёт в новое окно."""
         if (
             (event.buttons() & Qt.MouseButton.LeftButton)
             and self._drag_start_pos is not None
@@ -224,6 +234,7 @@ class ClosableTabBar(QTabBar):
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        """Вкладку отпустили за окном: сигнал tabDetachRequested, окно перенесёт её в новое окно."""
         if self._is_detached_mode:
             self._set_drag_cursor(False)
             self._is_detached_mode = False
@@ -248,6 +259,7 @@ class ClosableTabBar(QTabBar):
         super().mouseReleaseEvent(event)
 
     def set_tab_audio(self, index: int, audible: bool, muted: bool) -> None:
+        """Показывает значок звука, когда на вкладке что-то играет или звук выключен, иначе прячет."""
         self._audio_states[index] = (audible, muted)
         container = self.tabButton(index, QTabBar.ButtonPosition.RightSide)
         if not container:

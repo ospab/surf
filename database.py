@@ -44,6 +44,12 @@ DEFAULT_SPEED_DIAL_TILES = []
 
 
 class Database:
+    """Вся работа с SQLite.
+
+    Каждый метод открывает короткое соединение через _get_connection. Таблиц девять: история,
+    закладки, загрузки, настройки, плитки, сессия, разрешения сайтов, устройства, масштаб.
+    """
+
     def __init__(self, db_path: str = DEFAULT_DB_FILE):
         self.db_path = db_path
         self._init_db()
@@ -66,6 +72,10 @@ class Database:
             conn.close()
 
     def _init_db(self) -> None:
+        """Создаёт таблицы, если их нет, и добавляет настройки по умолчанию.
+
+        INSERT OR IGNORE не трогает настройки, которые пользователь уже поменял.
+        """
         with self._get_connection() as conn:
             cursor = conn.cursor()
 
@@ -234,6 +244,7 @@ class Database:
     # --- История ---
 
     def add_history_entry(self, url: str, title: str) -> None:
+        """Записывает посещение: если адрес уже есть, увеличивает счётчик и время, иначе добавляет строку."""
         if not url or url.startswith("data:") or url == "about:blank":
             return
         if self.get_setting("privacy_save_history", "1") == "0":
@@ -358,6 +369,7 @@ class Database:
             conn.commit()
 
     def get_top_domains(self, limit: int = 8) -> list[tuple[str, int]]:
+        """Самые посещаемые сайты для статистики: посещения складываются по домену."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT url, visit_count FROM history")
@@ -493,6 +505,10 @@ class Database:
         return len(bookmarks)
 
     def import_bookmarks_from_csv(self, filepath: str) -> int:
+        """Читает закладки из CSV (разделитель ';', первая строка с заголовками).
+
+        Возвращает, сколько закладок добавлено. Уже существующие адреса пропускаются.
+        """
         imported = 0
         if not os.path.exists(filepath):
             return 0
@@ -561,6 +577,7 @@ class Database:
             return cursor.rowcount > 0
 
     def get_top_visited_sites(self, limit: int = 6) -> list[dict]:
+        """Самые посещаемые страницы для новой вкладки, когда своих плиток нет."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(

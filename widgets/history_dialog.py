@@ -23,6 +23,8 @@ DATE_FORMAT_SQL = "yyyy-MM-dd"
 
 
 class HistoryDialog(QDialog, Ui_HistoryDialog):
+    """Журнал: история, закладки и статистика. Форма сделана в Qt Designer (history.ui)."""
+
     # Способ 2: форма history.ui скомпилирована pyuic6 в ui_history.py
     open_url = pyqtSignal(str)
 
