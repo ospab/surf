@@ -70,6 +70,8 @@ TAB_SLEEP_MINUTES = 10
 
 
 class SettingsDialog(QDialog):
+    """Окно настроек. Форма загружается из settings.ui, вкладка «Устройства» достраивается в коде."""
+
     settings_changed = pyqtSignal()
 
     def __init__(self, db: Database, parent=None):

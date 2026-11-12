@@ -47,6 +47,7 @@ def find_blocked_domain(host: str) -> str | None:
     Так поиск идёт за O(число частей имени), а не перебором всего списка.
     """
     parts = host.lower().split(".")
+    # Перебираем сам домен и все родительские: a.b.example.com, b.example.com, example.com, com
     for i in range(len(parts)):
         candidate = ".".join(parts[i:])
         if candidate in BLOCKED_DOMAINS:
@@ -55,6 +56,8 @@ def find_blocked_domain(host: str) -> str | None:
 
 
 class TrackingProtectionInterceptor(QWebEngineUrlRequestInterceptor):
+    """Перехватчик запросов. Qt вызывает interceptRequest для каждого запроса страницы."""
+
     blocked_count_changed = pyqtSignal(int)
 
     def __init__(self, parent=None):
@@ -75,6 +78,7 @@ class TrackingProtectionInterceptor(QWebEngineUrlRequestInterceptor):
         self.blocked_count_changed.emit(0)
 
     def interceptRequest(self, info: QWebEngineUrlRequestInfo) -> None:
+        """Добавляет заголовки DNT/GPC и блокирует запрос, если он идёт к трекеру."""
         if self.send_dnt:
             info.setHttpHeader(b"DNT", b"1")
             info.setHttpHeader(b"Sec-GPC", b"1")

@@ -91,6 +91,8 @@ def format_search_url(engine_template: str, query: str) -> str:
 
 
 class BrowserPage(QWebEnginePage):
+    """Страница вкладки: новые окна и Ctrl+клик открывает вкладками, принимает запросы разрешений."""
+
     def __init__(self, profile, parent=None, main_window=None, tab=None):
         super().__init__(profile, parent)
         self.main_window = main_window
@@ -111,6 +113,7 @@ class BrowserPage(QWebEnginePage):
         return None
 
     def createWindow(self, window_type):
+        """Сайт открывает новое окно (target=_blank, window.open): вместо окна делаем вкладку."""
         win = self._get_main_window()
         if win and hasattr(win, "add_new_tab"):
             new_tab = win.add_new_tab()
@@ -119,6 +122,7 @@ class BrowserPage(QWebEnginePage):
         return super().createWindow(window_type)
 
     def acceptNavigationRequest(self, url: QUrl, nav_type: QWebEnginePage.NavigationType, is_main_frame: bool) -> bool:
+        """Ctrl+клик по ссылке открывает её в новой вкладке, остальные переходы идут как обычно."""
         modifiers = QApplication.keyboardModifiers()
         is_ctrl = bool(modifiers & Qt.KeyboardModifier.ControlModifier)
         # Ctrl+клик по ссылке открывает её в новой вкладке
@@ -130,6 +134,10 @@ class BrowserPage(QWebEnginePage):
         return super().acceptNavigationRequest(url, nav_type, is_main_frame)
 
     def _permission_type_key(self, perm_type) -> str:
+        """Сводит тип разрешения Qt к короткому ключу ('audio', 'video', 'geolocation'...).
+
+        Под этим ключом решение пользователя хранится в таблице site_permissions.
+        """
         s = str(perm_type).lower()
         if "audio" in s and "video" in s:
             return "media"
@@ -152,6 +160,7 @@ class BrowserPage(QWebEnginePage):
         return "device"
 
     def _on_permission_requested(self, permission: QWebEnginePermission) -> None:
+        """Сайт просит разрешение. Если решение уже сохранено, применяем его, иначе показываем плашку."""
         origin_url = permission.origin()
         origin_str = normalize_origin(origin_url)
         feat_key = self._permission_type_key(permission.permissionType())
@@ -189,6 +198,7 @@ class BrowserPage(QWebEnginePage):
             permission.grant()
 
     def _on_feature_permission_requested(self, security_origin: QUrl, feature: QWebEnginePage.Feature) -> None:
+        """То же, что _on_permission_requested, но для старого API Qt (featurePermissionRequested)."""
         origin_str = normalize_origin(security_origin)
         feat_key = self._permission_type_key(feature)
 
@@ -342,6 +352,7 @@ class SpeedDialEditDialog(QDialog):
         layout.addLayout(btn_layout)
 
     def _handle_save(self) -> None:
+        """Дописывает https://, если схемы нет, а без названия берёт его из домена."""
         url = self.input_url.text().strip()
         if not url:
             self.input_url.setFocus()
@@ -539,6 +550,8 @@ class SpeedDialAddCard(QFrame):
 
 
 class SpeedDialWidget(QWidget):
+    """Новая вкладка: логотип, поиск и плитки. Нет своих плиток — показываем самые посещаемые сайты."""
+
     open_url = pyqtSignal(str)
     open_new_tab = pyqtSignal(str)
 
@@ -689,6 +702,12 @@ class SpeedDialWidget(QWidget):
 
 
 class BrowserTab(QWidget):
+    """Одна вкладка.
+
+    В QStackedWidget три экрана: страница (0), новая вкладка (1) и режим чтения (2).
+    Об изменениях (заголовок, адрес, значок, загрузка) вкладка сообщает окну сигналами.
+    """
+
     title_changed = pyqtSignal(str)
     url_changed = pyqtSignal(str)
     icon_changed = pyqtSignal(QIcon)
@@ -779,6 +798,7 @@ class BrowserTab(QWidget):
         self.browser_page.setAudioMuted(not muted)
 
     def _show_web_context_menu(self, pos: QPoint) -> None:
+        """Меню по правому клику. Пункты зависят от того, куда кликнули: ссылка, картинка, выделенный текст."""
         req = self.web_view.lastContextMenuRequest()
         menu = QMenu(self)
 
@@ -846,6 +866,11 @@ class BrowserTab(QWidget):
         self.open_new_tab.emit(url)
 
     def load_url(self, url: str) -> None:
+        """Открывает адрес или ищет текст.
+
+        Если в тексте есть точка и нет пробелов, считаем его адресом и дописываем https://.
+        Иначе отправляем текст в выбранную поисковую систему.
+        """
         url = url.strip()
         if not url:
             return
@@ -906,6 +931,7 @@ class BrowserTab(QWidget):
             self.speed_dial.refresh_tiles()
 
     def toggle_reader_mode(self) -> None:
+        """Включает или выключает режим чтения. Текст статьи достаёт JS-скрипт прямо со страницы."""
         if self.stack.currentIndex() == 2:
             self.show_normal_view()
             return
@@ -965,6 +991,7 @@ class BrowserTab(QWidget):
             QMessageBox.information(self, tr("screenshot_saved_title"), tr("screenshot_saved_msg", path=file_path))
 
     def _on_title_changed(self, title: str) -> None:
+        """Страница сменила заголовок: обновляем вкладку и заголовок в истории."""
         if title:
             self.current_title = title
             self.title_changed.emit(title)
@@ -973,6 +1000,7 @@ class BrowserTab(QWidget):
                 self.db.update_history_title(self.current_url, title)
 
     def _on_url_changed(self, qurl: QUrl) -> None:
+        """Адрес поменялся: обновляем адресную строку и прячем плашку разрешения от прошлого сайта."""
         url_str = qurl.toString()
         if not url_str or url_str == "about:blank":
             return
@@ -1052,6 +1080,7 @@ class BrowserTab(QWidget):
                 return
 
         def on_allow(result):
+            """Разрешили: выдаём разрешение всем ждущим запросам и, если стоит галочка, запоминаем."""
             if isinstance(result, dict):
                 allow_audio = result.get("allow_audio", True)
                 selected_audio = result.get("selected_audio", "")
@@ -1104,6 +1133,7 @@ class BrowserTab(QWidget):
                         pass
 
         def on_deny(remember: bool):
+            """Запретили: отказываем всем ждущим запросам и, если стоит галочка, запоминаем отказ."""
             items = self._pending_perm_requests.pop(req_key, [])
             for req in items:
                 if req["permission"]:
@@ -1132,6 +1162,7 @@ class BrowserTab(QWidget):
                     )
 
         def on_dismiss():
+            """Плашку закрыли крестиком: отказываем, но ничего не запоминаем."""
             items = self._pending_perm_requests.pop(req_key, [])
             for req in items:
                 if req["permission"]:
@@ -1171,6 +1202,7 @@ class BrowserTab(QWidget):
                 FaviconService.instance().save_to_cache(self.current_url, pix)
 
     def _on_load_finished(self, ok: bool) -> None:
+        """Страница загрузилась: засчитываем посещение и подставляем устройства, выбранные для сайта."""
         if ok and self.current_url and not self.current_url.startswith("surf://"):
             self.apply_saved_device_preferences(self.current_url)
             if not self.profile.isOffTheRecord():

@@ -22,6 +22,8 @@ except ModuleNotFoundError:
 
 
 class DownloadManagerDialog(QDialog):
+    """Окно загрузок: таблица из базы, открыть папку с файлом, очистить список."""
+
     def __init__(self, db: Database, parent=None):
         super().__init__(parent)
         self.db = db

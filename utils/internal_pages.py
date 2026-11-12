@@ -1153,6 +1153,7 @@ class SurfSchemeHandler(QWebEngineUrlSchemeHandler):
         self._buffers: dict = {}
 
     def requestStarted(self, job) -> None:
+        """Qt просит содержимое для адреса surf://...: собираем HTML нужной страницы и отдаём его."""
         url = job.requestUrl()
         host = url.host().lower()
 
@@ -1186,6 +1187,7 @@ class SurfSchemeHandler(QWebEngineUrlSchemeHandler):
         buf.write(html_content.encode("utf-8"))
         buf.close()
         buf.open(QIODevice.OpenModeFlag.ReadOnly)
+        # Буфер должен жить, пока Qt читает ответ, поэтому храним ссылку до удаления job
         self._buffers[job] = buf
         try:
             job.destroyed.connect(lambda: self._buffers.pop(job, None))

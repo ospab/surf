@@ -136,6 +136,12 @@ except Exception:
 
 
 class MainWindow(QMainWindow):
+    """Окно браузера: панель вкладок, адресная строка, меню, загрузки, масштаб.
+
+    Вкладки лежат в QStackedWidget, а ClosableTabBar сверху только переключает их.
+    Обычные окна делят один профиль Chromium, у приватного окна свой профиль в памяти.
+    """
+
     _open_windows: list["MainWindow"] = []
 
     def __init__(self, is_private: bool = False):
@@ -231,6 +237,7 @@ class MainWindow(QMainWindow):
         return icon
 
     def _render_themed_icon(self, name: str, is_dark: bool) -> QIcon:
+        """Рисует SVG-иконку под тему: в тексте SVG меняем цвет линий и рисуем её в нескольких размерах."""
         path = os.path.join(ICONS_DIR, f"{name}.svg")
         if not os.path.exists(path):
             return QIcon()
@@ -366,6 +373,7 @@ class MainWindow(QMainWindow):
         self._apply_network_proxy()
 
     def _apply_network_proxy(self) -> None:
+        """Ставит прокси для всего приложения: без прокси, системный, HTTP или SOCKS5."""
         p_type = self.db.get_setting("proxy_type", "none")
         if p_type == "none":
             QNetworkProxy.setApplicationProxy(QNetworkProxy(QNetworkProxy.ProxyType.NoProxy))
@@ -1024,6 +1032,7 @@ class MainWindow(QMainWindow):
     # --- Управление вкладками ---
 
     def add_new_tab(self, url: str = "") -> BrowserTab:
+        """Создаёт вкладку, подключает её сигналы к окну и открывает url (пустой url = новая вкладка)."""
         tab = BrowserTab(self.db, self, profile=self.profile)
         idx = self.tab_stack.addWidget(tab)
         self.tab_bar.addTab(tr("new_tab"))
@@ -1049,6 +1058,7 @@ class MainWindow(QMainWindow):
         return tab
 
     def close_tab(self, index: int, save_to_recent: bool = True) -> None:
+        """Закрывает вкладку. Последнюю вкладку не закрываем, а показываем на ней новую вкладку."""
         if self.tab_bar.count() > 1:
             tab = self.tab_stack.widget(index)
             if tab and isinstance(tab, BrowserTab):
@@ -1171,6 +1181,7 @@ class MainWindow(QMainWindow):
         return restored
 
     def _reopen_closed_tab(self) -> None:
+        """Ctrl+Shift+T: возвращает последнюю закрытую вкладку, а если таких нет, восстанавливает сессию."""
         if self._recently_closed_urls:
             url = self._recently_closed_urls.pop()
             self.add_new_tab(url)
@@ -1214,6 +1225,7 @@ class MainWindow(QMainWindow):
                 self._update_progress(getattr(tab, "load_progress_value", 100))
 
     def _on_tab_moved(self, from_idx: int, to_idx: int) -> None:
+        """Вкладку перетащили: переставляем её страницу в QStackedWidget, чтобы порядок совпадал с панелью."""
         widget = self.tab_stack.widget(from_idx)
         if widget:
             self.tab_stack.removeWidget(widget)
@@ -1266,6 +1278,7 @@ class MainWindow(QMainWindow):
             self.btn_reload.setIcon(self._get_icon("stop" if loading else "reload"))
 
     def _show_tab_context_menu(self, pos: QPoint) -> None:
+        """Меню по правому клику на вкладке: обновить, дублировать, закрыть, закрыть другие."""
         tab_idx = self.tab_bar.tabAt(pos)
         if tab_idx < 0:
             return
@@ -1295,6 +1308,7 @@ class MainWindow(QMainWindow):
     # --- Навигация и адресная строка ---
 
     def _navigate_from_address_bar(self) -> None:
+        """Enter в адресной строке. Адрес это или поисковый запрос, решает вкладка в load_url."""
         text = self.address_bar.text().strip()
         tab = self.current_tab()
         if tab and text:
@@ -1311,6 +1325,7 @@ class MainWindow(QMainWindow):
             tab.web_view.forward()
 
     def _reload_current(self) -> None:
+        """Кнопка обновления: пока страница грузится, она работает как «стоп»."""
         tab = self.current_tab()
         if tab:
             if getattr(tab, "load_progress_value", 100) < 100:
@@ -1339,6 +1354,7 @@ class MainWindow(QMainWindow):
     # --- Безопасность и защита от отслеживания ---
 
     def _prefetch_certificate(self, url: str) -> None:
+        """Заранее получает сертификат сайта в отдельном потоке, чтобы окно сертификата открывалось сразу."""
         if not url.startswith("https://"):
             return
         host = QUrl(url).host()
@@ -1364,6 +1380,7 @@ class MainWindow(QMainWindow):
             self._apply_site_zoom(tab)
 
     def _update_security_and_shield_icons(self, url: str) -> None:
+        """Показывает в адресной строке нужные значки: замок или лупу, щит, книжку и звезду."""
         if not hasattr(self, "act_ssl") or not hasattr(self, "act_shield"):
             return
 
@@ -1445,6 +1462,7 @@ class MainWindow(QMainWindow):
     # --- Закладки ---
 
     def _toggle_bookmark(self) -> None:
+        """Звёздочка и Ctrl+D: если закладка есть, удаляет её, иначе спрашивает название и добавляет."""
         tab = self.current_tab()
         if not tab or not tab.current_url or tab.current_url.startswith("surf://"):
             return
@@ -1698,6 +1716,7 @@ class MainWindow(QMainWindow):
                 tab.web_view.page().download(QUrl(url.strip()))
 
     def _handle_download_requested(self, download: QWebEngineDownloadRequest) -> None:
+        """Сайт начал скачивание: спрашиваем, куда сохранить, а когда файл скачается, пишем его в таблицу downloads."""
         self._active_downloads.append(download)
 
         raw_folder = self.db.get_setting(
@@ -1757,6 +1776,7 @@ class MainWindow(QMainWindow):
         self.completer_model.setStringList(urls)
 
     def closeEvent(self, event) -> None:
+        """При закрытии окна сохраняем вкладки. В приватном окне (или если так настроено) чистим кэш и cookies."""
         if self in MainWindow._open_windows:
             MainWindow._open_windows.remove(self)
 

@@ -204,6 +204,10 @@ class FaviconService(QObject):
         thread.start()
 
     def _download_worker(self, domain: str) -> None:
+        """Работает в отдельном потоке: сначала сервис значков Google, потом /favicon.ico самого сайта.
+
+        Найденный значок сохраняется в кэш, а окну отправляется сигнал favicon_loaded.
+        """
         file_path = get_cache_file_path(domain)
         pix = None
 
