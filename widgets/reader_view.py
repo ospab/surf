@@ -1,4 +1,5 @@
 import html
+import re
 
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtGui import QFont
@@ -15,6 +16,10 @@ try:
     from surf.i18n import tr
 except ModuleNotFoundError:
     from i18n import tr
+
+
+# src="//host/..." или src='//host/...'
+PROTOCOL_RELATIVE_SRC = re.compile(r"""(\bsrc\s*=\s*["'])//""", re.IGNORECASE)
 
 
 class ReaderViewWidget(QWidget):
@@ -46,12 +51,15 @@ class ReaderViewWidget(QWidget):
         self.title_label = QLabel(tr("reader_title"))
         self.title_label.setObjectName("readerTitleLabel")
 
-        self.zoom_out_btn = QPushButton("A-")
-        self.zoom_out_btn.setFixedSize(32, 28)
+        # У кнопок из темы отступы 5x12 px, в маленькую кнопку текст «A+» с ними не влезает
+        self.zoom_out_btn = QPushButton("A−")
+        self.zoom_out_btn.setFixedSize(40, 28)
+        self.zoom_out_btn.setStyleSheet("padding: 0;")
         self.zoom_out_btn.clicked.connect(self._decrease_font)
 
         self.zoom_in_btn = QPushButton("A+")
-        self.zoom_in_btn.setFixedSize(32, 28)
+        self.zoom_in_btn.setFixedSize(40, 28)
+        self.zoom_in_btn.setStyleSheet("padding: 0;")
         self.zoom_in_btn.clicked.connect(self._increase_font)
 
         self.exit_btn = QPushButton("Закрыть чтение")
@@ -87,6 +95,9 @@ class ReaderViewWidget(QWidget):
 
     def set_article(self, title: str, content_html: str, source_url: str) -> None:
         """Показывает статью: цвета под тему, шрифт Georgia, ширина текста до 760 px."""
+        # Страховка: адрес картинки //host/... на Windows открывается как сетевая папка
+        # \\host, и QTextBrowser зависает. Дописываем https:
+        content_html = PROTOCOL_RELATIVE_SRC.sub(r"\1https://", content_html)
         self._last_mode = "article"
         self._last_data = {"title": title, "content": content_html, "url": source_url}
         self._current_url = source_url

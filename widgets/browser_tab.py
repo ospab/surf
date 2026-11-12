@@ -945,6 +945,15 @@ class BrowserTab(QWidget):
             for (var i = 0; i < toRemove.length; i++) {
                 toRemove[i].remove();
             }
+            // Адреса делаем полными. Картинку с адресом вида //host/pic.png QTextBrowser
+            // на Windows открывает как сетевую папку \\host и висит минутами.
+            clone.querySelectorAll('img').forEach(function(img) {
+                if (img.src) img.setAttribute('src', img.src);
+                img.removeAttribute('srcset');
+            });
+            clone.querySelectorAll('a[href]').forEach(function(a) {
+                a.setAttribute('href', a.href);
+            });
             return {
                 title: document.title,
                 html: clone.innerHTML
