@@ -271,6 +271,7 @@ def render_pages_directory(is_dark: bool, accent: str = "#0060df") -> str:
     subtitle = "Список внутренних адресов surf://" if is_ru else "List of internal surf:// addresses"
 
     pages = [
+        ("surf://welcome", "surf://welcome", "Стартовая страница" if is_ru else "Welcome page"),
         (
             "surf://about",
             "surf://about",
@@ -317,6 +318,107 @@ def render_pages_directory(is_dark: bool, accent: str = "#0060df") -> str:
             <div class="grid-cards">
                 {cards_html}
             </div>
+        </div>
+    </body>
+    </html>
+    """
+
+
+def render_welcome_page(is_dark: bool, accent: str = "#0060df") -> str:
+    """Стартовая страница surf://welcome, которая открывается при первом запуске браузера."""
+    is_ru = get_language() == "ru"
+    if is_ru:
+        title = "Добро пожаловать в surf"
+        subtitle = "С чего начать"
+        intro = (
+            "surf — браузер на PyQt6. Страницы показывает Chromium, а вкладки, история, закладки, "
+            "режим чтения и остальное сделаны отдельно. Ниже несколько вещей, которые пригодятся сразу."
+        )
+        cards = [
+            ("surf://newtab", "Новая вкладка", "Поиск и плитки любимых сайтов. Плитку добавляет кнопка «+»."),
+            ("surf://protection", "Защита от трекеров", "Рекламные счётчики блокируются сразу. Список видно по щиту."),
+            ("surf://history", "История и закладки", "Ctrl+H. Поиск, фильтр по датам, выгрузка в CSV."),
+            ("surf://help", "Горячие клавиши", "Все сочетания клавиш одним списком."),
+            ("surf://settings", "Настройки", "Тема, язык, поисковая система, папка загрузок. Ctrl+,"),
+            ("surf://pages", "Служебные страницы", "Все адреса surf:// в одном месте."),
+        ]
+        tips_title = "Ещё пара мелочей"
+        tips = [
+            "Значок книжки в адресной строке включает режим чтения (Ctrl+Alt+R).",
+            "Ctrl+Shift+P открывает приватное окно: после закрытия из него ничего не остаётся.",
+            "Масштаб (Ctrl+колесо) запоминается для каждого сайта.",
+            "Вкладки, которые долго не открывали, засыпают и не занимают память.",
+        ]
+        footer = "Эта страница открывается только при первом запуске. Вернуться к ней можно по адресу surf://welcome."
+    else:
+        title = "Welcome to surf"
+        subtitle = "Getting started"
+        intro = (
+            "surf is a PyQt6 browser. Chromium renders the pages; tabs, history, bookmarks, reader view "
+            "and the rest are built on top. Here are a few things worth knowing right away."
+        )
+        cards = [
+            ("surf://newtab", "New tab", "Search and tiles for your favourite sites. Add a tile with “+”."),
+            (
+                "surf://protection",
+                "Tracking protection",
+                "Ad trackers are blocked right away. See the list under the shield.",
+            ),
+            ("surf://history", "History and bookmarks", "Ctrl+H. Search, filter by dates, export to CSV."),
+            ("surf://help", "Keyboard shortcuts", "Every shortcut in one list."),
+            ("surf://settings", "Settings", "Theme, language, search engine, downloads folder. Ctrl+,"),
+            ("surf://pages", "Internal pages", "All surf:// addresses in one place."),
+        ]
+        tips_title = "A few more things"
+        tips = [
+            "The book icon in the address bar turns on reader view (Ctrl+Alt+R).",
+            "Ctrl+Shift+P opens a private window: nothing is kept after you close it.",
+            "Zoom (Ctrl+wheel) is remembered for each site.",
+            "Tabs you have not opened for a while go to sleep and free their memory.",
+        ]
+        footer = "This page opens only on first launch. You can come back to it at surf://welcome."
+
+    cards_html = "".join(
+        f"""
+        <a href="{url}" class="page-card">
+            <div class="page-card-title">{card_title}</div>
+            <div class="page-card-desc">{desc}</div>
+        </a>
+        """
+        for url, card_title, desc in cards
+    )
+    tips_html = "".join(f"<li>{tip}</li>" for tip in tips)
+
+    return f"""<!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <title>{title}</title>
+        <style>{get_base_css(is_dark, accent)}</style>
+        {get_base_js()}
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <div class="header-left">
+                    <span class="logo-badge">surf://welcome</span>
+                    <div>
+                        <div class="header-title">{title}</div>
+                        <div class="header-subtitle">{subtitle}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <p style="margin: 0; font-size: 15px; line-height: 1.6;">{intro}</p>
+            </div>
+            <div class="grid-cards">
+                {cards_html}
+            </div>
+            <div class="card" style="margin-top: 20px;">
+                <div class="card-title">{tips_title}</div>
+                <ul style="margin: 0; padding-left: 20px; line-height: 1.8;">{tips_html}</ul>
+            </div>
+            <p style="color: var(--text-muted); font-size: 13px; margin-top: 16px;">{footer}</p>
         </div>
     </body>
     </html>
@@ -1073,6 +1175,8 @@ class SurfSchemeHandler(QWebEngineUrlSchemeHandler):
             html_content = render_help_page(is_dark, accent)
         elif host == "settings":
             html_content = render_settings_page(self.db, is_dark, accent)
+        elif host == "welcome":
+            html_content = render_welcome_page(is_dark, accent)
         else:
             # surf://pages, surf://surf, surf://urls или любой неизвестный host
             html_content = render_pages_directory(is_dark, accent)

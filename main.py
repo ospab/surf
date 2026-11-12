@@ -43,7 +43,7 @@ from PyQt6.QtWidgets import (
 )
 
 try:
-    from surf.constants import SURF_USER_AGENT
+    from surf.constants import SURF_USER_AGENT, WELCOME_URL
     from surf.database import Database
     from surf.i18n import get_language, set_language, tr
     from surf.utils.adblock import TrackingProtectionInterceptor
@@ -56,7 +56,7 @@ try:
     from surf.widgets.tab_bar import ClosableTabBar, ZoomWheelFilter
     from surf.widgets.tracking_dialog import TrackingProtectionDialog
 except ModuleNotFoundError:
-    from constants import SURF_USER_AGENT
+    from constants import SURF_USER_AGENT, WELCOME_URL
     from database import Database
     from i18n import get_language, set_language, tr
     from utils.adblock import TrackingProtectionInterceptor
@@ -174,7 +174,11 @@ class MainWindow(QMainWindow):
         restored = 0
         if not self.is_private and self.db.get_setting("restore_session_on_startup", "1") == "1":
             restored = self.restore_previous_session()
-        if restored == 0:
+        if self._is_first_run():
+            # Первый запуск: показываем стартовую страницу с подсказками
+            self.add_new_tab(WELCOME_URL)
+            self.db.set_setting("first_run_done", "1")
+        elif restored == 0:
             self.add_new_tab()
 
         # Усыпление неактивных вкладок для экономии памяти
@@ -182,6 +186,9 @@ class MainWindow(QMainWindow):
         self._sleep_timer.setInterval(TAB_SLEEP_CHECK_MS)
         self._sleep_timer.timeout.connect(self._sleep_inactive_tabs)
         self._sleep_timer.start()
+
+    def _is_first_run(self) -> bool:
+        return not self.is_private and self.db.get_setting("first_run_done", "0") != "1"
 
     def showEvent(self, event) -> None:
         super().showEvent(event)
@@ -1035,6 +1042,7 @@ class MainWindow(QMainWindow):
         tab.url_changed.connect(lambda u, t=tab: self._update_tab_url(t, u))
         tab.icon_changed.connect(lambda icon, t=tab: self._on_tab_icon_changed(t, icon))
         tab.audio_state_changed.connect(lambda aud, mut, t=tab: self._on_tab_audio_state_changed(t, aud, mut))
+        tab.pdf_saved.connect(lambda path: self.status_bar.showMessage(tr("status_pdf_saved", path=path), 3000))
         tab.load_progress.connect(lambda p, t=tab: self._on_tab_progress(t, p))
         tab.open_new_tab.connect(lambda u: self.add_new_tab(u))
         tab.web_view.loadFinished.connect(lambda ok, t=tab: self._on_tab_load_finished(t, ok))
@@ -1662,18 +1670,8 @@ class MainWindow(QMainWindow):
 
     def _save_page(self) -> None:
         tab = self.current_tab()
-        if not tab or not tab.current_url:
-            return
-
-        path, _ = QFileDialog.getSaveFileName(
-            self,
-            tr("save_pdf_dialog"),
-            "page.pdf",
-            "PDF (*.pdf)",
-        )
-        if path:
-            tab.web_view.page().printToPdf(path)
-            self.status_bar.showMessage(tr("status_pdf_saved", path=path), 3000)
+        if tab:
+            tab.save_page_pdf()
 
     def _capture_screenshot(self) -> None:
         tab = self.current_tab()
@@ -1784,13 +1782,23 @@ class MainWindow(QMainWindow):
         super().closeEvent(event)
 
 
-def main():
+def set_windows_app_id() -> None:
+    """Свой AppUserModelID: иначе Windows группирует окна под значком python.exe на панели задач."""
+    if sys.platform != "win32":
+        return
     try:
-        register_surf_scheme()
-    except Exception:
+        import ctypes
+
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("ospab.surf.browser")
+    except (AttributeError, OSError):
         pass
 
+
+def main():
+    # Схема surf:// уже зарегистрирована при импорте модуля (это нужно сделать до QApplication)
+    set_windows_app_id()
     app = QApplication(sys.argv)
+    app.setWindowIcon(QIcon(os.path.join(ICONS_DIR, "app.svg")))
     app.setApplicationName("surf")
     app.setOrganizationName("surf-browser")
 

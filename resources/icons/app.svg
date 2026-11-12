@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3d8bff"/>
+      <stop offset="1" stop-color="#0047b3"/>
+    </linearGradient>
+    <linearGradient id="foam" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#d6e6ff"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#bg)"/>
+  <!-- большая волна с закрученным гребнем -->
+  <path d="M36 188 C 66 184, 80 152, 96 120 C 114 88, 140 64, 172 64 C 202 64, 218 86, 214 110 C 211 128, 194 138, 178 132 C 166 127, 162 112, 172 104 C 160 104, 146 116, 140 138 C 132 166, 116 188, 88 196 C 68 200, 50 196, 36 188 Z" fill="url(#foam)"/>
+  <!-- линия воды под волной -->
+  <path d="M40 206 C 70 196, 98 216, 128 206 C 158 196, 186 216, 216 206" fill="none" stroke="#ffffff" stroke-width="10" stroke-linecap="round" opacity="0.85"/>
+</svg>

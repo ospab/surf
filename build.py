@@ -37,6 +37,7 @@ def build_executable():
         # Перезаписывать dist/surf без вопроса: иначе повторная сборка падает,
         # если папка уже существует
         "--noconfirm",
+        f"--icon={os.path.join(resources_dir, 'icons', 'app.ico')}",
         *data_args,
         main_script,
     ]
