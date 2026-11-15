@@ -60,19 +60,3 @@ class DeviceService(QObject):
                 }
             )
         return inputs
-
-    def get_default_audio_name(self) -> str:
-        """Возвращает название микрофона по умолчанию."""
-        def_dev = QMediaDevices.defaultAudioInput()
-        if def_dev and not def_dev.isNull():
-            return def_dev.description()
-        inputs = self.get_audio_inputs()
-        return inputs[0]["name"] if inputs else ""
-
-    def get_default_video_name(self) -> str:
-        """Возвращает название камеры по умолчанию."""
-        def_dev = QMediaDevices.defaultVideoInput()
-        if def_dev and not def_dev.isNull():
-            return def_dev.description()
-        inputs = self.get_video_inputs()
-        return inputs[0]["name"] if inputs else ""

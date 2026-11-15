@@ -40,8 +40,6 @@ DEFAULT_SETTINGS = {
     "first_run_done": "0",
 }
 
-DEFAULT_SPEED_DIAL_TILES = []
-
 
 class Database:
     """Вся работа с SQLite.
@@ -422,16 +420,6 @@ class Database:
                 cursor.execute("SELECT * FROM bookmarks ORDER BY id DESC")
             return [dict(row) for row in cursor.fetchall()]
 
-    def update_bookmark(self, bookmark_id: int, title: str, url: str, folder: str) -> bool:
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "UPDATE bookmarks SET title = ?, url = ?, folder = ? WHERE id = ?",
-                (title, url, folder, bookmark_id),
-            )
-            conn.commit()
-            return cursor.rowcount > 0
-
     def delete_bookmark(self, bookmark_id: int) -> None:
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -611,8 +599,6 @@ class Database:
                 )
             return result
 
-    get_most_visited_sites = get_top_visited_sites
-
     # --- Сохранённая сессия ---
 
     def save_session_tabs(self, tabs: list[dict]) -> None:
@@ -690,25 +676,6 @@ class Database:
             )
             conn.commit()
             return cursor.rowcount > 0
-
-    def get_all_site_permissions(self) -> list[dict]:
-        """Возвращает список всех сохранённых разрешений сайтов."""
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT origin, feature, decision, created_at FROM site_permissions ORDER BY origin ASC, feature ASC"
-            )
-            return [dict(r) for r in cursor.fetchall()]
-
-    def clear_site_permissions(self, origin: str = None) -> None:
-        """Очищает разрешения сайтов (все или для конкретного origin)."""
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            if origin:
-                cursor.execute("DELETE FROM site_permissions WHERE origin = ?", (origin,))
-            else:
-                cursor.execute("DELETE FROM site_permissions")
-            conn.commit()
 
     # --- Микрофон и камера для сайтов ---
 

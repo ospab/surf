@@ -39,7 +39,6 @@ TRANSLATIONS = {
         # Действия Журнал и Закладки
         "act_show_history": "Показать всю историю",
         "act_clear_history": "Очистить историю...",
-        "act_add_bookmark": "Добавить страницу в закладки",
         "act_manage_bookmarks": "Управление закладками",
         # Действия Инструменты и Справка
         "act_downloads": "Загрузки",
@@ -88,7 +87,6 @@ TRANSLATIONS = {
         "save_screenshot_dialog": "Сохранить скриншот страницы",
         "save_download_dialog": "Сохранить загружаемый файл",
         # Плитки на новой вкладке
-        "speed_dial_title": "Быстрый доступ",
         "speed_dial_open": "Открыть",
         "speed_dial_add": "Добавить сайт",
         "speed_dial_edit": "Редактировать...",
@@ -104,11 +102,9 @@ TRANSLATIONS = {
         "btn_cancel": "Отмена",
         # Вкладки с прошлого раза
         "act_restore_session": "Восстановить предыдущую сессию",
-        "tip_restore_session": "Открыть вкладки из предыдущего сеанса",
         "pref_restore_session": "Восстанавливать вкладки прошлого сеанса при запуске",
         "status_session_restored": "Восстановлено вкладок: {count}",
         "status_no_session": "Нет сохранённых вкладок",
-        "btn_restore_session": "Восстановить прошлую сессию",
         # О программе
         # Окно настроек
         "settings_title": "Настройки surf",
@@ -233,9 +229,6 @@ TRANSLATIONS = {
         "private_window_title": "surf (Приватный режим)",
         "tip_ssl_secure": "Безопасное соединение (HTTPS)",
         "tip_ssl_insecure": "Незащищенное соединение (HTTP)",
-        "ssl_secure_title": "Безопасность соединения",
-        "ssl_secure_msg": "Соединение защищено шифрованием SSL/TLS.\nХост: {host}",
-        "ssl_insecure_msg": "Внимание! Соединение не зашифровано.\nХост: {host}",
         "tip_shield_protection": "Защита от отслеживания",
         "shield_title": "Защита от отслеживания",
         "shield_blocked_text": "Заблокировано трекеров и рекламных запросов: {count}",
@@ -270,10 +263,8 @@ TRANSLATIONS = {
         "cert_valid_to": "Действителен по:",
         "cert_protocol": "Протокол:",
         "cert_cipher": "Алгоритм шифрования:",
-        "cert_key_length": "Длина ключа:",
         "cert_serial": "Серийный номер:",
         "cert_sans": "Альтернативные домены (SAN):",
-        "cert_loading": "Получение сведений о сертификате...",
         "cert_error_fetch": "Не удалось получить сертификат узла: {error}",
     },
     "en": {
@@ -311,7 +302,6 @@ TRANSLATIONS = {
         # History and Bookmarks actions
         "act_show_history": "Show All History",
         "act_clear_history": "Clear History...",
-        "act_add_bookmark": "Bookmark This Page",
         "act_manage_bookmarks": "Manage Bookmarks",
         # Tools and Help actions
         "act_downloads": "Downloads",
@@ -360,7 +350,6 @@ TRANSLATIONS = {
         "save_screenshot_dialog": "Save Page Screenshot",
         "save_download_dialog": "Save Downloaded File",
         # New tab tiles
-        "speed_dial_title": "Top Sites",
         "speed_dial_open": "Open",
         "speed_dial_add": "Add Shortcut",
         "speed_dial_edit": "Edit...",
@@ -376,11 +365,9 @@ TRANSLATIONS = {
         "btn_cancel": "Cancel",
         # Previous session
         "act_restore_session": "Restore Previous Session",
-        "tip_restore_session": "Open tabs from previous session",
         "pref_restore_session": "Restore previous session tabs on startup",
         "status_session_restored": "Restored tabs: {count}",
         "status_no_session": "No saved session to restore",
-        "btn_restore_session": "Restore Previous Session",
         # About
         # Settings
         "settings_title": "surf Settings",
@@ -505,9 +492,6 @@ TRANSLATIONS = {
         "private_window_title": "surf (Private Browsing)",
         "tip_ssl_secure": "Secure Connection (HTTPS)",
         "tip_ssl_insecure": "Insecure Connection (HTTP)",
-        "ssl_secure_title": "Connection Security",
-        "ssl_secure_msg": "Connection is encrypted with SSL/TLS.\nHost: {host}",
-        "ssl_insecure_msg": "Warning: Connection is not encrypted.\nHost: {host}",
         "tip_shield_protection": "Tracking protection",
         "shield_title": "Tracking protection",
         "shield_blocked_text": "Trackers and ad requests blocked: {count}",
@@ -542,10 +526,8 @@ TRANSLATIONS = {
         "cert_valid_to": "Valid Until:",
         "cert_protocol": "Protocol:",
         "cert_cipher": "Cipher Suite:",
-        "cert_key_length": "Key Length:",
         "cert_serial": "Serial Number:",
         "cert_sans": "Alternative Names (SAN):",
-        "cert_loading": "Retrieving certificate details...",
         "cert_error_fetch": "Failed to retrieve host certificate: {error}",
     },
 }

@@ -30,7 +30,6 @@ class ReaderViewWidget(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._current_url = ""
         self._font_size = 17
         self._is_dark = True
         self._last_mode = ""
@@ -62,7 +61,7 @@ class ReaderViewWidget(QWidget):
         self.zoom_in_btn.setStyleSheet("padding: 0;")
         self.zoom_in_btn.clicked.connect(self._increase_font)
 
-        self.exit_btn = QPushButton("Закрыть чтение")
+        self.exit_btn = QPushButton(tr("reader_close_btn"))
         self.exit_btn.setObjectName("readerExitBtn")
         self.exit_btn.clicked.connect(self.close_reader.emit)
 
@@ -90,8 +89,6 @@ class ReaderViewWidget(QWidget):
             self.set_article(self._last_data["title"], self._last_data["content"], self._last_data["url"])
         elif self._last_mode == "source" and self._last_data:
             self.set_source_code(self._last_data["title"], self._last_data["raw_html"], self._last_data["url"])
-        elif self._last_mode == "help":
-            self.set_help_content()
 
     def set_article(self, title: str, content_html: str, source_url: str) -> None:
         """Показывает статью: цвета под тему, шрифт Georgia, ширина текста до 760 px."""
@@ -100,8 +97,8 @@ class ReaderViewWidget(QWidget):
         content_html = PROTOCOL_RELATIVE_SRC.sub(r"\1https://", content_html)
         self._last_mode = "article"
         self._last_data = {"title": title, "content": content_html, "url": source_url}
-        self._current_url = source_url
-        self.title_label.setText(f"Чтение: {title[:60]}..." if len(title) > 60 else f"Чтение: {title}")
+        short = f"{title[:60]}..." if len(title) > 60 else title
+        self.title_label.setText(tr("reader_prefix") + short)
 
         bg = "#1e1e24" if self._is_dark else "#ffffff"
         fg = "#fbfbfe" if self._is_dark else "#15141a"
@@ -175,7 +172,7 @@ class ReaderViewWidget(QWidget):
         </head>
         <body>
             <h1>{html.escape(title)}</h1>
-            <a class="source-link" href="{source_url}">Источник: {source_url}</a>
+            <a class="source-link" href="{source_url}">{tr("reader_source_label")} {source_url}</a>
             <hr style="border: 0; border-top: 1px solid {hr_color}; margin: 15px 0 25px 0;" />
             {content_html}
         </body>
@@ -187,8 +184,7 @@ class ReaderViewWidget(QWidget):
         """Показывает исходный HTML страницы. Он экранируется, чтобы теги выводились текстом."""
         self._last_mode = "source"
         self._last_data = {"title": title, "raw_html": raw_html, "url": source_url}
-        self._current_url = source_url
-        self.title_label.setText(f"Исходный код: {title[:50]}")
+        self.title_label.setText(tr("reader_source_prefix") + title[:50])
         escaped = html.escape(raw_html)
 
         bg = "#1c1b22" if self._is_dark else "#ffffff"
@@ -220,86 +216,6 @@ class ReaderViewWidget(QWidget):
         </html>
         """
         self.browser.setHtml(code_view_html)
-
-    def set_help_content(self) -> None:
-        self._last_mode = "help"
-        self.title_label.setText("Справка surf")
-
-        bg = "#1e1e24" if self._is_dark else "#ffffff"
-        fg = "#fbfbfe" if self._is_dark else "#15141a"
-        h_color = "#ffffff" if self._is_dark else "#15141a"
-        border_color = "#42414d" if self._is_dark else "#d0d0d8"
-        th_bg = "#2b2a33" if self._is_dark else "#eaeaf0"
-        code_bg = "#2b2a33" if self._is_dark else "#f0f0f5"
-        code_color = "#00ddff" if self._is_dark else "#0055aa"
-
-        help_html = f"""
-        <html>
-        <head>
-            <style>
-                body {{
-                    background-color: {bg};
-                    color: {fg};
-                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                    font-size: {self._font_size - 1}px;
-                    line-height: 1.6;
-                    max-width: 740px;
-                    margin: 0 auto;
-                    padding: 30px 20px;
-                }}
-                h1, h2 {{ color: {h_color}; }}
-                h1 {{ font-size: 2em; border-bottom: 1px solid {border_color}; padding-bottom: 10px; }}
-                h2 {{ font-size: 1.3em; margin-top: 25px; }}
-                table {{
-                    width: 100%;
-                    border-collapse: collapse;
-                    margin: 15px 0;
-                }}
-                th, td {{
-                    border: 1px solid {border_color};
-                    padding: 8px 12px;
-                    text-align: left;
-                }}
-                th {{
-                    background-color: {th_bg};
-                    color: {h_color};
-                }}
-                code {{
-                    background-color: {code_bg};
-                    color: {code_color};
-                    padding: 2px 6px;
-                    border-radius: 4px;
-                    font-family: Consolas, monospace;
-                }}
-            </style>
-        </head>
-        <body>
-            <h1>Браузер surf</h1>
-            <p><strong>surf</strong> это браузер на PyQt6 от <b>ospab foundation</b>.
-            Страницы показывает Chromium через QtWebEngine.</p>
-
-            <h2>Горячие клавиши</h2>
-            <table>
-                <tr><th>Сочетание</th><th>Действие</th></tr>
-                <tr><td><code>Ctrl + T</code></td><td>Открыть новую вкладку</td></tr>
-                <tr><td><code>Ctrl + W</code></td><td>Закрыть активную вкладку</td></tr>
-                <tr><td><code>Ctrl + R</code> / <code>F5</code></td><td>Перезагрузить страницу</td></tr>
-                <tr><td><code>Ctrl + L</code> / <code>Alt + D</code></td><td>Фокус в адресную строку</td></tr>
-                <tr><td><code>Ctrl + H</code></td><td>Журнал истории и закладок</td></tr>
-                <tr><td><code>Ctrl + D</code></td><td>Добавить текущую страницу в закладки</td></tr>
-                <tr><td><code>Ctrl + F</code></td><td>Поиск текста на странице</td></tr>
-                <tr><td><code>Ctrl + +</code> / <code>Ctrl + -</code></td><td>Увеличение / уменьшение масштаба</td></tr>
-                <tr><td><code>Ctrl + 0</code></td><td>Сброс масштаба на 100%</td></tr>
-                <tr><td><code>F11</code></td><td>Полноэкранный режим</td></tr>
-            </table>
-
-            <h2>Режим чтения</h2>
-            <p>Включается значком книжки в адресной строке или через меню «Вид».
-            Убирает со страницы рекламу, меню и баннеры, остаются текст статьи и картинки.</p>
-        </body>
-        </html>
-        """
-        self.browser.setHtml(help_html)
 
     def _increase_font(self) -> None:
         if self._font_size < 30:

@@ -910,14 +910,6 @@ class BrowserTab(QWidget):
         else:
             self.show_speed_dial()
 
-    def show_help(self) -> None:
-        self.reader_view.set_help_content()
-        self.stack.setCurrentIndex(2)
-        self.current_title = tr("act_help")
-        self.current_url = "surf://help"
-        self.title_changed.emit(self.current_title)
-        self.url_changed.emit(self.current_url)
-
     def retranslate_ui(self) -> None:
         self.speed_dial.retranslate_ui()
         if self.stack.currentIndex() == 1:
