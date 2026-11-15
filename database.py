@@ -501,15 +501,25 @@ class Database:
         if not os.path.exists(filepath):
             return 0
 
-        with open(filepath, encoding="utf-8") as f:
-            reader = csv.reader(f, delimiter=";")
-            next(reader, None)  # пропускаем строку заголовков
-            for row in reader:
-                if len(row) >= 2:
-                    title, url = row[0], row[1]
-                    folder = row[2] if len(row) > 2 else "Избранное"
-                    if self.add_bookmark(title, url, folder):
-                        imported += 1
+        with open(filepath, "rb") as f:
+            raw = f.read()
+        # Excel на русской Windows сохраняет CSV в cp1251, остальные программы — в UTF-8
+        try:
+            text = raw.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            text = raw.decode("cp1251")
+        lines = text.splitlines()
+        if not lines:
+            return 0
+        # Наш экспорт пишет через ';', но файл могли сделать и с запятыми
+        delimiter = ";" if lines[0].count(";") >= lines[0].count(",") else ","
+        reader = csv.reader(lines[1:], delimiter=delimiter)  # первая строка — заголовки
+        for row in reader:
+            if len(row) >= 2 and row[1].strip():
+                title, url = row[0].strip(), row[1].strip()
+                folder = row[2].strip() if len(row) > 2 and row[2].strip() else "Избранное"
+                if self.add_bookmark(title or url, url, folder):
+                    imported += 1
         return imported
 
     def export_history_to_csv(self, filepath: str) -> int:

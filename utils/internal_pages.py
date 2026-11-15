@@ -1,23 +1,16 @@
 """
-Модуль внутренних страниц surf://
-Собирает HTML служебных страниц surf://:
-- surf://pages (каталог страниц)
-- surf://about (о браузере и компонентах)
-- surf://history (журнал посещений с поиском)
-- surf://bookmarks (закладки с поиском)
-- surf://downloads (загрузки)
-- surf://protection (защита от отслеживания ETP)
-- surf://gpu (графика и системные параметры)
-- surf://help (справочник хоткеев)
-- surf://settings (обзор параметров)
+Служебные страницы surf://. HTML собирается в Python на лету:
+- surf://welcome (стартовая страница первого запуска)
+- surf://help (горячие клавиши)
+- surf://about (версия и среда выполнения)
+- surf://pages (список этих страниц)
+Историю, закладки, загрузки и настройки показывают обычные окна, отдельные страницы для них не нужны.
 """
 
 import html
-import os
 import platform
 
 from PyQt6.QtCore import QBuffer, QIODevice
-from PyQt6.QtGui import QGuiApplication
 from PyQt6.QtWebEngineCore import QWebEngineUrlScheme, QWebEngineUrlSchemeHandler
 
 try:
@@ -277,12 +270,6 @@ def render_pages_directory(is_dark: bool, accent: str = "#0060df") -> str:
             "surf://about",
             "Версия и среда выполнения" if is_ru else "Browser and runtime environment details",
         ),
-        ("surf://history", "surf://history", "Журнал посещений" if is_ru else "Browsing history"),
-        ("surf://bookmarks", "surf://bookmarks", "Сохранённые закладки" if is_ru else "Saved bookmarks"),
-        ("surf://downloads", "surf://downloads", "Журнал загрузок" if is_ru else "Download records"),
-        ("surf://protection", "surf://protection", "Защита от отслеживания" if is_ru else "Tracking protection"),
-        ("surf://gpu", "surf://gpu", "Видеокарта и отрисовка" if is_ru else "Graphics and GPU diagnostics"),
-        ("surf://settings", "surf://settings", "Настройки браузера" if is_ru else "Browser settings"),
         ("surf://help", "surf://help", "Горячие клавиши" if is_ru else "Keyboard shortcuts"),
         ("surf://newtab", "surf://newtab", "Новая вкладка" if is_ru else "New tab"),
     ]
@@ -336,10 +323,14 @@ def render_welcome_page(is_dark: bool, accent: str = "#0060df") -> str:
         )
         cards = [
             ("surf://newtab", "Новая вкладка", "Поиск и плитки любимых сайтов. Плитку добавляет кнопка «+»."),
-            ("surf://protection", "Защита от трекеров", "Рекламные счётчики блокируются сразу. Список видно по щиту."),
-            ("surf://history", "История и закладки", "Ctrl+H. Поиск, фильтр по датам, выгрузка в CSV."),
+            (
+                None,
+                "Защита от трекеров",
+                "Рекламные счётчики блокируются сразу. Список — по значку щита в адресной строке.",
+            ),
+            (None, "История и закладки", "Ctrl+H. Поиск, фильтр по датам, выгрузка в CSV."),
             ("surf://help", "Горячие клавиши", "Все сочетания клавиш одним списком."),
-            ("surf://settings", "Настройки", "Тема, язык, поисковая система, папка загрузок. Ctrl+,"),
+            (None, "Настройки", "Тема, язык, поисковая система, папка загрузок. Ctrl+,"),
             ("surf://pages", "Служебные страницы", "Все адреса surf:// в одном месте."),
         ]
         tips_title = "Ещё пара мелочей"
@@ -360,13 +351,13 @@ def render_welcome_page(is_dark: bool, accent: str = "#0060df") -> str:
         cards = [
             ("surf://newtab", "New tab", "Search and tiles for your favourite sites. Add a tile with “+”."),
             (
-                "surf://protection",
+                None,
                 "Tracking protection",
-                "Ad trackers are blocked right away. See the list under the shield.",
+                "Ad trackers are blocked right away. Click the shield in the address bar for the list.",
             ),
-            ("surf://history", "History and bookmarks", "Ctrl+H. Search, filter by dates, export to CSV."),
+            (None, "History and bookmarks", "Ctrl+H. Search, filter by dates, export to CSV."),
             ("surf://help", "Keyboard shortcuts", "Every shortcut in one list."),
-            ("surf://settings", "Settings", "Theme, language, search engine, downloads folder. Ctrl+,"),
+            (None, "Settings", "Theme, language, search engine, downloads folder. Ctrl+,"),
             ("surf://pages", "Internal pages", "All surf:// addresses in one place."),
         ]
         tips_title = "A few more things"
@@ -380,10 +371,10 @@ def render_welcome_page(is_dark: bool, accent: str = "#0060df") -> str:
 
     cards_html = "".join(
         f"""
-        <a href="{url}" class="page-card">
+        <{"a" if url else "div"} {f'href="{url}" ' if url else ""}class="page-card">
             <div class="page-card-title">{card_title}</div>
             <div class="page-card-desc">{desc}</div>
-        </a>
+        </{"a" if url else "div"}>
         """
         for url, card_title, desc in cards
     )
@@ -550,9 +541,6 @@ def render_about_page(db: Database, is_dark: bool, accent: str = "#0060df") -> s
 
                 <div class="app-links">
                     <a href="surf://pages">{"Каталог страниц" if is_ru else "Pages Directory"}</a>
-                    <a href="surf://settings">{"Настройки" if is_ru else "Settings"}</a>
-                    <a href="surf://protection">{"Защита от трекеров" if is_ru else "Tracking Protection"}</a>
-                    <a href="surf://gpu">{"Графика и GPU" if is_ru else "Graphics & GPU"}</a>
                     <a href="surf://help">{"Справка" if is_ru else "Help & Docs"}</a>
                 </div>
 
@@ -567,403 +555,6 @@ def render_about_page(db: Database, is_dark: bool, accent: str = "#0060df") -> s
                         <tr><td class="dim">{"Идентификация" if is_ru else "User-Agent"}</td><td style="font-family: Consolas, monospace; font-size: 11px; word-break: break-all;">{html.escape(ua_str)}</td></tr>
                     </table>
                 </details>
-            </div>
-        </div>
-    </body>
-    </html>
-    """
-
-
-def render_history_page(db: Database, is_dark: bool, accent: str = "#0060df") -> str:
-    """Страница surf://history."""
-    is_ru = get_language() == "ru"
-    title = "Журнал посещений" if is_ru else "Browsing History"
-    subtitle = "История переходов" if is_ru else "Chronological log of visited pages"
-
-    records = db.get_history(limit=200)
-
-    rows_html = ""
-    if records:
-        for r in records:
-            r_title = html.escape(r.get("title") or r.get("url") or "Без названия")
-            r_url = html.escape(r.get("url", ""))
-            r_time = html.escape(str(r.get("visit_time", "")))
-            r_count = r.get("visit_count", 1)
-            rows_html += f"""
-            <tr class="history-row">
-                <td width="160" style="color: var(--text-muted); font-size: 12px;">{r_time}</td>
-                <td><a href="{r_url}" class="site-link">{r_title}</a></td>
-                <td style="color: var(--text-muted); font-size: 12px;">{r_url[:60]}</td>
-                <td width="80" align="center"><span class="badge badge-info">{r_count}</span></td>
-            </tr>
-            """
-    else:
-        rows_html = f"""<tr><td colspan="4"><div class="empty-state">{"История посещений пуста" if is_ru else "Browsing history is empty"}</div></td></tr>"""
-
-    return f"""<!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <title>{title}</title>
-        <style>{get_base_css(is_dark, accent)}</style>
-        {get_base_js()}
-        <script>
-            function filterHistory() {{
-                var q = document.getElementById('search').value.toLowerCase();
-                var rows = document.querySelectorAll('.history-row');
-                rows.forEach(function(r) {{
-                    var text = r.innerText.toLowerCase();
-                    r.style.display = text.indexOf(q) !== -1 ? '' : 'none';
-                }});
-            }}
-        </script>
-    </head>
-    <body>
-        <div class="container">
-            <div class="header">
-                <div class="header-left">
-                    <span class="logo-badge">surf://history</span>
-                    <div>
-                        <div class="header-title">{title}</div>
-                        <div class="header-subtitle">{subtitle} ({len(records)})</div>
-                    </div>
-                </div>
-                <a href="surf://pages" class="nav-link">{"Каталог страниц" if is_ru else "Pages Directory"}</a>
-            </div>
-
-            <input type="text" id="search" class="search-box" placeholder="{"Поиск в истории..." if is_ru else "Search history..."}" oninput="filterHistory()">
-
-            <div class="card" style="padding: 0; overflow: hidden;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>{"Дата и время" if is_ru else "Date & Time"}</th>
-                            <th>{"Название" if is_ru else "Title"}</th>
-                            <th>URL</th>
-                            <th style="text-align: center;">{"Переходов" if is_ru else "Visits"}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {rows_html}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </body>
-    </html>
-    """
-
-
-def render_bookmarks_page(db: Database, is_dark: bool, accent: str = "#0060df") -> str:
-    """Страница surf://bookmarks."""
-    is_ru = get_language() == "ru"
-    title = "Закладки" if is_ru else "Bookmarks"
-    subtitle = "Сохранённые закладки" if is_ru else "Saved bookmarks"
-
-    bookmarks = db.get_bookmarks()
-
-    rows_html = ""
-    if bookmarks:
-        for b in bookmarks:
-            b_title = html.escape(b.get("title") or b.get("url") or "Без названия")
-            b_url = html.escape(b.get("url", ""))
-            b_time = html.escape(str(b.get("created_at", "")))
-            rows_html += f"""
-            <tr class="bm-row">
-                <td><a href="{b_url}" class="site-link">{b_title}</a></td>
-                <td style="color: var(--text-muted); font-size: 12px;">{b_url}</td>
-                <td width="160" style="color: var(--text-muted); font-size: 12px;">{b_time}</td>
-            </tr>
-            """
-    else:
-        rows_html = f"""<tr><td colspan="3"><div class="empty-state">{"Список закладок пуст" if is_ru else "Bookmarks list is empty"}</div></td></tr>"""
-
-    return f"""<!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <title>{title}</title>
-        <style>{get_base_css(is_dark, accent)}</style>
-        {get_base_js()}
-        <script>
-            function filterBookmarks() {{
-                var q = document.getElementById('search').value.toLowerCase();
-                var rows = document.querySelectorAll('.bm-row');
-                rows.forEach(function(r) {{
-                    var text = r.innerText.toLowerCase();
-                    r.style.display = text.indexOf(q) !== -1 ? '' : 'none';
-                }});
-            }}
-        </script>
-    </head>
-    <body>
-        <div class="container">
-            <div class="header">
-                <div class="header-left">
-                    <span class="logo-badge">surf://bookmarks</span>
-                    <div>
-                        <div class="header-title">{title}</div>
-                        <div class="header-subtitle">{subtitle} ({len(bookmarks)})</div>
-                    </div>
-                </div>
-                <a href="surf://pages" class="nav-link">{"Каталог страниц" if is_ru else "Pages Directory"}</a>
-            </div>
-
-            <input type="text" id="search" class="search-box" placeholder="{"Поиск в закладках..." if is_ru else "Search bookmarks..."}" oninput="filterBookmarks()">
-
-            <div class="card" style="padding: 0; overflow: hidden;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>{"Название" if is_ru else "Title"}</th>
-                            <th>URL</th>
-                            <th>{"Дата добавления" if is_ru else "Date Added"}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {rows_html}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </body>
-    </html>
-    """
-
-
-def render_downloads_page(db: Database, is_dark: bool, accent: str = "#0060df") -> str:
-    """Страница surf://downloads."""
-    is_ru = get_language() == "ru"
-    title = "Загрузки" if is_ru else "Downloads"
-    subtitle = "Список загруженных файлов" if is_ru else "Downloaded files history"
-
-    downloads = db.get_downloads(limit=100)
-
-    rows_html = ""
-    if downloads:
-        for d in downloads:
-            d_name = html.escape(d.get("filename", "file"))
-            d_path = html.escape(d.get("filepath", ""))
-            d_size = d.get("filesize", 0)
-            if d_size > 1024 * 1024:
-                size_str = f"{d_size / (1024 * 1024):.1f} MB"
-            elif d_size > 1024:
-                size_str = f"{d_size / 1024:.1f} KB"
-            else:
-                size_str = f"{d_size} B"
-            d_status = html.escape(d.get("status", "Завершено"))
-            d_time = html.escape(str(d.get("download_time", "")))
-
-            badge_cls = "badge-success" if "Завершено" in d_status or "Completed" in d_status else "badge-danger"
-
-            rows_html += f"""
-            <tr>
-                <td><b>{d_name}</b><br><span style="font-size: 11px; color: var(--text-muted);">{d_path}</span></td>
-                <td width="100">{size_str}</td>
-                <td width="120"><span class="badge {badge_cls}">{d_status}</span></td>
-                <td width="150" style="color: var(--text-muted); font-size: 12px;">{d_time}</td>
-            </tr>
-            """
-    else:
-        rows_html = f"""<tr><td colspan="4"><div class="empty-state">{"Список загрузок пуст" if is_ru else "Downloads list is empty"}</div></td></tr>"""
-
-    return f"""<!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <title>{title}</title>
-        <style>{get_base_css(is_dark, accent)}</style>
-        {get_base_js()}
-    </head>
-    <body>
-        <div class="container">
-            <div class="header">
-                <div class="header-left">
-                    <span class="logo-badge">surf://downloads</span>
-                    <div>
-                        <div class="header-title">{title}</div>
-                        <div class="header-subtitle">{subtitle} ({len(downloads)})</div>
-                    </div>
-                </div>
-                <a href="surf://pages" class="nav-link">{"Каталог страниц" if is_ru else "Pages Directory"}</a>
-            </div>
-
-            <div class="card" style="padding: 0; overflow: hidden;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>{"Файл" if is_ru else "File"}</th>
-                            <th>{"Размер" if is_ru else "Size"}</th>
-                            <th>{"Статус" if is_ru else "Status"}</th>
-                            <th>{"Дата" if is_ru else "Date"}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {rows_html}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </body>
-    </html>
-    """
-
-
-def render_protection_page(is_dark: bool, accent: str = "#0060df", interceptor=None) -> str:
-    """Страница surf://protection."""
-    is_ru = get_language() == "ru"
-    title = "Защита от отслеживания" if is_ru else "Tracking Protection"
-    subtitle = "Какие трекеры блокирует surf" if is_ru else "Which trackers surf blocks"
-
-    blocked_count = interceptor.blocked_count if interceptor and hasattr(interceptor, "blocked_count") else 0
-    is_enabled = interceptor.is_enabled if interceptor and hasattr(interceptor, "is_enabled") else True
-
-    filter_rules = [
-        ("google-analytics.com", "Аналитика" if is_ru else "Analytics", "Сбор телеметрии"),
-        ("googletagmanager.com", "Аналитика" if is_ru else "Analytics", "Контейнер динамических тегов"),
-        ("doubleclick.net", "Реклама" if is_ru else "Advertising", "Рекламный трекинг"),
-        ("googlesyndication.com", "Реклама" if is_ru else "Advertising", "Рекламная сеть"),
-        ("adservice.google.com", "Реклама" if is_ru else "Advertising", "Рекламный сервис"),
-        ("an.yandex.ru", "Реклама" if is_ru else "Advertising", "Рекламная сеть Яндекса"),
-        ("mc.yandex.ru", "Аналитика" if is_ru else "Analytics", "Сбор метрик и вебвизор"),
-        ("adfox.ru", "Реклама" if is_ru else "Advertising", "Управление баннерами"),
-        ("criteo.com", "Трекер" if is_ru else "Tracker", "Ретаргетинг"),
-        ("criteo.net", "Трекер" if is_ru else "Tracker", "Идентификаторы пользователей"),
-        ("connect.facebook.net", "Соцсети" if is_ru else "Social", "Межсайтовое отслеживание"),
-        ("scorecardresearch.com", "Аналитика" if is_ru else "Analytics", "Измерение аудитории"),
-        ("hotjar.com", "Аналитика" if is_ru else "Analytics", "Запись активности"),
-        ("clarity.ms", "Аналитика" if is_ru else "Analytics", "Тепловые карты и сессии"),
-        ("ads.twitter.com", "Соцсети" if is_ru else "Social", "Трекинг конверсий"),
-        ("moatads.com", "Реклама" if is_ru else "Advertising", "Атрибуция рекламы"),
-        ("outbrain.com", "Реклама" if is_ru else "Advertising", "Рекламные виджеты"),
-        ("taboola.com", "Реклама" if is_ru else "Advertising", "Спонсорские блоки"),
-        ("rubiconproject.com", "Реклама" if is_ru else "Advertising", "Рекламная биржа"),
-        ("adsystem.com", "Реклама" if is_ru else "Advertising", "Рекламная сеть"),
-        ("advertising.com", "Реклама" if is_ru else "Advertising", "Медийная реклама"),
-        ("admob.com", "Реклама" if is_ru else "Advertising", "Мобильная реклама"),
-        ("trafficjunky.com", "Реклама" if is_ru else "Advertising", "Рекламная сеть"),
-        ("openx.net", "Реклама" if is_ru else "Advertising", "Рекламный сервер"),
-        ("pubmatic.com", "Реклама" if is_ru else "Advertising", "Программатик-платформа"),
-        ("adnxs.com", "Реклама" if is_ru else "Advertising", "Платформа монетизации"),
-    ]
-
-    rules_html = ""
-    for dom, cat, purpose in filter_rules:
-        rules_html += f"""
-        <tr>
-            <td><code>{dom}</code></td>
-            <td width="140"><span class="badge badge-info">{cat}</span></td>
-            <td style="color: var(--text-muted); font-size: 12px;">{purpose}</td>
-        </tr>
-        """
-
-    status_badge = (
-        '<span class="badge badge-success">Включена</span>'
-        if is_enabled
-        else '<span class="badge badge-danger">Отключена</span>'
-    )
-
-    return f"""<!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <title>{title}</title>
-        <style>{get_base_css(is_dark, accent)}</style>
-        {get_base_js()}
-    </head>
-    <body>
-        <div class="container">
-            <div class="header">
-                <div class="header-left">
-                    <span class="logo-badge">surf://protection</span>
-                    <div>
-                        <div class="header-title">{title}</div>
-                        <div class="header-subtitle">{subtitle}</div>
-                    </div>
-                </div>
-                <a href="surf://pages" class="nav-link">{"Каталог страниц" if is_ru else "Pages Directory"}</a>
-            </div>
-
-            <div class="card">
-                <div class="card-title">{"Параметры защиты" if is_ru else "Protection Parameters"}</div>
-                <table>
-                    <tr><td width="240"><b>{"Состояние защиты" if is_ru else "Protection Status"}</b></td><td>{status_badge}</td></tr>
-                    <tr><td><b>{"Заблокировано в текущей сессии" if is_ru else "Blocked in Current Session"}</b></td><td><span class="badge badge-info">{blocked_count}</span></td></tr>
-                    <tr><td><b>{"Механизм перехвата" if is_ru else "Interception Mechanism"}</b></td><td><code>QWebEngineUrlRequestInterceptor</code></td></tr>
-                    <tr><td><b>{"Активных правил" if is_ru else "Active Rules"}</b></td><td>{len(filter_rules)}</td></tr>
-                </table>
-            </div>
-
-            <div class="card" style="padding: 0; overflow: hidden;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>{"Доменный шаблон" if is_ru else "Domain Pattern"}</th>
-                            <th>{"Категория" if is_ru else "Category"}</th>
-                            <th>{"Назначение" if is_ru else "Purpose"}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {rules_html}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </body>
-    </html>
-    """
-
-
-def render_gpu_page(is_dark: bool, accent: str = "#0060df") -> str:
-    """Страница surf://gpu."""
-    is_ru = get_language() == "ru"
-    title = "Графика" if is_ru else "Graphics"
-    subtitle = "Видеокарта, экран и отрисовка" if is_ru else "Graphics card, screen and rendering"
-
-    app = QGuiApplication.instance()
-    primary_screen = app.primaryScreen() if app else None
-
-    res_str = f"{primary_screen.size().width()}x{primary_screen.size().height()}" if primary_screen else "Unknown"
-    dpi_str = f"{primary_screen.devicePixelRatio():.2f}" if primary_screen else "1.00"
-    plat_str = app.platformName() if app else "windows"
-
-    return f"""<!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <title>{title}</title>
-        <style>{get_base_css(is_dark, accent)}</style>
-        {get_base_js()}
-    </head>
-    <body>
-        <div class="container">
-            <div class="header">
-                <div class="header-left">
-                    <span class="logo-badge">surf://gpu</span>
-                    <div>
-                        <div class="header-title">{title}</div>
-                        <div class="header-subtitle">{subtitle}</div>
-                    </div>
-                </div>
-                <a href="surf://pages" class="nav-link">{"Каталог страниц" if is_ru else "Pages Directory"}</a>
-            </div>
-
-            <div class="card">
-                <div class="card-title">{"Параметры графической подсистемы" if is_ru else "Graphics Subsystem Parameters"}</div>
-                <table>
-                    <tr><td width="240"><b>{"Платформа QPA" if is_ru else "QPA Platform"}</b></td><td><code>{plat_str}</code></td></tr>
-                    <tr><td><b>{"Разрешение экрана" if is_ru else "Screen Resolution"}</b></td><td>{res_str} px</td></tr>
-                    <tr><td><b>{"Коэффициент масштабирования (DPI)" if is_ru else "DPI Scaling Factor"}</b></td><td>{dpi_str}x</td></tr>
-                    <tr><td><b>{"Графический API" if is_ru else "Graphics API"}</b></td><td>Direct3D 11 / ANGLE / Hardware OpenGL</td></tr>
-                    <tr><td><b>{"Аппаратное 2D ускорение Canvas" if is_ru else "Hardware 2D Canvas"}</b></td><td><span class="badge badge-success">Включено</span></td></tr>
-                    <tr><td><b>WebGL 1.0 & WebGL 2.0</b></td><td><span class="badge badge-success">Поддерживается</span></td></tr>
-                    <tr><td><b>WebAssembly (WASM)</b></td><td><span class="badge badge-success">Поддерживается</span></td></tr>
-                    <tr><td><b>WebRTC & PeerConnection</b></td><td><span class="badge badge-success">Поддерживается</span></td></tr>
-                    <tr><td><b>WebXR & Gamepad API</b></td><td><span class="badge badge-success">Поддерживается</span></td></tr>
-                    <tr><td><b>WebUSB & WebHID API</b></td><td><span class="badge badge-success">Поддерживается</span></td></tr>
-                    <tr><td><b>{"Захват экрана (Screen Capture)" if is_ru else "Screen Capture API"}</b></td><td><span class="badge badge-success">{"Включено" if is_ru else "Enabled"}</span></td></tr>
-                    <tr><td><b>{"Сглаживание шрифтов" if is_ru else "Font Antialiasing"}</b></td><td>DirectWrite / FreeType</td></tr>
-                </table>
             </div>
         </div>
     </body>
@@ -1083,73 +674,12 @@ def render_help_page(is_dark: bool, accent: str = "#0060df") -> str:
     """
 
 
-def render_settings_page(db: Database, is_dark: bool, accent: str = "#0060df") -> str:
-    """Страница surf://settings."""
-    is_ru = get_language() == "ru"
-    title = "Настройки" if is_ru else "Settings"
-    subtitle = "Что выбрано сейчас" if is_ru else "What is selected now"
-
-    homepage = db.get_setting("homepage", "https://ya.ru")
-    search_eng = db.get_setting("search_engine", "https://www.google.com/search?q=")
-    theme_val = db.get_setting("theme", "dark")
-    lang_val = db.get_setting("language", "ru")
-    dl_folder = db.get_setting("download_folder", os.path.join(os.path.expanduser("~"), "Downloads"))
-    proxy_type = db.get_setting("proxy_type", "none")
-    auto_hide_menu = db.get_setting("menu_bar_auto_hide", "1") == "1"
-
-    return f"""<!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <title>{title}</title>
-        <style>{get_base_css(is_dark, accent)}</style>
-        {get_base_js()}
-    </head>
-    <body>
-        <div class="container">
-            <div class="header">
-                <div class="header-left">
-                    <span class="logo-badge">surf://settings</span>
-                    <div>
-                        <div class="header-title">{title}</div>
-                        <div class="header-subtitle">{subtitle}</div>
-                    </div>
-                </div>
-                <a href="surf://pages" class="nav-link">{"Каталог страниц" if is_ru else "Pages Directory"}</a>
-            </div>
-
-            <div class="card">
-                <div class="card-title">{"Основные параметры" if is_ru else "General Settings"}</div>
-                <table>
-                    <tr><td width="240"><b>{"Домашняя страница" if is_ru else "Homepage"}</b></td><td><code>{html.escape(homepage)}</code></td></tr>
-                    <tr><td><b>{"Поисковая система" if is_ru else "Search Engine"}</b></td><td><code>{html.escape(search_eng)}</code></td></tr>
-                    <tr><td><b>{"Тема оформления" if is_ru else "Theme"}</b></td><td><span class="badge badge-info">{theme_val}</span></td></tr>
-                    <tr><td><b>{"Язык интерфейса" if is_ru else "Language"}</b></td><td><span class="badge badge-info">{lang_val.upper()}</span></td></tr>
-                    <tr><td><b>{"Папка для загрузок" if is_ru else "Download Folder"}</b></td><td><code>{html.escape(dl_folder)}</code></td></tr>
-                    <tr><td><b>{"Прокси-сервер" if is_ru else "Proxy Mode"}</b></td><td><span class="badge badge-info">{proxy_type}</span></td></tr>
-                    <tr><td><b>{"Скрытие строки меню (Alt)" if is_ru else "Auto-hide Menu Bar"}</b></td><td>{"Включено" if auto_hide_menu else "Отключено"}</td></tr>
-                </table>
-            </div>
-
-            <div class="card">
-                <div class="card-title">{"Как поменять" if is_ru else "How to change"}</div>
-                <p style="font-size: 13px; color: var(--text-muted); line-height: 1.8;">
-                    {"Откройте окно настроек:" if is_ru else "Open the Settings window:"} <kbd>Ctrl+,</kbd>
-                </p>
-            </div>
-        </div>
-    </body>
-    </html>
-    """
-
-
 class SurfSchemeHandler(QWebEngineUrlSchemeHandler):
     """Отдаёт служебные страницы по адресам surf://."""
 
-    def __init__(self, db: Database, parent=None, interceptor=None):
+    def __init__(self, db: Database, parent=None):
         super().__init__(parent)
         self.db = db
-        self.interceptor = interceptor
         self._buffers: dict = {}
 
     def requestStarted(self, job) -> None:
@@ -1162,20 +692,8 @@ class SurfSchemeHandler(QWebEngineUrlSchemeHandler):
 
         if host in ("about", "version"):
             html_content = render_about_page(self.db, is_dark, accent)
-        elif host == "history":
-            html_content = render_history_page(self.db, is_dark, accent)
-        elif host == "bookmarks":
-            html_content = render_bookmarks_page(self.db, is_dark, accent)
-        elif host == "downloads":
-            html_content = render_downloads_page(self.db, is_dark, accent)
-        elif host == "protection":
-            html_content = render_protection_page(is_dark, accent, self.interceptor)
-        elif host == "gpu":
-            html_content = render_gpu_page(is_dark, accent)
         elif host == "help":
             html_content = render_help_page(is_dark, accent)
-        elif host == "settings":
-            html_content = render_settings_page(self.db, is_dark, accent)
         elif host == "welcome":
             html_content = render_welcome_page(is_dark, accent)
         else:

@@ -1,3 +1,5 @@
+import csv
+
 from PyQt6.QtCore import QDate, pyqtSignal
 from PyQt6.QtWidgets import (
     QDialog,
@@ -208,7 +210,11 @@ class HistoryDialog(QDialog, Ui_HistoryDialog):
             "CSV (*.csv);;All Files (*)",
         )
         if path:
-            count = self.db.export_history_to_csv(path)
+            try:
+                count = self.db.export_history_to_csv(path)
+            except OSError as e:
+                self._show_file_error("msg_file_write_error", path, e)
+                return
             QMessageBox.information(
                 self,
                 tr("msg_done_title"),
@@ -252,7 +258,11 @@ class HistoryDialog(QDialog, Ui_HistoryDialog):
             "CSV (*.csv);;All Files (*)",
         )
         if path:
-            count = self.db.export_bookmarks_to_csv(path)
+            try:
+                count = self.db.export_bookmarks_to_csv(path)
+            except OSError as e:
+                self._show_file_error("msg_file_write_error", path, e)
+                return
             QMessageBox.information(
                 self,
                 tr("msg_done_title"),
@@ -267,13 +277,20 @@ class HistoryDialog(QDialog, Ui_HistoryDialog):
             "CSV (*.csv);;All Files (*)",
         )
         if path:
-            count = self.db.import_bookmarks_from_csv(path)
+            try:
+                count = self.db.import_bookmarks_from_csv(path)
+            except (OSError, UnicodeDecodeError, csv.Error) as e:
+                self._show_file_error("msg_file_read_error", path, e)
+                return
             self._reload_bookmarks()
             QMessageBox.information(
                 self,
                 tr("msg_done_title"),
                 tr("msg_bookmarks_imported", count=count, path=path),
             )
+
+    def _show_file_error(self, key: str, path: str, error: Exception) -> None:
+        QMessageBox.warning(self, tr("msg_error_title"), tr(key, path=path, error=error))
 
     # --- Статистика ---
 

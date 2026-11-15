@@ -723,6 +723,10 @@ class BrowserTab(QWidget):
         self.profile = profile or QWebEngineProfile.defaultProfile()
         self.current_title = tr("new_tab")
         self.current_url = ""
+        # Загрузку остановил сам пользователь: тогда это не ошибка
+        self.stopped_by_user = False
+        # Значок сайта: пока страница грузится, на вкладке крутится стрелка
+        self.favicon = QIcon()
         # Когда вкладку последний раз открывали (для усыпления неактивных вкладок)
         self.last_active = time.monotonic()
         self._init_ui()
@@ -752,6 +756,8 @@ class BrowserTab(QWidget):
         self.web_view.titleChanged.connect(self._on_title_changed)
         self.web_view.urlChanged.connect(self._on_url_changed)
         self.web_view.iconChanged.connect(self._on_icon_changed)
+        # Полоска появляется сразу при старте загрузки, а не после первых процентов
+        self.web_view.loadStarted.connect(self._on_load_started)
         self.web_view.loadProgress.connect(self.load_progress.emit)
         self.web_view.loadFinished.connect(self._on_load_finished)
 
@@ -1201,6 +1207,10 @@ class BrowserTab(QWidget):
             pix = icon.pixmap(64, 64)
             if not pix.isNull():
                 FaviconService.instance().save_to_cache(self.current_url, pix)
+
+    def _on_load_started(self) -> None:
+        self.stopped_by_user = False
+        self.load_progress.emit(0)
 
     def _on_load_finished(self, ok: bool) -> None:
         """Страница загрузилась: засчитываем посещение и подставляем устройства, выбранные для сайта."""

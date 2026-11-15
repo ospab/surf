@@ -11,7 +11,7 @@ if PARENT_DIR not in sys.path:
     sys.path.insert(0, PARENT_DIR)
 
 from PyQt6.QtCore import QByteArray, QPoint, QSize, QStringListModel, Qt, QTimer, QUrl
-from PyQt6.QtGui import QColor, QIcon, QKeySequence, QPainter, QPixmap, QShortcut
+from PyQt6.QtGui import QColor, QIcon, QKeySequence, QPainter, QPixmap, QShortcut, QTransform
 from PyQt6.QtNetwork import QNetworkProxy
 from PyQt6.QtSvg import QSvgRenderer
 from PyQt6.QtWebEngineCore import (
@@ -80,6 +80,10 @@ ZOOM_MAX = 3.0
 # Как часто проверять, не пора ли усыпить неактивные вкладки
 TAB_SLEEP_CHECK_MS = 60_000
 SLEEPING_TAB_COLOR = "#8e8e9a"
+
+# Крутящаяся стрелка на вкладке во время загрузки
+SPINNER_INTERVAL_MS = 80
+SPINNER_FRAMES = 12
 
 
 def load_js(filename: str) -> str:
@@ -154,6 +158,11 @@ class MainWindow(QMainWindow):
 
         self.db = Database()
         self._active_tab: BrowserTab | None = None
+        # Стрелка на загружающихся вкладках. Таймер нужен до открытия первых вкладок
+        self._spinner_frame = 0
+        self._spinner_timer = QTimer(self)
+        self._spinner_timer.setInterval(SPINNER_INTERVAL_MS)
+        self._spinner_timer.timeout.connect(self._spin_loading_tabs)
         self._active_downloads: list[QWebEngineDownloadRequest] = []
         self._recently_closed_urls: list[str] = []
         self._cert_cache: dict[str, dict] = {}
@@ -334,7 +343,7 @@ class MainWindow(QMainWindow):
         # Обработчик страниц surf://, тоже один на профиль: второй раз Qt его не установит
         self.scheme_handler = self.profile.urlSchemeHandler(b"surf")
         if self.scheme_handler is None:
-            self.scheme_handler = SurfSchemeHandler(self.db, self.profile, interceptor=self.tracking_interceptor)
+            self.scheme_handler = SurfSchemeHandler(self.db, self.profile)
             self.profile.installUrlSchemeHandler(b"surf", self.scheme_handler)
 
         self._apply_profile_settings()
@@ -413,7 +422,7 @@ class MainWindow(QMainWindow):
 
         # Тонкая полоска загрузки
         self.progress_bar = QProgressBar()
-        self.progress_bar.setFixedHeight(2)
+        self.progress_bar.setFixedHeight(3)
         self.progress_bar.setTextVisible(False)
         self.progress_bar.setVisible(False)
         self.main_layout.addWidget(self.progress_bar)
@@ -1248,8 +1257,9 @@ class MainWindow(QMainWindow):
             self._update_security_and_shield_icons(url)
 
     def _on_tab_icon_changed(self, tab: BrowserTab, icon: QIcon) -> None:
+        tab.favicon = icon
         idx = self.tab_stack.indexOf(tab)
-        if idx >= 0:
+        if idx >= 0 and getattr(tab, "load_progress_value", 100) >= 100:
             self.tab_bar.setTabIcon(idx, icon if not icon.isNull() else self._get_icon("globe"))
 
     def _on_tab_audio_state_changed(self, tab: BrowserTab, audible: bool, muted: bool) -> None:
@@ -1264,9 +1274,52 @@ class MainWindow(QMainWindow):
 
     def _on_tab_progress(self, tab: BrowserTab, progress: int) -> None:
         """Запоминает прогресс вкладки; общий индикатор показывает только активную."""
+        was_loading = getattr(tab, "load_progress_value", 100) < 100
         tab.load_progress_value = progress
+        idx = self.tab_stack.indexOf(tab)
+        if progress < 100:
+            if not was_loading and idx >= 0:
+                # У новой вкладки ещё нет заголовка сайта — пишем, что идёт загрузка
+                if self.tab_bar.tabText(idx) in (tr("new_tab"), tr("untitled")):
+                    self.tab_bar.setTabText(idx, tr("tab_loading"))
+            if not self._spinner_timer.isActive():
+                self._spinner_timer.start()
+        elif was_loading and idx >= 0:
+            favicon = getattr(tab, "favicon", QIcon())
+            self.tab_bar.setTabIcon(idx, favicon if not favicon.isNull() else self._get_icon("globe"))
+            if self.tab_bar.tabText(idx) == tr("tab_loading"):
+                self.tab_bar.setTabText(idx, tab.current_title or tr("untitled"))
         if tab is self.current_tab():
             self._update_progress(progress)
+            if progress < 100:
+                host = QUrl(tab.current_url).host() or tab.current_url
+                self.status_bar.showMessage(tr("status_loading", host=host, percent=progress))
+
+    def _spinner_icon(self, frame: int) -> QIcon:
+        """Стрелка «обновить», повёрнутая на нужный угол. Кадры кэшируются вместе с иконками."""
+        key = f"_spinner_{frame}"
+        icon = self._icon_cache.get(key)
+        if icon is None:
+            base = self._get_icon("reload").pixmap(32, 32)
+            rotated = base.transformed(QTransform().rotate(frame * 360 / SPINNER_FRAMES))
+            # После поворота картинка больше, обрезаем её обратно по центру
+            x, y = (rotated.width() - 32) // 2, (rotated.height() - 32) // 2
+            icon = QIcon(rotated.copy(x, y, 32, 32))
+            self._icon_cache[key] = icon
+        return icon
+
+    def _spin_loading_tabs(self) -> None:
+        """Крутит стрелку на всех загружающихся вкладках; когда загрузок нет, таймер выключается."""
+        self._spinner_frame = (self._spinner_frame + 1) % SPINNER_FRAMES
+        icon = self._spinner_icon(self._spinner_frame)
+        any_loading = False
+        for index in range(self.tab_stack.count()):
+            tab = self.tab_stack.widget(index)
+            if isinstance(tab, BrowserTab) and getattr(tab, "load_progress_value", 100) < 100:
+                self.tab_bar.setTabIcon(index, icon)
+                any_loading = True
+        if not any_loading:
+            self._spinner_timer.stop()
 
     def _update_progress(self, progress: int) -> None:
         loading = progress < 100
@@ -1329,6 +1382,7 @@ class MainWindow(QMainWindow):
         tab = self.current_tab()
         if tab:
             if getattr(tab, "load_progress_value", 100) < 100:
+                tab.stopped_by_user = True
                 tab.web_view.stop()
             else:
                 tab.web_view.reload()
@@ -1378,6 +1432,21 @@ class MainWindow(QMainWindow):
         if ok and tab.current_url:
             self._prefetch_certificate(tab.current_url)
             self._apply_site_zoom(tab)
+            if tab is self.current_tab():
+                self.status_bar.clearMessage()
+        elif not ok:
+            # loadFinished(False) приходит и при переходе на другую страницу посреди загрузки,
+            # поэтому чуть ждём: если вкладка уже грузит новую страницу, это не ошибка
+            QTimer.singleShot(400, lambda t=tab: self._report_load_failure(t))
+
+    def _report_load_failure(self, tab: BrowserTab) -> None:
+        if tab is not self.current_tab() or getattr(tab, "load_progress_value", 100) < 100:
+            return
+        if getattr(tab, "stopped_by_user", False):
+            self.status_bar.showMessage(tr("status_load_stopped"), 3000)
+        else:
+            host = QUrl(tab.current_url).host() or tab.current_url
+            self.status_bar.showMessage(tr("status_load_failed", host=host), 8000)
 
     def _update_security_and_shield_icons(self, url: str) -> None:
         """Показывает в адресной строке нужные значки: замок или лупу, щит, книжку и звезду."""
