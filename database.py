@@ -175,6 +175,10 @@ class Database:
                 )
                 """
             )
+            # В старых базах нет номера окна: тогда все вкладки считаются вкладками первого окна
+            columns = {row["name"] for row in cursor.execute("PRAGMA table_info(session_tabs)")}
+            if "window_index" not in columns:
+                cursor.execute("ALTER TABLE session_tabs ADD COLUMN window_index INTEGER NOT NULL DEFAULT 0")
 
             # Разрешения сайтов: микрофон, камера, геолокация и т.д.
             cursor.execute(
@@ -621,8 +625,14 @@ class Database:
                 if not url or url.startswith("data:"):
                     continue
                 cursor.execute(
-                    "INSERT INTO session_tabs (url, title, tab_index, is_active) VALUES (?, ?, ?, ?)",
-                    (url, t.get("title", ""), t.get("tab_index", 0), 1 if t.get("is_active") else 0),
+                    "INSERT INTO session_tabs (url, title, tab_index, is_active, window_index) VALUES (?, ?, ?, ?, ?)",
+                    (
+                        url,
+                        t.get("title", ""),
+                        t.get("tab_index", 0),
+                        1 if t.get("is_active") else 0,
+                        t.get("window_index", 0),
+                    ),
                 )
             conn.commit()
 
@@ -631,7 +641,8 @@ class Database:
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT id, url, title, tab_index, is_active FROM session_tabs ORDER BY tab_index ASC, id ASC"
+                "SELECT id, url, title, tab_index, is_active, window_index FROM session_tabs "
+                "ORDER BY window_index ASC, tab_index ASC, id ASC"
             )
             res = []
             for row in cursor.fetchall():

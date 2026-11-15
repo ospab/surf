@@ -105,6 +105,9 @@ class BrowserPage(QWebEnginePage):
         self.fileSystemAccessRequested.connect(self._on_file_system_access_requested)
 
     def _get_main_window(self):
+        # Вкладку могут перетащить в другое окно, поэтому окно ищем по её нынешнему родителю
+        if self.tab is not None and hasattr(self.tab.window(), "add_new_tab"):
+            return self.tab.window()
         if self.main_window:
             return self.main_window
         p = self.parent()

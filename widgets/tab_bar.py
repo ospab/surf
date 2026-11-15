@@ -196,7 +196,7 @@ class ClosableTabBar(QTabBar):
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
-        """Следим, не вытащили ли вкладку за окно. Если да, меняем курсор: при отпускании она уйдёт в новое окно."""
+        """Следим, не вытащили ли вкладку за панель. Если да, меняем курсор: при отпускании она уйдёт в другое окно."""
         if (
             (event.buttons() & Qt.MouseButton.LeftButton)
             and self._drag_start_pos is not None
@@ -204,42 +204,44 @@ class ClosableTabBar(QTabBar):
         ):
             dist = (event.pos() - self._drag_start_pos).manhattanLength()
             if dist > QApplication.startDragDistance():
-                if self.count() > 1:
-                    cur_global = event.globalPosition().toPoint()
-                    local_pt = self.mapFromGlobal(cur_global)
-                    win = self.window()
-                    win_geo = win.frameGeometry() if win else None
+                cur_global = event.globalPosition().toPoint()
+                local_pt = self.mapFromGlobal(cur_global)
+                win = self.window()
+                win_geo = win.frameGeometry() if win else None
 
-                    # Вкладку вытащили за пределы окна или панели?
-                    is_outside = False
-                    if win_geo and not win_geo.contains(cur_global):
-                        is_outside = True
-                    elif (
-                        local_pt.y() < -20
-                        or local_pt.y() > self.height() + 35
-                        or local_pt.x() < -30
-                        or local_pt.x() > self.width() + 40
-                    ):
-                        is_outside = True
+                # Вкладку вытащили за пределы окна или панели?
+                is_outside = False
+                if win_geo and not win_geo.contains(cur_global):
+                    is_outside = True
+                elif (
+                    local_pt.y() < -20
+                    or local_pt.y() > self.height() + 35
+                    or local_pt.x() < -30
+                    or local_pt.x() > self.width() + 40
+                ):
+                    is_outside = True
 
-                    if is_outside:
-                        if not self._is_detached_mode:
-                            self._is_detached_mode = True
-                            self._set_drag_cursor(True)
-                    else:
-                        if self._is_detached_mode:
-                            self._is_detached_mode = False
-                            self._set_drag_cursor(False)
+                if is_outside:
+                    if not self._is_detached_mode:
+                        self._is_detached_mode = True
+                        self._set_drag_cursor(True)
+                else:
+                    if self._is_detached_mode:
+                        self._is_detached_mode = False
+                        self._set_drag_cursor(False)
 
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
-        """Вкладку отпустили за окном: сигнал tabDetachRequested, окно перенесёт её в новое окно."""
+        """Вкладку отпустили за панелью: сигнал tabDetachRequested.
+
+        Окно само решит, куда её деть: в другое окно под курсором или в новое окно.
+        """
         if self._is_detached_mode:
             self._set_drag_cursor(False)
             self._is_detached_mode = False
 
-            if self.count() > 1:
+            if self.count() >= 1:
                 cur_global = event.globalPosition().toPoint()
                 detach_idx = self.currentIndex()
                 if detach_idx < 0:

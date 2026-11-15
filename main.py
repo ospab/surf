@@ -10,7 +10,7 @@ if CURRENT_DIR not in sys.path:
 if PARENT_DIR not in sys.path:
     sys.path.insert(0, PARENT_DIR)
 
-from PyQt6.QtCore import QByteArray, QPoint, QSize, QStringListModel, Qt, QTimer, QUrl
+from PyQt6.QtCore import QByteArray, QObject, QPoint, QSize, QStringListModel, Qt, QTimer, QUrl
 from PyQt6.QtGui import QColor, QIcon, QKeySequence, QPainter, QPixmap, QShortcut, QTransform
 from PyQt6.QtNetwork import QNetworkProxy
 from PyQt6.QtSvg import QSvgRenderer
@@ -85,6 +85,9 @@ SLEEPING_TAB_COLOR = "#8e8e9a"
 SPINNER_INTERVAL_MS = 80
 SPINNER_FRAMES = 12
 
+# Через сколько после изменения вкладок записывать сеанс в базу
+SESSION_SAVE_DELAY_MS = 1000
+
 
 def load_js(filename: str) -> str:
     """Читает JS-скрипт, внедряемый в страницы, из resources/js."""
@@ -148,9 +151,25 @@ class MainWindow(QMainWindow):
 
     _open_windows: list["MainWindow"] = []
 
-    def __init__(self, is_private: bool = False):
+    # Сохранение вкладок всех окон откладывается на секунду, чтобы не писать в базу на каждый чих
+    _session_timer: QTimer | None = None
+
+    def __init__(
+        self,
+        is_private: bool = False,
+        restore_session: bool = False,
+        profile: QWebEngineProfile | None = None,
+        empty: bool = False,
+    ):
+        """restore_session — открыть вкладки прошлого сеанса (только при запуске программы).
+        profile — общий профиль, когда вкладку из приватного окна выносят в новое приватное окно.
+        empty — окно без стартовой вкладки, в него сразу перенесут вкладку.
+        """
         super().__init__()
         self.is_private = is_private
+        self._given_profile = profile
+        # Закрытое окно удаляется вместе со страницами, иначе они продолжают жить и играть звук
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         MainWindow._open_windows.append(self)
 
         self.setWindowTitle(tr("private_window_title") if self.is_private else tr("app_title"))
@@ -186,13 +205,13 @@ class MainWindow(QMainWindow):
             app.installEventFilter(self.zoom_filter)
 
         restored = 0
-        if not self.is_private and self.db.get_setting("restore_session_on_startup", "1") == "1":
+        if restore_session and not self.is_private and self.db.get_setting("restore_session_on_startup", "1") == "1":
             restored = self.restore_previous_session()
         if self._is_first_run():
             # При первом запуске открываем стартовую страницу
             self.add_new_tab(WELCOME_URL)
             self.db.set_setting("first_run_done", "1")
-        elif restored == 0:
+        elif restored == 0 and not empty:
             self.add_new_tab()
 
         # Раз в минуту проверяем, какие вкладки пора усыпить
@@ -285,8 +304,12 @@ class MainWindow(QMainWindow):
         return icon
 
     def _setup_network_and_profile(self) -> None:
-        if self.is_private:
-            self.profile = QWebEngineProfile(self)
+        if self._given_profile is not None:
+            self.profile = self._given_profile
+        elif self.is_private:
+            # Родитель — приложение, а не окно: вкладку можно унести в другое окно, и профиль
+            # должен пережить окно, в котором его создали
+            self.profile = QWebEngineProfile(QApplication.instance())
         else:
             self.profile = get_persistent_profile()
 
@@ -1043,20 +1066,7 @@ class MainWindow(QMainWindow):
     def add_new_tab(self, url: str = "") -> BrowserTab:
         """Создаёт вкладку, подключает её сигналы к окну и открывает url (пустой url = новая вкладка)."""
         tab = BrowserTab(self.db, self, profile=self.profile)
-        idx = self.tab_stack.addWidget(tab)
-        self.tab_bar.addTab(tr("new_tab"))
-        self.tab_bar.setTabIcon(idx, self._get_icon("globe"))
-        self.tab_bar.setCurrentIndex(idx)
-
-        tab.title_changed.connect(lambda title, t=tab: self._update_tab_title(t, title))
-        tab.url_changed.connect(lambda u, t=tab: self._update_tab_url(t, u))
-        tab.icon_changed.connect(lambda icon, t=tab: self._on_tab_icon_changed(t, icon))
-        tab.audio_state_changed.connect(lambda aud, mut, t=tab: self._on_tab_audio_state_changed(t, aud, mut))
-        tab.pdf_saved.connect(lambda path: self.status_bar.showMessage(tr("status_pdf_saved", path=path), 3000))
-        tab.load_progress.connect(lambda p, t=tab: self._on_tab_progress(t, p))
-        tab.open_new_tab.connect(lambda u: self.add_new_tab(u))
-        tab.web_view.loadFinished.connect(lambda ok, t=tab: self._on_tab_load_finished(t, ok))
-        tab.web_view.page().linkHovered.connect(self._on_link_hovered)
+        self._insert_tab(tab, self.tab_stack.count())
 
         if url:
             tab.load_url(url)
@@ -1064,6 +1074,55 @@ class MainWindow(QMainWindow):
             tab.show_speed_dial()
 
         self._focus_address_bar()
+        return tab
+
+    def _insert_tab(self, tab: BrowserTab, index: int) -> None:
+        """Ставит вкладку в окно на место index и подключает её сигналы к этому окну.
+
+        Используется и для новых вкладок, и для вкладок, перенесённых из другого окна.
+        """
+        tab.main_window = self
+        index = max(0, min(index, self.tab_stack.count()))
+        self.tab_stack.insertWidget(index, tab)
+        self.tab_bar.insertTab(index, tab.current_title or tr("new_tab"))
+        self.tab_bar.setTabToolTip(index, tab.current_title)
+        favicon = getattr(tab, "favicon", QIcon())
+        self.tab_bar.setTabIcon(index, favicon if not favicon.isNull() else self._get_icon("globe"))
+        self.tab_bar.setCurrentIndex(index)
+        self._on_tab_bar_current_changed(index)
+
+        # Соединения запоминаем, чтобы при переносе в другое окно отключить ровно их
+        tab.window_connections = [
+            tab.title_changed.connect(lambda title, t=tab: self._update_tab_title(t, title)),
+            tab.url_changed.connect(lambda u, t=tab: self._update_tab_url(t, u)),
+            tab.icon_changed.connect(lambda icon, t=tab: self._on_tab_icon_changed(t, icon)),
+            tab.audio_state_changed.connect(lambda aud, mut, t=tab: self._on_tab_audio_state_changed(t, aud, mut)),
+            tab.pdf_saved.connect(lambda path: self.status_bar.showMessage(tr("status_pdf_saved", path=path), 3000)),
+            tab.load_progress.connect(lambda p, t=tab: self._on_tab_progress(t, p)),
+            tab.open_new_tab.connect(lambda u: self.add_new_tab(u)),
+            tab.web_view.loadFinished.connect(lambda ok, t=tab: self._on_tab_load_finished(t, ok)),
+            tab.web_view.page().linkHovered.connect(self._on_link_hovered),
+        ]
+        if getattr(tab, "load_progress_value", 100) < 100 and not self._spinner_timer.isActive():
+            self._spinner_timer.start()
+        self.tab_bar.update_movable_state()
+        self._schedule_session_save()
+
+    def _take_tab(self, index: int) -> BrowserTab | None:
+        """Вынимает вкладку из окна, не закрывая страницу, и отключает её от окна."""
+        tab = self.tab_stack.widget(index)
+        if not isinstance(tab, BrowserTab):
+            return None
+        for conn in getattr(tab, "window_connections", []):
+            QObject.disconnect(conn)
+        tab.window_connections = []
+        self.tab_stack.removeWidget(tab)
+        self.tab_bar.removeTab(index)
+        if self._active_tab is tab:
+            self._active_tab = None
+        self._on_tab_bar_current_changed(self.tab_bar.currentIndex())
+        self.tab_bar.update_movable_state()
+        self._schedule_session_save()
         return tab
 
     def close_tab(self, index: int, save_to_recent: bool = True) -> None:
@@ -1085,69 +1144,110 @@ class MainWindow(QMainWindow):
                 widget.deleteLater()
             self._on_tab_bar_current_changed(self.tab_bar.currentIndex())
             self.tab_bar.update_movable_state()
+            self._schedule_session_save()
         else:
             current = self.current_tab()
             if current:
                 current.show_speed_dial()
             self.tab_bar.update_movable_state()
 
+    def _window_under(self, global_pos: QPoint) -> "MainWindow | None":
+        """Другое окно surf под курсором, в которое можно перенести вкладку.
+
+        Переносить можно только между окнами с одним профилем: обычное в обычное,
+        приватное в приватное, вынесенное из него же.
+        """
+        widget = QApplication.widgetAt(global_pos)
+        candidates = [widget.window()] if widget else []
+        candidates += [w for w in reversed(MainWindow._open_windows) if w.frameGeometry().contains(global_pos)]
+        for win in candidates:
+            if isinstance(win, MainWindow) and win is not self and win.isVisible() and win.profile is self.profile:
+                return win
+        return None
+
     def _detach_tab_to_new_window(self, tab_idx: int, drop_pos: QPoint) -> None:
-        """Переносит вкладку в новое окно."""
-        if self.tab_bar.count() <= 1:
-            return
+        """Вкладку вытащили с панели: кладём её в окно под курсором или в новое окно.
+
+        Переносится сама страница, поэтому остаются история «назад/вперёд», введённый текст и видео.
+        """
         if not (0 <= tab_idx < self.tab_stack.count()):
             return
-
-        old_tab = self.tab_stack.widget(tab_idx)
-        if not old_tab or not isinstance(old_tab, BrowserTab):
+        target = self._window_under(drop_pos)
+        if target is None and self.tab_bar.count() <= 1:
+            # Единственную вкладку в пустое место выносить незачем: она и так в своём окне
             return
 
-        url = old_tab.current_url
+        tab = self._take_tab(tab_idx)
+        if tab is None:
+            return
 
-        # Новое окно
-        new_win = MainWindow(is_private=self.is_private)
-        new_win.resize(self.size())
+        if target is not None:
+            index = target.tab_bar.tabAt(target.tab_bar.mapFromGlobal(drop_pos))
+            target._insert_tab(tab, index if index >= 0 else target.tab_bar.count())
+        else:
+            target = MainWindow(is_private=self.is_private, profile=self.profile, empty=True)
+            target.resize(self.size())
+            target.move(max(20, drop_pos.x() - 140), max(20, drop_pos.y() - 30))
+            target._insert_tab(tab, 0)
+            target.show()
 
-        # Ставим его туда, где отпустили мышь
-        target_x = max(20, drop_pos.x() - 140)
-        target_y = max(20, drop_pos.y() - 30)
-        new_win.move(target_x, target_y)
+        target.raise_()
+        target.activateWindow()
+        if self.tab_bar.count() == 0:
+            # Унесли последнюю вкладку, окно больше не нужно
+            self.close()
 
-        # Закрываем вкладку в старом окне
-        self.close_tab(tab_idx, save_to_recent=False)
+    # --- Сохранение вкладок ---
 
-        # И открываем её адрес в новом
-        target_tab = new_win.current_tab()
-        if target_tab:
-            if url and not url.startswith("surf://newtab") and url != "about:blank":
-                target_tab.load_url(url)
-            else:
-                target_tab.show_speed_dial()
-
-        new_win.show()
-        new_win.raise_()
-        new_win.activateWindow()
-
-    def _save_current_session(self) -> None:
-        """Сохраняет список открытых вкладок текущего окна для восстановления."""
+    def _schedule_session_save(self) -> None:
         if self.is_private:
             return
+        if MainWindow._session_timer is None:
+            MainWindow._session_timer = QTimer(QApplication.instance())
+            MainWindow._session_timer.setSingleShot(True)
+            MainWindow._session_timer.setInterval(SESSION_SAVE_DELAY_MS)
+            MainWindow._session_timer.timeout.connect(lambda: MainWindow._save_all_windows())
+        MainWindow._session_timer.start()
+
+    @staticmethod
+    def _save_all_windows(extra: "MainWindow | None" = None) -> None:
+        """Записывает вкладки всех обычных окон. Окна нумеруются в порядке открытия.
+
+        extra — окно, которое уже убрано из списка, но его вкладки ещё нужно сохранить
+        (последнее закрываемое окно).
+        """
+        windows = [w for w in MainWindow._open_windows if not w.is_private]
+        if extra is not None and not extra.is_private and extra not in windows:
+            windows.append(extra)
+        if not windows:
+            # Обычных окон нет, программа закрывается: сохранённое раньше не трогаем
+            return
         tabs = []
-        for i in range(self.tab_bar.count()):
-            tab = self.tab_stack.widget(i)
-            if tab and isinstance(tab, BrowserTab):
-                url = tab.current_url
-                if url and not url.startswith("data:"):
-                    tabs.append(
-                        {
-                            "url": url,
-                            "title": tab.current_title,
-                            "tab_index": i,
-                            "is_active": (i == self.tab_bar.currentIndex()),
-                        }
-                    )
+        for window_index, win in enumerate(windows):
+            tabs.extend(win._collect_tabs(window_index))
         if tabs:
-            self.db.save_session_tabs(tabs)
+            windows[0].db.save_session_tabs(tabs)
+
+    def _collect_tabs(self, window_index: int) -> list[dict]:
+        tabs = []
+        for i in range(self.tab_stack.count()):
+            tab = self.tab_stack.widget(i)
+            if isinstance(tab, BrowserTab) and tab.current_url and not tab.current_url.startswith("data:"):
+                tabs.append(
+                    {
+                        "url": tab.current_url,
+                        "title": tab.current_title,
+                        "tab_index": i,
+                        "is_active": i == self.tab_bar.currentIndex(),
+                        "window_index": window_index,
+                    }
+                )
+        return tabs
+
+    def _save_current_session(self) -> None:
+        """Сразу сохраняет вкладки всех обычных окон, не дожидаясь таймера."""
+        if not self.is_private:
+            MainWindow._save_all_windows(extra=self)
 
     def restore_previous_session(self) -> int:
         """Восстанавливает вкладки сохранённой сессии."""
@@ -1170,21 +1270,28 @@ class MainWindow(QMainWindow):
             )
         )
 
-        active_idx = 0
-        restored = 0
+        # Вкладки первого окна открываем здесь, для остальных окон создаём новые окна
+        groups: dict[int, list[dict]] = {}
         for item in saved_tabs:
-            url = item.get("url")
-            if url:
-                tab = self.add_new_tab(url)
+            if item.get("url"):
+                groups.setdefault(item.get("window_index", 0), []).append(item)
+
+        restored = 0
+        for n, items in enumerate(groups.values()):
+            win = self if n == 0 else MainWindow(empty=True)
+            active_idx = 0
+            for item in items:
+                tab = win.add_new_tab(item["url"])
                 if item.get("is_active"):
-                    active_idx = self.tab_stack.indexOf(tab)
+                    active_idx = win.tab_stack.indexOf(tab)
                 restored += 1
-
-        if initial_is_blank and self.tab_bar.count() > 1:
-            self.close_tab(0)
-
-        if 0 <= active_idx < self.tab_bar.count():
-            self.tab_bar.setCurrentIndex(active_idx)
+            if win is self and initial_is_blank and self.tab_bar.count() > 1:
+                self.close_tab(0, save_to_recent=False)
+                active_idx = max(0, active_idx - 1)
+            if 0 <= active_idx < win.tab_bar.count():
+                win.tab_bar.setCurrentIndex(active_idx)
+            if win is not self:
+                win.show()
 
         self.status_bar.showMessage(tr("status_session_restored", count=restored), 4000)
         return restored
@@ -1240,6 +1347,7 @@ class MainWindow(QMainWindow):
             self.tab_stack.removeWidget(widget)
             self.tab_stack.insertWidget(to_idx, widget)
             self.tab_stack.setCurrentIndex(to_idx)
+        self._schedule_session_save()
 
     def _update_tab_title(self, tab: BrowserTab, title: str) -> None:
         idx = self.tab_stack.indexOf(tab)
@@ -1251,6 +1359,7 @@ class MainWindow(QMainWindow):
 
     def _update_tab_url(self, tab: BrowserTab, url: str) -> None:
         self._apply_site_zoom(tab)
+        self._schedule_session_save()
         if tab == self.current_tab():
             self.address_bar.setText("" if url.startswith("surf://newtab") else url)
             self._update_bookmark_icon(url)
@@ -1848,14 +1957,20 @@ class MainWindow(QMainWindow):
         """При закрытии окна сохраняем вкладки. В приватном окне (или если так настроено) чистим кэш и cookies."""
         if self in MainWindow._open_windows:
             MainWindow._open_windows.remove(self)
+        # Профилем могут пользоваться и другие окна: чистим его, только когда закрывается последнее
+        profile_in_use = any(w.profile is self.profile for w in MainWindow._open_windows)
+        clear_on_exit = self.db.get_setting("privacy_clear_on_exit", "0") == "1"
 
-        if not self.is_private and self.db.get_setting("privacy_clear_on_exit", "0") != "1":
-            self._save_current_session()
+        if not self.is_private and not clear_on_exit:
+            # Если закрыли одно из нескольких окон, его вкладки из сеанса уходят, как в Firefox
+            MainWindow._save_all_windows(extra=None if profile_in_use else self)
 
-        if self.is_private:
+        if profile_in_use:
+            pass
+        elif self.is_private:
             self.profile.clearHttpCache()
             self.profile.cookieStore().deleteAllCookies()
-        elif self.db.get_setting("privacy_clear_on_exit", "0") == "1":
+        elif clear_on_exit:
             self.profile.clearHttpCache()
             self.profile.cookieStore().deleteAllCookies()
             self.db.clear_history("all")
@@ -1883,7 +1998,7 @@ def main():
     app.setApplicationName("surf")
     app.setOrganizationName("surf-browser")
 
-    window = MainWindow()
+    window = MainWindow(restore_session=True)
     window.show()
     sys.exit(app.exec())
 
